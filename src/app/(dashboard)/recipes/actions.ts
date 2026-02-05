@@ -16,6 +16,7 @@ import {
   parsePrepGroupsFromText,
   parseTags,
 } from "@/lib/recipe-utils";
+import { buildOcrRecipePayload } from "@/lib/ocr";
 
 const toOptionalInt = (value: FormDataEntryValue | null) => {
   if (value === null) {
@@ -364,6 +365,40 @@ export async function createRecipe(formData: FormData) {
   revalidatePath("/recipes");
   revalidatePath("/planner");
   redirect("/recipes");
+}
+
+export async function createRecipeFromOcr(formData: FormData) {
+  const ocrText = toOptionalString(formData.get("ocrText"));
+  if (!ocrText) {
+    return;
+  }
+
+  const title = toOptionalString(formData.get("title"));
+  const payload = buildOcrRecipePayload(ocrText);
+
+  const householdId = await getDefaultHouseholdId();
+
+  const recipe = await prisma.recipe.create({
+    data: {
+      householdId,
+      title: title ?? payload.title,
+      description: null,
+      imageUrl: null,
+      sourceUrl: null,
+      servings: payload.servings,
+      prepTime: payload.prepTime,
+      cookTime: payload.cookTime,
+      tags: [],
+      ingredients: payload.ingredients,
+      instructions: payload.instructions,
+      notes: payload.notes,
+      prepGroups: payload.prepGroups,
+    },
+  });
+
+  revalidatePath("/recipes");
+  revalidatePath("/planner");
+  redirect(`/recipes/${recipe.id}`);
 }
 
 export async function updateRecipe(formData: FormData) {

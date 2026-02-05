@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import RecipeCard from "@/components/recipes/RecipeCard";
 import RecipeForm from "@/components/recipes/RecipeForm";
+import OcrImportCard from "@/components/recipes/OcrImportCard";
 import { listRecipes } from "@/lib/recipes";
 
 import { createRecipe, importRecipeFromUrl } from "./actions";
@@ -23,7 +24,7 @@ export default async function RecipesPage() {
                 </Link>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
+            <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr_1.4fr]">
                 <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="mb-6">
                         <h2 className="text-xl font-bold text-slate-900">Import from URL</h2>
@@ -47,6 +48,8 @@ export default async function RecipesPage() {
                         </button>
                     </form>
                 </section>
+
+                <OcrImportCard />
 
                 <section id="add-recipe" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="mb-6">

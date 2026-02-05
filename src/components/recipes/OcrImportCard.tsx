@@ -1,0 +1,170 @@
+"use client";
+
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { createRecipeFromOcr } from "@/app/(dashboard)/recipes/actions";
+
+const loadTesseract = async () => {
+  const module = await import("tesseract.js");
+  return module;
+};
+
+type ProgressState = {
+  status: string;
+  progress: number;
+};
+
+export default function OcrImportCard() {
+  const [file, setFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [ocrText, setOcrText] = useState("");
+  const [title, setTitle] = useState("");
+  const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const canRun = Boolean(file);
+
+  const previewUrl = useMemo(() => {
+    if (!file) {
+      return null;
+    }
+    return URL.createObjectURL(file);
+  }, [file]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextFile = event.target.files?.[0] ?? null;
+    setFile(nextFile);
+    setOcrText("");
+    setTitle("");
+    setError(null);
+    setProgress(null);
+    if (nextFile) {
+      setImageUrl(nextFile.name);
+    }
+  };
+
+  const handleRunOcr = async () => {
+    if (!file) {
+      return;
+    }
+
+    setError(null);
+    setProgress({ status: "loading", progress: 0 });
+
+    try {
+      const tesseract = await loadTesseract();
+      const result = await tesseract.recognize(file, "eng", {
+        logger: (message: { status: string; progress: number }) => {
+          setProgress({ status: message.status, progress: message.progress });
+        },
+      });
+      setOcrText(result.data.text?.trim() ?? "");
+      setProgress({ status: "complete", progress: 1 });
+    } catch (err) {
+      setError("OCR failed. Please try a clearer image.");
+      setProgress(null);
+    }
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+
+    startTransition(async () => {
+      await createRecipeFromOcr(formData);
+    });
+  };
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-slate-900">OCR Import</h2>
+        <p className="text-sm text-slate-500">
+          Upload a cookbook photo and let OCR extract the text. Review and save your recipe.
+        </p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="w-full text-sm text-slate-500"
+            />
+            <p className="mt-2">Upload a clear, well-lit photo.</p>
+          </div>
+
+          {previewUrl ? (
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={previewUrl} alt="OCR preview" className="h-56 w-full object-cover" />
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleRunOcr}
+            disabled={!canRun}
+            className="w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
+          >
+            {progress?.status === "complete" ? "Re-run OCR" : "Run OCR"}
+          </button>
+
+          {progress ? (
+            <div className="text-xs text-slate-500">
+              {progress.status} {Math.round(progress.progress * 100)}%
+            </div>
+          ) : null}
+
+          {error ? <div className="text-xs text-rose-500">{error}</div> : null}
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input type="hidden" name="ocrText" value={ocrText} />
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700" htmlFor="ocr-title">
+              Recipe Title
+            </label>
+            <input
+              id="ocr-title"
+              name="title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Optional override"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Extracted Text</label>
+            <textarea
+              value={ocrText}
+              onChange={(event) => setOcrText(event.target.value)}
+              rows={10}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+              placeholder="OCR output will appear here. You can edit before saving."
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isPending || ocrText.length === 0}
+            className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
+          >
+            {isPending ? "Saving..." : "Create Recipe"}
+          </button>
+          {imageUrl ? (
+            <p className="text-xs text-slate-400">Source: {imageUrl}</p>
+          ) : null}
+        </form>
+      </div>
+    </section>
+  );
+}

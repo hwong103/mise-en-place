@@ -13,32 +13,33 @@ model Household {
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  members   HouseholdMember[]
-  recipes   Recipe[]
-  mealPlans MealPlan[]
+
+  members           HouseholdMember[]
+  recipes           Recipe[]
+  mealPlans         MealPlan[]
+  shoppingListItems ShoppingListItem[]
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  avatarUrl    String?
-  createdAt    DateTime @default(now())
-  
-  households   HouseholdMember[]
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  households HouseholdMember[]
 }
 
 model HouseholdMember {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   userId      String
   householdId String
-  role        Role      @default(MEMBER)
-  joinedAt    DateTime  @default(now())
-  
-  user        User      @relation(fields: [userId], references: [id])
-  household   Household @relation(fields: [householdId], references: [id])
-  
+  role        Role     @default(MEMBER)
+  joinedAt    DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  household Household @relation(fields: [householdId], references: [id])
+
   @@unique([userId, householdId])
 }
 
@@ -50,18 +51,18 @@ model Recipe {
   imageUrl     String?
   sourceUrl    String?
   servings     Int?
-  prepTime     Int?     // minutes
-  cookTime     Int?     // minutes
-  ingredients  Json     // Structured ingredient list
-  instructions Json     // Step-by-step instructions
-  notes        Json?    // Notes or tips
-  prepGroups   Json     // "Mise" section - prep groupings
+  prepTime     Int? // minutes
+  cookTime     Int? // minutes
+  ingredients  Json // Structured ingredient list
+  instructions Json // Step-by-step instructions
+  notes        Json? // Notes or tips
+  prepGroups   Json // "Mise" section - prep groupings
   tags         String[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
-  household    Household  @relation(fields: [householdId], references: [id])
-  mealPlans    MealPlan[]
+
+  household Household  @relation(fields: [householdId], references: [id])
+  mealPlans MealPlan[]
 }
 
 model MealPlan {
@@ -71,11 +72,29 @@ model MealPlan {
   date        DateTime @db.Date
   mealType    MealType @default(DINNER)
   servings    Int      @default(2)
-  
-  household   Household @relation(fields: [householdId], references: [id])
-  recipe      Recipe    @relation(fields: [recipeId], references: [id])
-  
+
+  household Household @relation(fields: [householdId], references: [id])
+  recipe    Recipe    @relation(fields: [recipeId], references: [id])
+
   @@unique([householdId, date, mealType])
+}
+
+model ShoppingListItem {
+  id             String   @id @default(cuid())
+  householdId    String
+  weekStart      DateTime @db.Date
+  line           String
+  lineNormalized String
+  category       String
+  manual         Boolean  @default(false)
+  checked        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id])
+
+  @@unique([householdId, weekStart, lineNormalized, category, manual])
+  @@index([householdId, weekStart])
 }
 
 enum Role {
