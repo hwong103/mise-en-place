@@ -23,9 +23,10 @@ const formatMinutes = (value?: number | null) =>
 export default async function RecipeDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const recipe = await getRecipeById(params.id);
+  const { id } = await params;
+  const recipe = await getRecipeById(id);
 
   if (!recipe) {
     notFound();
