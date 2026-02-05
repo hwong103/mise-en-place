@@ -60,6 +60,7 @@ export default async function RecipeDetailPage({
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
             {recipe.title}
           </h1>
+          <p className="text-xs text-slate-400">ID: {recipe.id}</p>
           {recipe.description ? (
             <p className="max-w-2xl text-slate-500">{recipe.description}</p>
           ) : null}
