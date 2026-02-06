@@ -1,3 +1,5 @@
+"use client";
+
 import type { Recipe } from "@prisma/client";
 
 export type RecipeFormValues = {

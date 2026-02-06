@@ -13,14 +13,16 @@ export const MEAL_TYPES = [
 type AddToPlannerDialogProps = {
     recipeId: string;
     recipeTitle: string;
+    defaultDate?: string;
 };
 
-export default function AddToPlannerDialog({ recipeId, recipeTitle }: AddToPlannerDialogProps) {
+export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate }: AddToPlannerDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isPending, setIsPending] = useState(false);
 
     // Default to today
     const today = new Date().toISOString().split("T")[0];
+    const dateValue = defaultDate ?? today;
 
     async function clientAction(formData: FormData) {
         setIsPending(true);
@@ -56,7 +58,7 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle }: AddToPlann
                         <input
                             type="date"
                             name="date"
-                            defaultValue={today}
+                            defaultValue={dateValue}
                             required
                             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
                         />

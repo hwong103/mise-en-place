@@ -20,6 +20,23 @@ export const dynamicParams = true;
 const formatMinutes = (value?: number | null) =>
   value ? `${value} min` : null;
 
+const getAuthorLabel = (sourceUrl?: string | null) => {
+  if (!sourceUrl) {
+    return null;
+  }
+
+  try {
+    const hostname = new URL(sourceUrl).hostname.replace(/^www\./, "");
+    const parts = hostname.split(".").filter(Boolean);
+    if (parts.length >= 2) {
+      return parts[parts.length - 2];
+    }
+    return hostname;
+  } catch {
+    return null;
+  }
+};
+
 export default async function RecipeDetailPage({
   params,
 }: {
@@ -37,6 +54,7 @@ export default async function RecipeDetailPage({
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
   const prepGroupsText = serializePrepGroupsToText(prepGroups);
+  const authorLabel = getAuthorLabel(recipe.sourceUrl);
   const initialValues = {
     title: recipe.title,
     description: recipe.description ?? undefined,
@@ -61,19 +79,12 @@ export default async function RecipeDetailPage({
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
             {recipe.title}
           </h1>
-          <p className="text-xs text-slate-400">ID: {recipe.id}</p>
           {recipe.description ? (
             <p className="max-w-2xl text-slate-500">{recipe.description}</p>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-3">
           <AddToPlannerDialog recipeId={recipe.id} recipeTitle={recipe.title} />
-          <a
-            href="#edit-recipe"
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            Edit Details
-          </a>
           <form action={deleteRecipe}>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <button
@@ -112,7 +123,7 @@ export default async function RecipeDetailPage({
                   rel="noreferrer"
                   className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600"
                 >
-                  Source
+                  {authorLabel ? `By ${authorLabel}` : "Source"}
                 </a>
               ) : null}
             </div>
@@ -150,22 +161,30 @@ export default async function RecipeDetailPage({
                   ))}
                 </ul>
               )}
-              <form action={updateRecipeSection} className="mt-6 space-y-3">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="ingredients" />
-                <textarea
-                  name="ingredients"
-                  rows={6}
-                  defaultValue={ingredients.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
-                >
-                  Save Ingredients
-                </button>
-              </form>
+              <details className="mt-6">
+                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  Edit Ingredients
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
+                  </svg>
+                </summary>
+                <form action={updateRecipeSection} className="mt-4 space-y-3">
+                  <input type="hidden" name="recipeId" value={recipe.id} />
+                  <input type="hidden" name="section" value="ingredients" />
+                  <textarea
+                    name="ingredients"
+                    rows={6}
+                    defaultValue={ingredients.join("\n")}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                  >
+                    Save Ingredients
+                  </button>
+                </form>
+              </details>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -188,22 +207,30 @@ export default async function RecipeDetailPage({
                   ))}
                 </ol>
               )}
-              <form action={updateRecipeSection} className="mt-6 space-y-3">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="instructions" />
-                <textarea
-                  name="instructions"
-                  rows={6}
-                  defaultValue={instructions.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
-                >
-                  Save Instructions
-                </button>
-              </form>
+              <details className="mt-6">
+                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  Edit Instructions
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
+                  </svg>
+                </summary>
+                <form action={updateRecipeSection} className="mt-4 space-y-3">
+                  <input type="hidden" name="recipeId" value={recipe.id} />
+                  <input type="hidden" name="section" value="instructions" />
+                  <textarea
+                    name="instructions"
+                    rows={6}
+                    defaultValue={instructions.join("\n")}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                  >
+                    Save Instructions
+                  </button>
+                </form>
+              </details>
             </section>
           </div>
 
@@ -220,22 +247,30 @@ export default async function RecipeDetailPage({
                 ))}
               </ul>
             )}
-            <form action={updateRecipeSection} className="mt-6 space-y-3">
-              <input type="hidden" name="recipeId" value={recipe.id} />
-              <input type="hidden" name="section" value="notes" />
-              <textarea
-                name="notes"
-                rows={4}
-                defaultValue={notes.join("\n")}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
-              >
-                Save Notes
-              </button>
-            </form>
+            <details className="mt-6">
+              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                Edit Notes
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
+                </svg>
+              </summary>
+              <form action={updateRecipeSection} className="mt-4 space-y-3">
+                <input type="hidden" name="recipeId" value={recipe.id} />
+                <input type="hidden" name="section" value="notes" />
+                <textarea
+                  name="notes"
+                  rows={4}
+                  defaultValue={notes.join("\n")}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                >
+                  Save Notes
+                </button>
+              </form>
+            </details>
           </section>
         </section>
 
@@ -276,40 +311,57 @@ export default async function RecipeDetailPage({
               </div>
             )}
 
-            <form action={updateRecipeSection} className="mt-6 space-y-3">
-              <input type="hidden" name="recipeId" value={recipe.id} />
-              <input type="hidden" name="section" value="prepGroups" />
-              <textarea
-                name="prepGroups"
-                rows={8}
-                defaultValue={prepGroupsText}
-                placeholder="Prep\n- mince garlic\n- chop onions"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
-              >
-                Save Prep Groups
-              </button>
-            </form>
+            <details className="mt-6">
+              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                Edit Prep Groups
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
+                </svg>
+              </summary>
+              <form action={updateRecipeSection} className="mt-4 space-y-3">
+                <input type="hidden" name="recipeId" value={recipe.id} />
+                <input type="hidden" name="section" value="prepGroups" />
+                <textarea
+                  name="prepGroups"
+                  rows={8}
+                  defaultValue={prepGroupsText}
+                  placeholder="Prep\n- mince garlic\n- chop onions"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                >
+                  Save Prep Groups
+                </button>
+              </form>
+            </details>
           </section>
         </aside>
       </div>
 
       <section id="edit-recipe" className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-slate-900">Edit Recipe Details</h2>
-          <p className="text-sm text-slate-500">
-            Update the core recipe metadata, timings, and full ingredient list.
-          </p>
-        </div>
-        <RecipeForm
-          action={updateRecipe}
-          initialValues={initialValues}
-          recipeId={recipe.id}
-          submitLabel="Save Recipe"
-        />
+        <details>
+          <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+            <span>Edit Recipe Details</span>
+            <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
+            </svg>
+          </summary>
+          <div className="mt-6">
+            <p className="text-sm text-slate-500">
+              Update the core recipe metadata, timings, and full ingredient list.
+            </p>
+            <div className="mt-6">
+              <RecipeForm
+                action={updateRecipe}
+                initialValues={initialValues}
+                recipeId={recipe.id}
+                submitLabel="Save Recipe"
+              />
+            </div>
+          </div>
+        </details>
       </section>
     </div>
   );

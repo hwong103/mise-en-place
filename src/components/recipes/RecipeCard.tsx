@@ -1,7 +1,9 @@
-import Link from "next/link";
-import type { Recipe } from "@prisma/client";
+"use client";
 
-import { coerceStringArray } from "@/lib/recipe-utils";
+import { useMemo } from "react";
+import Link from "next/link";
+import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
+import { getWeekRange } from "@/lib/date";
 
 const formatMinutes = (value?: number | null) => {
   if (!value) {
@@ -11,30 +13,45 @@ const formatMinutes = (value?: number | null) => {
   return `${value} min`;
 };
 
+export type RecipeSummary = {
+  id: string;
+  title: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  tags?: string[];
+  servings?: number | null;
+  prepTime?: number | null;
+  cookTime?: number | null;
+  ingredientCount: number;
+};
+
 type RecipeCardProps = {
-  recipe: Recipe;
+  recipe: RecipeSummary;
 };
 
 export default function RecipeCard({ recipe }: RecipeCardProps) {
   const tags = recipe.tags ?? [];
-  const ingredients = coerceStringArray(recipe.ingredients);
+  const ingredientCount = recipe.ingredientCount;
+  const nextWeekDate = useMemo(() => {
+    const { start } = getWeekRange(new Date(), 1);
+    const nextWeek = new Date(start);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return nextWeek.toISOString().split("T")[0];
+  }, []);
 
   return (
-    <Link
-      href={`/recipes/${recipe.id}`}
-      className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:border-indigo-300 hover:shadow-lg"
-    >
+    <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:border-indigo-300 hover:shadow-lg">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600">
+          <Link
+            href={`/recipes/${recipe.id}`}
+            className="text-lg font-bold text-slate-900 transition-colors hover:text-indigo-600"
+          >
             {recipe.title}
-          </h3>
-          {recipe.description ? (
-            <p className="mt-1 text-sm text-slate-500">{recipe.description}</p>
-          ) : null}
+          </Link>
         </div>
         {recipe.imageUrl ? (
-          <div className="h-14 w-14 overflow-hidden rounded-2xl bg-slate-100">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
           </div>
@@ -72,11 +89,25 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         </div>
       ) : null}
 
-      {ingredients.length > 0 ? (
+      {ingredientCount > 0 ? (
         <div className="mt-4 text-xs text-slate-400">
-          {ingredients.length} ingredient{ingredients.length === 1 ? "" : "s"}
+          {ingredientCount} ingredient{ingredientCount === 1 ? "" : "s"}
         </div>
       ) : null}
-    </Link>
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <AddToPlannerDialog
+          recipeId={recipe.id}
+          recipeTitle={recipe.title}
+          defaultDate={nextWeekDate}
+        />
+        <Link
+          href={`/recipes/${recipe.id}`}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+        >
+          View Recipe
+        </Link>
+      </div>
+    </div>
   );
 }
