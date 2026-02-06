@@ -32,14 +32,17 @@ const getVideoEmbedUrl = (videoUrl?: string | null) => {
       return id ? `https://www.youtube.com/embed/${id}` : null;
     }
 
-    if (hostname.endsWith("youtube.com")) {
+    if (hostname.endsWith("youtube.com") || hostname.endsWith("youtube-nocookie.com")) {
       if (url.pathname === "/watch") {
         const id = url.searchParams.get("v");
         return id ? `https://www.youtube.com/embed/${id}` : null;
       }
       if (url.pathname.startsWith("/embed/") || url.pathname.startsWith("/shorts/")) {
         const id = url.pathname.split("/")[2];
-        return id ? `https://www.youtube.com/embed/${id}` : null;
+        const embedHost = hostname.endsWith("youtube-nocookie.com")
+          ? "https://www.youtube-nocookie.com/embed/"
+          : "https://www.youtube.com/embed/";
+        return id ? `${embedHost}${id}` : null;
       }
     }
 

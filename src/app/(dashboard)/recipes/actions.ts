@@ -59,17 +59,23 @@ const toOptionalUrl = (value: FormDataEntryValue | null) => {
   }
 };
 
+const normalizeUrlCandidate = (value: string) =>
+  decodeHtml(value)
+    .trim()
+    .replace(/^[("'`\\[]+/, "")
+    .replace(/[)"'`\\]>.,;]+$/, "");
+
 const toOptionalUrlString = (value: unknown) => {
   if (typeof value !== "string") {
     return undefined;
   }
-  const trimmed = value.trim();
-  if (!trimmed) {
+  const normalized = normalizeUrlCandidate(value);
+  if (!normalized) {
     return undefined;
   }
   try {
-    new URL(trimmed);
-    return trimmed;
+    new URL(normalized);
+    return normalized;
   } catch {
     return undefined;
   }
@@ -253,21 +259,22 @@ const extractVideoFromHtml = (html: string) => {
     return metaUrl;
   }
 
-  const iframeRegex = /<iframe[^>]+src=["']([^"']+)["'][^>]*>/gi;
-  let iframeMatch = iframeRegex.exec(html);
+  const iframeAttrRegex =
+    /<(?:iframe|video)[^>]+(?:data-cmp-src|data-src|data-lazy-src|data-yt-src|src)=["']([^"']+)["'][^>]*>/gi;
+  let iframeMatch = iframeAttrRegex.exec(html);
   while (iframeMatch) {
-    const src = iframeMatch[1];
-    if (/youtube\.com|youtu\.be|vimeo\.com/i.test(src)) {
-      const iframeUrl = toOptionalUrlString(src);
+    const raw = iframeMatch[1];
+    if (/youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com/i.test(raw)) {
+      const iframeUrl = toOptionalUrlString(raw);
       if (iframeUrl) {
         return iframeUrl;
       }
     }
-    iframeMatch = iframeRegex.exec(html);
+    iframeMatch = iframeAttrRegex.exec(html);
   }
 
   const linkMatch = html.match(
-    /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|vimeo\.com\/)\S+)/i
+    /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube-nocookie\.com\/embed\/|vimeo\.com\/)\S+)/i
   );
   if (linkMatch?.[1]) {
     return toOptionalUrlString(linkMatch[1]);
@@ -290,7 +297,7 @@ const normalizeVideoUrl = (value: string | undefined) => {
       return id ? `https://youtu.be/${id}` : value;
     }
 
-    if (hostname.endsWith("youtube.com")) {
+    if (hostname.endsWith("youtube.com") || hostname.endsWith("youtube-nocookie.com")) {
       if (url.pathname === "/watch") {
         const id = url.searchParams.get("v");
         return id ? `https://youtu.be/${id}` : value;
