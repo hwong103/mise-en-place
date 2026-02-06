@@ -1004,7 +1004,7 @@ export async function importRecipeFromUrl(formData: FormData) {
       groupedIngredients.ingredients.length > 0
   );
   const cleanedIngredients = hasGroupedIngredients
-    ? { lines: groupedIngredients.ingredients, notes: groupedIngredients.notes }
+    ? { lines: groupedIngredients!.ingredients, notes: groupedIngredients!.notes }
     : cleanIngredientLines(scrapedRecipe?.ingredients ?? []);
   const cleanedInstructions = cleanInstructionLines(scrapedRecipe?.instructions ?? []);
   const htmlNotes = extractNotesFromHtml(html);
