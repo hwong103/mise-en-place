@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createRecipeFromOcr } from "@/app/(dashboard)/recipes/actions";
+import { cleanOcrText } from "@/lib/ocr";
 
 const loadTesseract = async () => {
   const module = await import("tesseract.js");
@@ -126,7 +127,8 @@ export default function OcrImportCard() {
           setProgress({ status: message.status, progress: message.progress });
         },
       });
-      setOcrText(result.data.text?.trim() ?? "");
+      const rawText = result.data.text?.trim() ?? "";
+      setOcrText(cleanOcrText(rawText));
       setProgress({ status: "complete", progress: 1 });
       setToast({ type: "success", message: "Import complete. Review the text before saving." });
     } catch (err) {
