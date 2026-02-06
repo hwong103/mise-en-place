@@ -11,6 +11,20 @@ const HTML_ENTITY_MAP: Record<string, string> = {
   "&lt;": "<",
   "&gt;": ">",
   "&nbsp;": " ",
+  "&ndash;": "-",
+  "&mdash;": "-",
+};
+
+const FRACTION_CHAR_MAP: Record<string, string> = {
+  "\u00BC": "1/4",
+  "\u00BD": "1/2",
+  "\u00BE": "3/4",
+  "\u2153": "1/3",
+  "\u2154": "2/3",
+  "\u215B": "1/8",
+  "\u215C": "3/8",
+  "\u215D": "5/8",
+  "\u215E": "7/8",
 };
 
 const NOTE_PATTERN = /\(+\s*note[^)]*\)+/gi;
@@ -113,8 +127,31 @@ const UNIT_WORDS = new Set([
   "inches",
 ]);
 
-const decodeHtmlEntities = (value: string) =>
-  value.replace(/&(?:amp|quot|#39|#x27|lt|gt|nbsp);/g, (match) => HTML_ENTITY_MAP[match] ?? match);
+const decodeHtmlEntities = (value: string) => {
+  const namedDecoded = value.replace(
+    /&(?:amp|quot|#39|#x27|lt|gt|nbsp|ndash|mdash);/g,
+    (match) => HTML_ENTITY_MAP[match] ?? match
+  );
+  const decimalDecoded = namedDecoded.replace(/&#(\d+);/g, (_, code) => {
+    const parsed = Number.parseInt(code, 10);
+    if (!Number.isFinite(parsed)) {
+      return "";
+    }
+    return String.fromCharCode(parsed);
+  });
+  const hexDecoded = decimalDecoded.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
+    const parsed = Number.parseInt(code, 16);
+    if (!Number.isFinite(parsed)) {
+      return "";
+    }
+    return String.fromCharCode(parsed);
+  });
+
+  return hexDecoded.replace(
+    /[\u00BC\u00BD\u00BE\u2153\u2154\u215B\u215C\u215D\u215E]/g,
+    (match) => FRACTION_CHAR_MAP[match] ?? match
+  );
+};
 
 const normalizeWhitespace = (value: string) =>
   value.replace(MULTI_SPACE_PATTERN, " ").trim();
@@ -152,6 +189,7 @@ const balanceParentheses = (value: string) => {
 
 const cleanLineBase = (line: string) => {
   const cleaned = decodeHtmlEntities(line)
+    .replace(/^\s*(?:[•·▪◦□☐☑■]|\-|\*)\s+/g, "")
     .replace(PAREN_COMMA_PATTERN, "(")
     .replace(EMPTY_PAREN_PATTERN, "")
     .replace(SPACE_BEFORE_PAREN_CLOSE, ")")

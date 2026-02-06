@@ -6,6 +6,7 @@ import RecipeForm from "@/components/recipes/RecipeForm";
 import SubmitButton from "@/components/forms/SubmitButton";
 import { getRecipeById } from "@/lib/recipes";
 import {
+  cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
   serializePrepGroupsToText,
@@ -76,6 +77,20 @@ const getAuthorLabel = (sourceUrl?: string | null) => {
   }
 };
 
+const isIngredientGroupTitle = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (/(^|\b)(prep|preparation)\b/.test(normalized)) {
+    return false;
+  }
+  if (/^step\s+\d+/.test(normalized)) {
+    return false;
+  }
+  return true;
+};
+
 export default async function RecipeDetailPage({
   params,
   searchParams,
@@ -90,11 +105,40 @@ export default async function RecipeDetailPage({
     notFound();
   }
 
-  const ingredients = coerceStringArray(recipe.ingredients);
+  const ingredients = coerceStringArray(recipe.ingredients)
+    .map((line) => cleanIngredientLine(line).line)
+    .filter(Boolean);
   const instructions = coerceStringArray(recipe.instructions);
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
   const prepGroupsText = serializePrepGroupsToText(prepGroups);
+  const ingredientGroups = (() => {
+    if (!prepGroups.length) {
+      return [];
+    }
+    const candidates = prepGroups.filter((group) => isIngredientGroupTitle(group.title));
+    if (!candidates.length) {
+      return [];
+    }
+    const ingredientSet = new Set(ingredients);
+    const groupedItems = new Set<string>();
+    const filtered = candidates
+      .map((group) => ({
+        title: group.title,
+        items: group.items
+          .map((item) => cleanIngredientLine(item).line)
+          .filter(Boolean)
+          .filter((item) => ingredientSet.has(item)),
+      }))
+      .filter((group) => group.items.length > 0);
+
+    filtered.forEach((group) => group.items.forEach((item) => groupedItems.add(item)));
+    const remaining = ingredients.filter((item) => !groupedItems.has(item));
+    if (remaining.length > 0) {
+      filtered.push({ title: "Other Ingredients", items: remaining });
+    }
+    return filtered;
+  })();
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
   const editParam = Array.isArray(searchParams?.edit)
     ? searchParams?.edit[0]
@@ -239,6 +283,24 @@ export default async function RecipeDetailPage({
                 <p className="mt-4 text-sm text-slate-500">
                   No ingredients listed yet.
                 </p>
+              ) : ingredientGroups.length > 0 ? (
+                <div className="mt-4 space-y-5">
+                  {ingredientGroups.map((group) => (
+                    <div key={group.title}>
+                      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                        {group.title}
+                      </h3>
+                      <ul className="mt-2 space-y-2 text-sm text-slate-700">
+                        {group.items.map((item) => (
+                          <li key={`${group.title}-${item}`} className="flex items-start gap-2">
+                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <ul className="mt-4 space-y-2 text-sm text-slate-700">
                   {ingredients.map((item) => (
