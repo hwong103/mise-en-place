@@ -47,8 +47,9 @@ const getVideoEmbedUrl = (videoUrl?: string | null) => {
       }
     }
 
-    if (hostname === "vimeo.com" || hostname.endsWith(".vimeo.com")) {
-      const id = url.pathname.split("/").filter(Boolean)[0];
+    if (hostname === "vimeo.com" || hostname === "player.vimeo.com" || hostname.endsWith(".vimeo.com")) {
+      const idMatch = url.pathname.match(/(\d+)/);
+      const id = idMatch ? idMatch[1] : null;
       return id ? `https://player.vimeo.com/video/${id}` : null;
     }
   } catch {

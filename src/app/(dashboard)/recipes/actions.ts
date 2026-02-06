@@ -65,6 +65,27 @@ const normalizeUrlCandidate = (value: string) =>
     .replace(/^[("'`\\[]+/, "")
     .replace(/[)"'`\\]>.,;]+$/, "");
 
+const getVideoKind = (value: string | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.replace(/^www\./, "");
+    if (hostname === "youtu.be" || hostname.endsWith("youtube.com") || hostname.endsWith("youtube-nocookie.com")) {
+      return "youtube";
+    }
+    if (hostname === "vimeo.com" || hostname === "player.vimeo.com" || hostname.endsWith(".vimeo.com")) {
+      return "vimeo";
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
 const normalizeSourceUrl = (value: string | undefined) => {
   if (!value) {
     return undefined;
@@ -314,9 +335,10 @@ const extractVideoFromHtml = (html: string) => {
     extractMeta(html, "og:video:url", "property") ||
     extractMeta(html, "og:video", "property") ||
     extractMeta(html, "twitter:player", "name");
+  const candidates: string[] = [];
   const metaUrl = toOptionalUrlString(metaCandidate ?? "");
   if (metaUrl) {
-    return metaUrl;
+    candidates.push(metaUrl);
   }
 
   const iframeAttrRegex =
@@ -327,7 +349,7 @@ const extractVideoFromHtml = (html: string) => {
     if (/youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com/i.test(raw)) {
       const iframeUrl = toOptionalUrlString(raw);
       if (iframeUrl) {
-        return iframeUrl;
+        candidates.push(iframeUrl);
       }
     }
     iframeMatch = iframeAttrRegex.exec(html);
@@ -337,10 +359,27 @@ const extractVideoFromHtml = (html: string) => {
     /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube-nocookie\.com\/embed\/|vimeo\.com\/)\S+)/i
   );
   if (linkMatch?.[1]) {
-    return toOptionalUrlString(linkMatch[1]);
+    const linkUrl = toOptionalUrlString(linkMatch[1]);
+    if (linkUrl) {
+      candidates.push(linkUrl);
+    }
   }
 
-  return undefined;
+  const normalizedCandidates = candidates
+    .map((candidate) => normalizeVideoUrl(candidate))
+    .filter((candidate): candidate is string => Boolean(candidate));
+
+  const youtubeCandidate = normalizedCandidates.find(
+    (candidate) => getVideoKind(candidate) === "youtube"
+  );
+  if (youtubeCandidate) {
+    return youtubeCandidate;
+  }
+
+  const vimeoCandidate = normalizedCandidates.find(
+    (candidate) => getVideoKind(candidate) === "vimeo"
+  );
+  return vimeoCandidate;
 };
 
 const normalizeVideoUrl = (value: string | undefined) => {
@@ -368,8 +407,9 @@ const normalizeVideoUrl = (value: string | undefined) => {
       }
     }
 
-    if (hostname === "vimeo.com" || hostname.endsWith(".vimeo.com")) {
-      const id = url.pathname.split("/").filter(Boolean)[0];
+    if (hostname === "vimeo.com" || hostname === "player.vimeo.com" || hostname.endsWith(".vimeo.com")) {
+      const idMatch = url.pathname.match(/(\d+)/);
+      const id = idMatch ? idMatch[1] : null;
       return id ? `https://vimeo.com/${id}` : value;
     }
   } catch {
@@ -387,12 +427,13 @@ const findRecipeBySourceUrl = async (
     return null;
   }
 
+  const normalized = normalizeSourceUrl(sourceUrl);
   const candidates = buildSourceUrlCandidates(sourceUrl);
-  if (candidates.length === 0) {
+  if (!normalized || candidates.length === 0) {
     return null;
   }
 
-  return prisma.recipe.findFirst({
+  const matches = await prisma.recipe.findMany({
     where: {
       householdId,
       OR: candidates.map((candidate) => ({
@@ -401,8 +442,13 @@ const findRecipeBySourceUrl = async (
         },
       })),
     },
-    select: { id: true },
+    select: { id: true, sourceUrl: true },
   });
+  return (
+    matches.find(
+      (match) => normalizeSourceUrl(match.sourceUrl ?? "") === normalized
+    ) ?? null
+  );
 };
 
 const cleanDescription = (value: string | undefined) => {
@@ -776,9 +822,6 @@ export async function importRecipeFromUrl(formData: FormData) {
 
   const householdId = await getDefaultHouseholdId();
   const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
-  if (existingRecipe) {
-    redirect(`/recipes/${existingRecipe.id}`);
-  }
 
   let html = "";
 
@@ -794,6 +837,9 @@ export async function importRecipeFromUrl(formData: FormData) {
     }
     html = await response.text();
   } catch {
+    if (existingRecipe) {
+      redirect(`/recipes/${existingRecipe.id}`);
+    }
     return;
   }
 
@@ -829,9 +875,12 @@ export async function importRecipeFromUrl(formData: FormData) {
     extractMeta(html, "twitter:image", "name") ??
     null
   );
-  const videoUrl = normalizeVideoUrl(
-    scrapedRecipe?.videoUrl ?? extractVideoFromHtml(html)
-  );
+  const rawVideoUrl = scrapedRecipe?.videoUrl ?? extractVideoFromHtml(html);
+  const normalizedVideoUrl = normalizeVideoUrl(rawVideoUrl);
+  const videoUrl =
+    getVideoKind(normalizedVideoUrl) === "youtube"
+      ? normalizedVideoUrl
+      : normalizedVideoUrl ?? undefined;
   const notes = Array.from(
     new Set([
       ...cleanedIngredients.notes,
@@ -842,6 +891,33 @@ export async function importRecipeFromUrl(formData: FormData) {
   ).filter((note) => !/^note\s*\d+$/i.test(note));
 
   const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
+
+  if (existingRecipe) {
+    const existing = await prisma.recipe.findFirst({
+      where: { id: existingRecipe.id, householdId },
+      select: { id: true, videoUrl: true },
+    });
+
+    if (existing) {
+      const existingKind = getVideoKind(existing.videoUrl ?? undefined);
+      const nextKind = getVideoKind(videoUrl ?? undefined);
+      const shouldUpdate =
+        (!existing.videoUrl && videoUrl) ||
+        (existingKind !== "youtube" && nextKind === "youtube") ||
+        (existingKind === null && nextKind !== null);
+
+      if (shouldUpdate && videoUrl) {
+        await prisma.recipe.update({
+          where: { id: existing.id },
+          data: { videoUrl },
+        });
+      }
+    }
+
+    revalidatePath("/recipes");
+    revalidatePath(`/recipes/${existingRecipe.id}`);
+    redirect(`/recipes/${existingRecipe.id}`);
+  }
 
   const recipe = await prisma.recipe.create({
     data: {
