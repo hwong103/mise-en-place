@@ -8,6 +8,7 @@ import { fromDateKey } from "@/lib/date";
 import {
   buildPrepGroups,
   buildPrepGroupsFromInstructions,
+  cleanIngredientLine,
   cleanIngredientLines,
   cleanInstructionLines,
   cleanTextLines,
@@ -15,6 +16,7 @@ import {
   parseLines,
   parsePrepGroupsFromText,
   parseTags,
+  type PrepGroup,
 } from "@/lib/recipe-utils";
 import { buildOcrRecipePayload } from "@/lib/ocr";
 
@@ -173,6 +175,15 @@ const decodeHtml = (value: string) =>
     .replace(/&nbsp;/g, " ");
 
 const normalizeText = (value: string) => decodeHtml(value).replace(/\s+/g, " ").trim();
+
+const stripHtml = (value: string) =>
+  normalizeText(
+    value
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|li|div|tr|h\d)>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "- ")
+      .replace(/<[^>]+>/g, " ")
+  );
 
 const extractMeta = (html: string, key: string, attribute: "name" | "property") => {
   const regex = new RegExp(
@@ -558,6 +569,134 @@ const extractNotesFromHtml = (html: string) => {
   return lines.filter((line) => !/^nutrition\b/i.test(line));
 };
 
+const normalizeIngredientHeading = (value: string) =>
+  normalizeText(value).replace(/:\s*$/, "");
+
+const isLikelyIngredientHeading = (value: string) => {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return false;
+  }
+  if (/\d/.test(normalized)) {
+    return false;
+  }
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return false;
+  }
+  if (/:\s*$/.test(normalized)) {
+    return true;
+  }
+  if (/^(for|to)\b/i.test(normalized)) {
+    return true;
+  }
+  const letters = normalized.replace(/[^A-Za-z]/g, "");
+  const uppercase = letters.replace(/[^A-Z]/g, "").length;
+  const upperRatio = letters.length > 0 ? uppercase / letters.length : 0;
+  if (upperRatio >= 0.8 && words.length >= 2 && letters.length >= 6) {
+    return true;
+  }
+  if (
+    words.length === 1 &&
+    /^(sauce|dressing|marinade|filling|topping|crust|base|glaze|broth|stock|seasoning)$/i.test(normalized)
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const extractIngredientGroupsFromLines = (lines: string[]): PrepGroup[] => {
+  const groups: PrepGroup[] = [];
+  const ungrouped: string[] = [];
+  let current: PrepGroup | null = null;
+
+  for (const line of lines) {
+    const normalized = normalizeText(line).replace(/^[-*]\s*/, "");
+    if (!normalized) {
+      continue;
+    }
+    if (isLikelyIngredientHeading(normalized)) {
+      const title = normalizeIngredientHeading(normalized);
+      current = { title, items: [] };
+      groups.push(current);
+      continue;
+    }
+    if (current) {
+      current.items.push(normalized);
+    } else {
+      ungrouped.push(normalized);
+    }
+  }
+
+  if (groups.length > 0 && ungrouped.length > 0) {
+    groups.push({ title: "Other Ingredients", items: ungrouped });
+  }
+
+  return groups.filter((group) => group.items.length > 0);
+};
+
+const extractWprmIngredientItems = (html: string) => {
+  const items: string[] = [];
+  const itemRegex =
+    /<li[^>]+class=["'][^"']*wprm-recipe-ingredient[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+  let match = itemRegex.exec(html);
+  while (match) {
+    const itemText = stripHtml(match[1]);
+    if (itemText) {
+      items.push(itemText);
+    }
+    match = itemRegex.exec(html);
+  }
+  return items;
+};
+
+const extractIngredientGroupsFromHtml = (html: string): PrepGroup[] => {
+  const groups: PrepGroup[] = [];
+  const groupRegex =
+    /<div[^>]+class=["'][^"']*wprm-recipe-ingredient-group[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
+  let match = groupRegex.exec(html);
+  while (match) {
+    const groupHtml = match[1];
+    const titleMatch = groupHtml.match(
+      /<[^>]+class=["'][^"']*wprm-recipe-group-name[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
+    );
+    const title = titleMatch ? normalizeIngredientHeading(stripHtml(titleMatch[1])) : "";
+    const items = extractWprmIngredientItems(groupHtml);
+    if (title && items.length > 0) {
+      groups.push({ title, items });
+    }
+    match = groupRegex.exec(html);
+  }
+  return groups;
+};
+
+const cleanIngredientGroups = (groups: PrepGroup[]) => {
+  const cleanedGroups: PrepGroup[] = [];
+  const ingredients: string[] = [];
+  const notes: string[] = [];
+
+  for (const group of groups) {
+    const title = normalizeIngredientHeading(group.title);
+    const cleanedItems: string[] = [];
+
+    for (const item of group.items) {
+      const normalizedItem = item.replace(/^[-*]\s*/, "").trim();
+      const result = cleanIngredientLine(normalizedItem);
+      if (result.line) {
+        cleanedItems.push(result.line);
+        ingredients.push(result.line);
+      }
+      notes.push(...result.notes);
+    }
+
+    if (title && cleanedItems.length > 0) {
+      cleanedGroups.push({ title, items: cleanedItems });
+    }
+  }
+
+  return { groups: cleanedGroups, ingredients, notes };
+};
+
 const extractRecipeFromHtml = (html: string) => {
   const blocks = parseJsonLdBlocks(html);
   const recipeNodes: Record<string, unknown>[] = [];
@@ -584,6 +723,7 @@ const extractRecipeFromHtml = (html: string) => {
     (typeof recipe.description === "string" && normalizeText(recipe.description)) || undefined;
   const imageUrl = extractImageUrl(recipe.image);
   const ingredients = extractTextList(recipe.recipeIngredient ?? recipe.ingredients);
+  const ingredientGroups = extractIngredientGroupsFromHtml(html);
   const instructions = extractTextList(recipe.recipeInstructions);
   const tags = typeof recipe.keywords === "string"
     ? parseTags(normalizeText(recipe.keywords))
@@ -599,6 +739,7 @@ const extractRecipeFromHtml = (html: string) => {
     imageUrl,
     videoUrl,
     ingredients,
+    ingredientGroups,
     instructions,
     tags,
     servings,
@@ -849,7 +990,22 @@ export async function importRecipeFromUrl(formData: FormData) {
     extractTitle(html) ||
     new URL(sourceUrl).hostname;
   const scrapedRecipe = extractRecipeFromHtml(html);
-  const cleanedIngredients = cleanIngredientLines(scrapedRecipe?.ingredients ?? []);
+  const ingredientGroupCandidates =
+    scrapedRecipe?.ingredientGroups?.length
+      ? scrapedRecipe.ingredientGroups
+      : extractIngredientGroupsFromLines(scrapedRecipe?.ingredients ?? []);
+  const groupedIngredients =
+    ingredientGroupCandidates.length > 0
+      ? cleanIngredientGroups(ingredientGroupCandidates)
+      : null;
+  const hasGroupedIngredients = Boolean(
+    groupedIngredients &&
+      groupedIngredients.groups.length > 0 &&
+      groupedIngredients.ingredients.length > 0
+  );
+  const cleanedIngredients = hasGroupedIngredients
+    ? { lines: groupedIngredients.ingredients, notes: groupedIngredients.notes }
+    : cleanIngredientLines(scrapedRecipe?.ingredients ?? []);
   const cleanedInstructions = cleanInstructionLines(scrapedRecipe?.instructions ?? []);
   const htmlNotes = extractNotesFromHtml(html);
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
@@ -857,9 +1013,11 @@ export async function importRecipeFromUrl(formData: FormData) {
     cleanedInstructions.lines
   );
   const prepGroups =
-    instructionPrepGroups.length > 0
-      ? instructionPrepGroups
-      : buildPrepGroups(cleanedIngredients.lines);
+    hasGroupedIngredients
+      ? groupedIngredients!.groups
+      : instructionPrepGroups.length > 0
+        ? instructionPrepGroups
+        : buildPrepGroups(cleanedIngredients.lines);
   const rawDescription =
     scrapedRecipe?.description ||
     extractMeta(html, "description", "name") ||
