@@ -87,6 +87,26 @@ const OCR_VERBS = [
   "drain",
 ];
 
+const OCR_KEYWORDS = [
+  "serve",
+  "serves",
+  "yield",
+  "prep",
+  "cook",
+  "bake",
+  "oven",
+  "preheat",
+  "ingredients",
+  "instructions",
+  "directions",
+  "method",
+  "notes",
+  "leftovers",
+  "sauce",
+  "broth",
+  "stock",
+];
+
 const OCR_FRACTION_MAP: Record<string, string> = {
   "\u00BC": "1/4",
   "\u00BD": "1/2",
@@ -130,6 +150,7 @@ const OCR_SHORT_WORDS = new Set([
 
 const UNIT_PATTERN = new RegExp(`\\b(${OCR_UNIT_WORDS.join("|")})\\b`, "i");
 const VERB_PATTERN = new RegExp(`\\b(${OCR_VERBS.join("|")})\\b`, "i");
+const KEYWORD_PATTERN = new RegExp(`\\b(${OCR_KEYWORDS.join("|")})\\b`, "i");
 const META_PATTERN = /\b(serves?|yield|prep|cook|total|time)\b/i;
 const PAGE_PATTERN = /\bpage\s*\d+\b/i;
 
@@ -224,6 +245,17 @@ const normalizeOcrLine = (line: string) => {
 
 const countMatches = (value: string, regex: RegExp) => (value.match(regex) ?? []).length;
 
+const isUppercaseTitle = (cleaned: string) => {
+  const letters = countMatches(cleaned, /[A-Za-z]/g);
+  if (letters < 8) {
+    return false;
+  }
+  const uppercase = countMatches(cleaned, /[A-Z]/g);
+  const upperRatio = letters > 0 ? uppercase / letters : 0;
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  return upperRatio >= 0.8 && tokens.length >= 2;
+};
+
 const analyzeOcrLine = (line: string) => {
   const cleaned = normalizeOcrLine(line);
   if (!cleaned) {
@@ -239,23 +271,35 @@ const analyzeOcrLine = (line: string) => {
   const digits = countMatches(cleaned, /\d/g);
   const symbols = countMatches(cleaned, /[^A-Za-z0-9\s]/g);
   const symbolRatio = totalChars > 0 ? symbols / totalChars : 1;
+  const letterRatio = totalChars > 0 ? letters / totalChars : 0;
   const tokens = cleaned.split(/\s+/).filter(Boolean);
   const shortTokens = tokens.filter((token) => token.length <= 2).length;
   const shortRatio = tokens.length > 0 ? shortTokens / tokens.length : 1;
   const singleCharTokens = tokens.filter((token) => token.length === 1).length;
   const singleCharRatio = tokens.length > 0 ? singleCharTokens / tokens.length : 0;
+  const avgTokenLength =
+    tokens.length > 0
+      ? tokens.reduce((sum, token) => sum + token.length, 0) / tokens.length
+      : 0;
+  const vowelTokens = tokens.filter((token) => /[aeiou]/i.test(token)).length;
+  const vowelRatio = tokens.length > 0 ? vowelTokens / tokens.length : 0;
 
   const lower = cleaned.toLowerCase();
   const hasUnit = UNIT_PATTERN.test(lower);
   const hasVerb = VERB_PATTERN.test(lower);
   const isHeading = Boolean(parseHeading(cleaned));
   const hasMeta = META_PATTERN.test(lower);
+  const hasKeyword = KEYWORD_PATTERN.test(lower);
+  const uppercaseTitle = isUppercaseTitle(cleaned);
 
   let score = 0;
   if (isHeading) {
     score += 3;
   }
   if (hasMeta) {
+    score += 2;
+  }
+  if (hasKeyword) {
     score += 2;
   }
   if (hasUnit) {
@@ -276,6 +320,12 @@ const analyzeOcrLine = (line: string) => {
   if (digits === 0 && tokens.length <= 3 && letters >= 4) {
     score += 1;
   }
+  if (letterRatio > 0.55) {
+    score += 1;
+  }
+  if (vowelRatio >= 0.5) {
+    score += 1;
+  }
 
   if (symbolRatio > 0.35) {
     score -= 2;
@@ -289,13 +339,22 @@ const analyzeOcrLine = (line: string) => {
   if (cleaned.length <= 3 && !hasUnit && !hasMeta) {
     score -= 2;
   }
+  if (letterRatio < 0.35) {
+    score -= 3;
+  }
+  if (avgTokenLength < 3.2 && !hasMeta && !hasUnit && !hasKeyword) {
+    score -= 1;
+  }
+  if (vowelRatio < 0.35 && !hasMeta && !hasUnit && !hasKeyword) {
+    score -= 2;
+  }
 
   const singleWordKeep =
     tokens.length === 1 && letters >= 4 && symbolRatio <= 0.1 && !PAGE_PATTERN.test(cleaned);
 
-  const anchor = score >= 2;
+  const anchor = isHeading || hasMeta || uppercaseTitle || score >= 3;
 
-  if (score >= 2 || singleWordKeep) {
+  if (score >= 2 || singleWordKeep || hasKeyword || isHeading || hasMeta) {
     return { cleaned, keep: true, score, anchor };
   }
   if (score < 1) {
