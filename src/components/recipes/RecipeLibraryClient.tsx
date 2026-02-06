@@ -25,6 +25,7 @@ export default function RecipeLibraryClient({
 }: RecipeLibraryClientProps) {
   const [query, setQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [selected, setSelected] = useState<"url" | "photo" | "manual" | null>(null);
 
   const filtered = useMemo(() => {
     const needle = normalize(query);
@@ -51,50 +52,121 @@ export default function RecipeLibraryClient({
         </div>
         <button
           type="button"
-          onClick={() => setIsAddOpen((prev) => !prev)}
+          onClick={() => {
+            setIsAddOpen(true);
+            setSelected(null);
+          }}
           className="flex items-center space-x-2 rounded-xl bg-indigo-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
         >
-          <span>{isAddOpen ? "Close" : "Add Recipe"}</span>
+          <span>Add Recipe</span>
         </button>
       </div>
 
       {isAddOpen ? (
-        <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr_1.4fr]">
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900">Import from URL</h2>
-              <p className="text-sm text-slate-500">
-                Drop in a recipe link to create a quick placeholder entry.
-              </p>
-            </div>
-            <form action={importAction} className="space-y-4">
-              <input
-                type="url"
-                name="sourceUrl"
-                required
-                placeholder="https://example.com/recipe"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
-              />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-5xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Add a Recipe</h2>
+                <p className="text-sm text-slate-500">Pick how you want to add a recipe.</p>
+              </div>
               <button
-                type="submit"
-                className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-100"
+                type="button"
+                onClick={() => {
+                  setIsAddOpen(false);
+                  setSelected(null);
+                }}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-500"
               >
-                Import Recipe
+                Close
               </button>
-            </form>
-          </section>
-
-          <OcrImportCard />
-
-          <section id="add-recipe" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900">Add a New Recipe</h2>
-              <p className="text-sm text-slate-500">
-                Create a manual entry to get started. OCR and URL tools can come next.
-              </p>
             </div>
-            <RecipeForm action={createAction} submitLabel="Add Recipe" />
-          </section>
+
+            {!selected ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => setSelected("url")}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300"
+                >
+                  <h3 className="text-lg font-bold text-slate-900">Import from URL</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Paste a recipe link and we&apos;ll import it.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected("photo")}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300"
+                >
+                  <h3 className="text-lg font-bold text-slate-900">Take a Photo</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Upload a cookbook photo and extract the text.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected("manual")}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300"
+                >
+                  <h3 className="text-lg font-bold text-slate-900">Manual Entry</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Type the recipe in a structured form.
+                  </p>
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-6">
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="text-sm font-semibold text-indigo-600"
+                >
+                  ← Back to options
+                </button>
+
+                {selected === "url" ? (
+                  <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold text-slate-900">Import from URL</h3>
+                      <p className="text-sm text-slate-500">
+                        Drop in a recipe link to create a quick placeholder entry.
+                      </p>
+                    </div>
+                    <form action={importAction} className="space-y-4">
+                      <input
+                        type="url"
+                        name="sourceUrl"
+                        required
+                        placeholder="https://example.com/recipe"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg"
+                      >
+                        Import Recipe
+                      </button>
+                    </form>
+                  </section>
+                ) : null}
+
+                {selected === "photo" ? <OcrImportCard /> : null}
+
+                {selected === "manual" ? (
+                  <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold text-slate-900">Manual Entry</h3>
+                      <p className="text-sm text-slate-500">
+                        Create a manual entry to get started.
+                      </p>
+                    </div>
+                    <RecipeForm action={createAction} submitLabel="Add Recipe" />
+                  </section>
+                ) : null}
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 

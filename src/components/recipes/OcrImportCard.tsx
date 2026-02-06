@@ -85,9 +85,9 @@ export default function OcrImportCard() {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">OCR Import</h2>
+        <h2 className="text-xl font-bold text-slate-900">Take a Photo</h2>
         <p className="text-sm text-slate-500">
-          Upload a cookbook photo and let OCR extract the text. Review and save your recipe.
+          Upload a cookbook photo and we&apos;ll extract the recipe text for you to review.
         </p>
       </div>
 
@@ -95,12 +95,19 @@ export default function OcrImportCard() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
             <input
+              id="photo-upload"
               type="file"
               accept="image/*"
               onChange={handleFileChange}
-              className="w-full text-sm text-slate-500"
+              className="hidden"
             />
-            <p className="mt-2">Upload a clear, well-lit photo.</p>
+            <label
+              htmlFor="photo-upload"
+              className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+            >
+              Add Photo
+            </label>
+            <p className="mt-3">Upload a clear, well-lit photo.</p>
           </div>
 
           {previewUrl ? (
@@ -116,7 +123,7 @@ export default function OcrImportCard() {
             disabled={!canRun}
             className="w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
           >
-            {progress?.status === "complete" ? "Re-run OCR" : "Run OCR"}
+            {progress?.status === "complete" ? "Re-import" : "Import"}
           </button>
 
           {progress ? (
@@ -150,7 +157,7 @@ export default function OcrImportCard() {
               onChange={(event) => setOcrText(event.target.value)}
               rows={10}
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
-              placeholder="OCR output will appear here. You can edit before saving."
+              placeholder="Extracted text will appear here. You can edit before saving."
             />
           </div>
           <button
