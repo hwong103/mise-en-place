@@ -83,6 +83,12 @@ export default async function RecipeDetailPage({
         </div>
         <div className="flex flex-wrap gap-3">
           <AddToPlannerDialog recipeId={recipe.id} recipeTitle={recipe.title} />
+          <a
+            href="#edit-recipe"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            Edit
+          </a>
           <form action={deleteRecipe}>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <button
@@ -339,27 +345,18 @@ export default async function RecipeDetailPage({
       </div>
 
       <section id="edit-recipe" className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <details>
-          <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-slate-700">
-            <span>Edit Recipe Details</span>
-            <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
-            </svg>
-          </summary>
-          <div className="mt-6">
-            <p className="text-sm text-slate-500">
-              Update the core recipe metadata, timings, and full ingredient list.
-            </p>
-            <div className="mt-6">
-              <RecipeForm
-                action={updateRecipe}
-                initialValues={initialValues}
-                recipeId={recipe.id}
-                submitLabel="Save Recipe"
-              />
-            </div>
-          </div>
-        </details>
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-slate-900">Edit Recipe Details</h2>
+          <p className="text-sm text-slate-500">
+            Update the core recipe metadata, timings, and full ingredient list.
+          </p>
+        </div>
+        <RecipeForm
+          action={updateRecipe}
+          initialValues={initialValues}
+          recipeId={recipe.id}
+          submitLabel="Save Recipe"
+        />
       </section>
     </div>
   );
