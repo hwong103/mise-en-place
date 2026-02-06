@@ -40,25 +40,32 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
   }, []);
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:border-indigo-300 hover:shadow-lg">
-      <div className="flex items-start justify-between">
-        <div>
+    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-indigo-300 hover:shadow-lg">
+      <div className="relative h-44 w-full">
+        {recipe.imageUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/15 to-transparent" />
+          </>
+        ) : (
+          <div className="h-full w-full bg-slate-100" />
+        )}
+        <div className="absolute inset-x-0 top-0 p-5">
           <Link
             href={`/recipes/${recipe.id}`}
-            className="text-lg font-bold text-slate-900 transition-colors hover:text-indigo-600"
+            className="text-lg font-bold text-white drop-shadow-sm transition-colors"
           >
             {recipe.title}
           </Link>
+          {recipe.description ? (
+            <p className="mt-1 text-xs text-white/85 line-clamp-2">{recipe.description}</p>
+          ) : null}
         </div>
-        {recipe.imageUrl ? (
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
-          </div>
-        ) : null}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+      <div className="flex flex-1 flex-col p-6">
+        <div className="flex flex-wrap gap-2 text-xs text-slate-500">
         {recipe.servings ? (
           <span className="rounded-full bg-slate-100 px-3 py-1">
             {recipe.servings} servings
@@ -74,39 +81,40 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
             Cook {formatMinutes(recipe.cookTime)}
           </span>
         ) : null}
-      </div>
-
-      {tags.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600"
-            >
-              {tag}
-            </span>
-          ))}
         </div>
-      ) : null}
 
-      {ingredientCount > 0 ? (
-        <div className="mt-4 text-xs text-slate-400">
-          {ingredientCount} ingredient{ingredientCount === 1 ? "" : "s"}
+        {tags.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {ingredientCount > 0 ? (
+          <div className="mt-4 text-xs text-slate-400">
+            {ingredientCount} ingredient{ingredientCount === 1 ? "" : "s"}
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <AddToPlannerDialog
+            recipeId={recipe.id}
+            recipeTitle={recipe.title}
+            defaultDate={nextWeekDate}
+          />
+          <Link
+            href={`/recipes/${recipe.id}`}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            View Recipe
+          </Link>
         </div>
-      ) : null}
-
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <AddToPlannerDialog
-          recipeId={recipe.id}
-          recipeTitle={recipe.title}
-          defaultDate={nextWeekDate}
-        />
-        <Link
-          href={`/recipes/${recipe.id}`}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-        >
-          View Recipe
-        </Link>
       </div>
     </div>
   );
