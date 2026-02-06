@@ -3,30 +3,32 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { getWeekRange, toDateKey, fromDateKey } from "@/lib/date";
 import { getDefaultHouseholdId } from "@/lib/household";
-import { listRecipes } from "@/lib/recipes";
+import { listRecipeTitles } from "@/lib/recipes";
 import PlannerBoard from "@/components/planner/PlannerBoard";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
 export default async function PlannerPage() {
-  const recipes = await listRecipes();
   const { days } = getWeekRange();
   const dateKeys = days.map((day) => toDateKey(day));
   const weekDates = dateKeys.map((key) => fromDateKey(key));
 
   const householdId = await getDefaultHouseholdId();
-  const mealPlans = await prisma.mealPlan.findMany({
-    where: {
-      householdId,
-      date: { in: weekDates },
-    },
-    include: {
-      recipe: true,
-    },
-  });
+  const [recipes, mealPlans] = await Promise.all([
+    listRecipeTitles(householdId),
+    prisma.mealPlan.findMany({
+      where: {
+        householdId,
+        date: { in: weekDates },
+      },
+      include: {
+        recipe: true,
+      },
+    }),
+  ]);
 
   const hasRecipes = recipes.length > 0;
   const slots = mealPlans.map((plan) => ({

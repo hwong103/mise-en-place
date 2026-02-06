@@ -1,8 +1,9 @@
+import { cache } from "react";
 import prisma from "@/lib/prisma";
 
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
 
-export async function getDefaultHouseholdId() {
+export const getDefaultHouseholdId = cache(async () => {
   const existing = await prisma.household.findFirst({
     orderBy: { createdAt: "asc" },
   });
@@ -17,4 +18,4 @@ export async function getDefaultHouseholdId() {
   });
 
   return created.id;
-}
+});

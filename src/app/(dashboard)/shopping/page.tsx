@@ -6,7 +6,7 @@ import { buildShoppingList } from "@/lib/shopping";
 import { coerceStringArray } from "@/lib/recipe-utils";
 import { listShoppingItems } from "@/lib/shopping-list";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -17,22 +17,24 @@ export default async function ShoppingPage() {
   const endDate = fromDateKey(toDateKey(end));
   const householdId = await getDefaultHouseholdId();
 
-  const mealPlans = await prisma.mealPlan.findMany({
-    where: {
-      householdId,
-      date: {
-        gte: startDate,
-        lte: endDate,
+  const [mealPlans, persistedItems] = await Promise.all([
+    prisma.mealPlan.findMany({
+      where: {
+        householdId,
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
       },
-    },
-    include: { recipe: true },
-  });
+      include: { recipe: true },
+    }),
+    listShoppingItems(startDate, householdId),
+  ]);
 
   const ingredientLines = mealPlans.flatMap((plan) =>
-    coerceStringArray(plan.recipe.ingredients),
+    plan.recipe ? coerceStringArray(plan.recipe.ingredients) : [],
   );
   const categories = buildShoppingList(ingredientLines);
-  const persistedItems = await listShoppingItems(startDate);
   return (
     <ShoppingList
       weekKey={toDateKey(start)}

@@ -37,8 +37,10 @@ const getAuthorLabel = (sourceUrl?: string | null) => {
 
 export default async function RecipeDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: { [key: string]: string | string[] | undefined };
 }) {
   const { id } = await params;
   const recipe = await getRecipeById(id);
@@ -53,6 +55,10 @@ export default async function RecipeDetailPage({
   const prepGroups = coercePrepGroups(recipe.prepGroups);
   const prepGroupsText = serializePrepGroupsToText(prepGroups);
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
+  const editParam = Array.isArray(searchParams?.edit)
+    ? searchParams?.edit[0]
+    : searchParams?.edit;
+  const isEditing = editParam === "1" || editParam === "true";
   const initialValues = {
     title: recipe.title,
     description: recipe.description ?? undefined,
@@ -83,12 +89,16 @@ export default async function RecipeDetailPage({
         </div>
         <div className="flex flex-wrap gap-3">
           <AddToPlannerDialog recipeId={recipe.id} recipeTitle={recipe.title} />
-          <a
-            href="#edit-recipe"
+          <Link
+            href={
+              isEditing
+                ? `/recipes/${recipe.id}#edit-recipe`
+                : `/recipes/${recipe.id}?edit=1#edit-recipe`
+            }
             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
           >
             Edit
-          </a>
+          </Link>
           <form action={deleteRecipe}>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <button
@@ -344,20 +354,25 @@ export default async function RecipeDetailPage({
         </aside>
       </div>
 
-      <section id="edit-recipe" className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-slate-900">Edit Recipe Details</h2>
-          <p className="text-sm text-slate-500">
-            Update the core recipe metadata, timings, and full ingredient list.
-          </p>
-        </div>
-        <RecipeForm
-          action={updateRecipe}
-          initialValues={initialValues}
-          recipeId={recipe.id}
-          submitLabel="Save Recipe"
-        />
-      </section>
+      {isEditing ? (
+        <section
+          id="edit-recipe"
+          className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"
+        >
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-slate-900">Edit Recipe Details</h2>
+            <p className="text-sm text-slate-500">
+              Update the core recipe metadata, timings, and full ingredient list.
+            </p>
+          </div>
+          <RecipeForm
+            action={updateRecipe}
+            initialValues={initialValues}
+            recipeId={recipe.id}
+            submitLabel="Save Recipe"
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

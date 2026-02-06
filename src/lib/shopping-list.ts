@@ -8,10 +8,10 @@ export const normalizeShoppingLine = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-export async function listShoppingItems(weekStart: Date) {
-  const householdId = await getDefaultHouseholdId();
+export async function listShoppingItems(weekStart: Date, householdId?: string) {
+  const resolvedHouseholdId = householdId ?? (await getDefaultHouseholdId());
   return prisma.shoppingListItem.findMany({
-    where: { householdId, weekStart },
+    where: { householdId: resolvedHouseholdId, weekStart },
     orderBy: { createdAt: "asc" },
   });
 }
