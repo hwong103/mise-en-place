@@ -7,6 +7,7 @@ export type RecipeFormValues = {
   description?: string | null;
   sourceUrl?: string | null;
   imageUrl?: string | null;
+  videoUrl?: string | null;
   servings?: number | null;
   prepTime?: number | null;
   cookTime?: number | null;
@@ -92,6 +93,20 @@ export default function RecipeForm({
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-slate-700" htmlFor="videoUrl">
+          Video URL
+        </label>
+        <input
+          id="videoUrl"
+          name="videoUrl"
+          type="url"
+          defaultValue={initialValues?.videoUrl ?? ""}
+          placeholder="https://youtu.be/..."
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+        />
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

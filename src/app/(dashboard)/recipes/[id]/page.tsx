@@ -18,6 +18,42 @@ export const dynamicParams = true;
 const formatMinutes = (value?: number | null) =>
   value ? `${value} min` : null;
 
+const getVideoEmbedUrl = (videoUrl?: string | null) => {
+  if (!videoUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(videoUrl);
+    const hostname = url.hostname.replace(/^www\./, "");
+
+    if (hostname === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+
+    if (hostname.endsWith("youtube.com")) {
+      if (url.pathname === "/watch") {
+        const id = url.searchParams.get("v");
+        return id ? `https://www.youtube.com/embed/${id}` : null;
+      }
+      if (url.pathname.startsWith("/embed/") || url.pathname.startsWith("/shorts/")) {
+        const id = url.pathname.split("/")[2];
+        return id ? `https://www.youtube.com/embed/${id}` : null;
+      }
+    }
+
+    if (hostname === "vimeo.com" || hostname.endsWith(".vimeo.com")) {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      return id ? `https://player.vimeo.com/video/${id}` : null;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
 const getAuthorLabel = (sourceUrl?: string | null) => {
   if (!sourceUrl) {
     return null;
@@ -59,11 +95,13 @@ export default async function RecipeDetailPage({
     ? searchParams?.edit[0]
     : searchParams?.edit;
   const isEditing = editParam === "1" || editParam === "true";
+  const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
   const initialValues = {
     title: recipe.title,
     description: recipe.description ?? undefined,
     sourceUrl: recipe.sourceUrl ?? undefined,
     imageUrl: recipe.imageUrl ?? undefined,
+    videoUrl: recipe.videoUrl ?? undefined,
     servings: recipe.servings ?? undefined,
     prepTime: recipe.prepTime ?? undefined,
     cookTime: recipe.cookTime ?? undefined,
@@ -157,6 +195,38 @@ export default async function RecipeDetailPage({
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
+            {recipe.videoUrl ? (
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-bold text-slate-900">Watch</h2>
+                  <a
+                    href={recipe.videoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-semibold text-indigo-600"
+                  >
+                    Open Video
+                  </a>
+                </div>
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                  {embedUrl ? (
+                    <div className="aspect-[16/9] w-full">
+                      <iframe
+                        src={embedUrl}
+                        title={`Video for ${recipe.title}`}
+                        className="h-full w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-40 items-center justify-center text-sm text-slate-500">
+                      Video preview not available.
+                    </div>
+                  )}
+                </div>
+              </section>
+            ) : null}
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-900">Ingredients</h2>

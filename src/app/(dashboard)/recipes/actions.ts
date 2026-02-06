@@ -59,6 +59,22 @@ const toOptionalUrl = (value: FormDataEntryValue | null) => {
   }
 };
 
+const toOptionalUrlString = (value: unknown) => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  try {
+    new URL(trimmed);
+    return trimmed;
+  } catch {
+    return undefined;
+  }
+};
+
 const decodeHtml = (value: string) =>
   value
     .replace(/&amp;/g, "&")
@@ -201,6 +217,101 @@ const extractImageUrl = (value: unknown) => {
   return undefined;
 };
 
+const extractVideoUrl = (value: unknown): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return toOptionalUrlString(value);
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const found = extractVideoUrl(entry);
+      if (found) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return extractVideoUrl(
+      record.embedUrl ?? record.contentUrl ?? record.url ?? record["@id"]
+    );
+  }
+  return undefined;
+};
+
+const extractVideoFromHtml = (html: string) => {
+  const metaCandidate =
+    extractMeta(html, "og:video:secure_url", "property") ||
+    extractMeta(html, "og:video:url", "property") ||
+    extractMeta(html, "og:video", "property") ||
+    extractMeta(html, "twitter:player", "name");
+  const metaUrl = toOptionalUrlString(metaCandidate ?? "");
+  if (metaUrl) {
+    return metaUrl;
+  }
+
+  const iframeRegex = /<iframe[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  let iframeMatch = iframeRegex.exec(html);
+  while (iframeMatch) {
+    const src = iframeMatch[1];
+    if (/youtube\.com|youtu\.be|vimeo\.com/i.test(src)) {
+      const iframeUrl = toOptionalUrlString(src);
+      if (iframeUrl) {
+        return iframeUrl;
+      }
+    }
+    iframeMatch = iframeRegex.exec(html);
+  }
+
+  const linkMatch = html.match(
+    /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|vimeo\.com\/)\S+)/i
+  );
+  if (linkMatch?.[1]) {
+    return toOptionalUrlString(linkMatch[1]);
+  }
+
+  return undefined;
+};
+
+const normalizeVideoUrl = (value: string | undefined) => {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.replace(/^www\./, "");
+
+    if (hostname === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      return id ? `https://youtu.be/${id}` : value;
+    }
+
+    if (hostname.endsWith("youtube.com")) {
+      if (url.pathname === "/watch") {
+        const id = url.searchParams.get("v");
+        return id ? `https://youtu.be/${id}` : value;
+      }
+      if (url.pathname.startsWith("/embed/") || url.pathname.startsWith("/shorts/")) {
+        const id = url.pathname.split("/")[2];
+        return id ? `https://youtu.be/${id}` : value;
+      }
+    }
+
+    if (hostname === "vimeo.com" || hostname.endsWith(".vimeo.com")) {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      return id ? `https://vimeo.com/${id}` : value;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return value;
+};
+
 const cleanDescription = (value: string | undefined) => {
   if (!value) {
     return undefined;
@@ -341,11 +452,13 @@ const extractRecipeFromHtml = (html: string) => {
   const servings = parseYield(recipe.recipeYield);
   const prepTime = parseDurationMinutes(recipe.prepTime);
   const cookTime = parseDurationMinutes(recipe.cookTime);
+  const videoUrl = extractVideoUrl(recipe.video ?? recipe.videoUrl);
 
   return {
     title,
     description,
     imageUrl,
+    videoUrl,
     ingredients,
     instructions,
     tags,
@@ -364,6 +477,7 @@ const buildRecipePayload = (formData: FormData) => {
   const description = toOptionalString(formData.get("description"));
   const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
   const imageUrl = toOptionalUrl(formData.get("imageUrl"));
+  const videoUrl = toOptionalUrl(formData.get("videoUrl"));
   const servings = toOptionalInt(formData.get("servings"));
   const prepTime = toOptionalInt(formData.get("prepTime"));
   const cookTime = toOptionalInt(formData.get("cookTime"));
@@ -380,6 +494,7 @@ const buildRecipePayload = (formData: FormData) => {
     description,
     sourceUrl,
     imageUrl,
+    videoUrl,
     servings,
     prepTime,
     cookTime,
@@ -615,6 +730,9 @@ export async function importRecipeFromUrl(formData: FormData) {
     extractMeta(html, "twitter:image", "name") ??
     null
   );
+  const videoUrl = normalizeVideoUrl(
+    scrapedRecipe?.videoUrl ?? extractVideoFromHtml(html)
+  );
   const notes = Array.from(
     new Set([
       ...cleanedIngredients.notes,
@@ -633,6 +751,7 @@ export async function importRecipeFromUrl(formData: FormData) {
       description,
       sourceUrl,
       imageUrl,
+      videoUrl,
       servings: scrapedRecipe?.servings ?? null,
       prepTime: scrapedRecipe?.prepTime ?? null,
       cookTime: scrapedRecipe?.cookTime ?? null,

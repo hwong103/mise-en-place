@@ -49,6 +49,7 @@ model Recipe {
   title        String
   description  String?
   imageUrl     String?
+  videoUrl     String?
   sourceUrl    String?
   servings     Int?
   prepTime     Int? // minutes
