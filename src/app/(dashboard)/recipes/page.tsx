@@ -4,7 +4,7 @@ import { coerceStringArray } from "@/lib/recipe-utils";
 
 import { createRecipe, importRecipeFromUrl } from "./actions";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function RecipesPage() {
     const recipes = await listRecipes();
