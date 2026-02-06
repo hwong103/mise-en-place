@@ -36,8 +36,9 @@ export default function OcrImportCard() {
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const canRun = Boolean(file);
+  const canRun = Boolean(file) && !isConverting;
 
   const previewUrl = useMemo(() => {
     if (!file) {
@@ -54,25 +55,60 @@ export default function OcrImportCard() {
     };
   }, [previewUrl]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
-    setFile(nextFile);
     setOcrText("");
     setTitle("");
     setError(null);
     setProgress(null);
-    if (nextFile && isHeicFile(nextFile)) {
-      const message = "HEIC photos aren’t supported yet. Please convert to JPG or PNG.";
+    setToast(null);
+
+    if (!nextFile) {
+      setFile(null);
+      return;
+    }
+
+    if (isHeicFile(nextFile)) {
+      setIsConverting(true);
+      try {
+        const { default: heic2any } = await import("heic2any");
+        const converted = await heic2any({
+          blob: nextFile,
+          toType: "image/jpeg",
+          quality: 0.9,
+        });
+        const convertedBlob = Array.isArray(converted) ? converted[0] : converted;
+        const convertedFile = new File(
+          [convertedBlob],
+          nextFile.name.replace(/\.(heic|heif)$/i, ".jpg"),
+          { type: "image/jpeg", lastModified: Date.now() }
+        );
+        setFile(convertedFile);
+        setImageUrl(convertedFile.name);
+        setToast({ type: "success", message: "Converted HEIC to JPG. Ready to import." });
+      } catch (err) {
+        const message = "HEIC conversion failed. Please convert to JPG/PNG and try again.";
+        setError(message);
+        setToast({ type: "error", message });
+        setFile(null);
+      } finally {
+        setIsConverting(false);
+      }
+      return;
+    }
+
+    setFile(nextFile);
+    setImageUrl(nextFile.name);
+  };
+
+  const handleRunOcr = async () => {
+    if (isConverting) {
+      const message = "Finishing photo conversion. Please wait.";
       setError(message);
       setToast({ type: "error", message });
       return;
     }
-    if (nextFile) {
-      setImageUrl(nextFile.name);
-    }
-  };
 
-  const handleRunOcr = async () => {
     if (!file) {
       const message = "Add a photo first.";
       setError(message);
@@ -147,7 +183,7 @@ export default function OcrImportCard() {
             <input
               id="photo-upload"
               type="file"
-              accept="image/*"
+              accept="image/*,image/heic,image/heif"
               onChange={handleFileChange}
               className="hidden"
             />
@@ -175,6 +211,10 @@ export default function OcrImportCard() {
           >
             {progress?.status === "complete" ? "Re-import" : "Import"}
           </button>
+
+          {isConverting ? (
+            <div className="text-xs text-slate-500">Converting HEIC photo...</div>
+          ) : null}
 
           {progress ? (
             <div className="text-xs text-slate-500">
