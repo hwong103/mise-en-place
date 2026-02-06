@@ -6,7 +6,7 @@ import { getDefaultHouseholdId } from "@/lib/household";
 import { listRecipes } from "@/lib/recipes";
 import PlannerBoard from "@/components/planner/PlannerBoard";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
