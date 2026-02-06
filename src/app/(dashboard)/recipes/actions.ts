@@ -201,37 +201,6 @@ const extractImageUrl = (value: unknown) => {
   return undefined;
 };
 
-const extractVideoUrl = (value: unknown): string | undefined => {
-  if (!value) {
-    return undefined;
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      const candidate = extractVideoUrl(entry);
-      if (candidate) {
-        return candidate;
-      }
-    }
-    return undefined;
-  }
-  if (typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if (typeof record.embedUrl === "string") {
-      return record.embedUrl;
-    }
-    if (typeof record.contentUrl === "string") {
-      return record.contentUrl;
-    }
-    if (typeof record.url === "string") {
-      return record.url;
-    }
-  }
-  return undefined;
-};
-
 const cleanDescription = (value: string | undefined) => {
   if (!value) {
     return undefined;
@@ -273,13 +242,6 @@ const extractNotesFromDescription = (value: string | undefined) => {
     notes,
   };
 };
-
-const extractVideoFromHtml = (html: string) =>
-  extractMeta(html, "og:video", "property") ||
-  extractMeta(html, "og:video:url", "property") ||
-  extractMeta(html, "og:video:secure_url", "property") ||
-  extractMeta(html, "twitter:player", "name") ||
-  extractMeta(html, "twitter:player:stream", "name");
 
 const parseYield = (value: unknown) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -371,7 +333,6 @@ const extractRecipeFromHtml = (html: string) => {
   const description =
     (typeof recipe.description === "string" && normalizeText(recipe.description)) || undefined;
   const imageUrl = extractImageUrl(recipe.image);
-  const videoUrl = extractVideoUrl(recipe.video);
   const ingredients = extractTextList(recipe.recipeIngredient ?? recipe.ingredients);
   const instructions = extractTextList(recipe.recipeInstructions);
   const tags = typeof recipe.keywords === "string"
@@ -385,7 +346,6 @@ const extractRecipeFromHtml = (html: string) => {
     title,
     description,
     imageUrl,
-    videoUrl,
     ingredients,
     instructions,
     tags,
@@ -404,7 +364,6 @@ const buildRecipePayload = (formData: FormData) => {
   const description = toOptionalString(formData.get("description"));
   const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
   const imageUrl = toOptionalUrl(formData.get("imageUrl"));
-  const videoUrl = toOptionalUrl(formData.get("videoUrl"));
   const servings = toOptionalInt(formData.get("servings"));
   const prepTime = toOptionalInt(formData.get("prepTime"));
   const cookTime = toOptionalInt(formData.get("cookTime"));
@@ -421,7 +380,6 @@ const buildRecipePayload = (formData: FormData) => {
     description,
     sourceUrl,
     imageUrl,
-    videoUrl,
     servings,
     prepTime,
     cookTime,
@@ -657,9 +615,6 @@ export async function importRecipeFromUrl(formData: FormData) {
     extractMeta(html, "twitter:image", "name") ??
     null
   );
-  const videoUrl = toOptionalUrl(
-    scrapedRecipe?.videoUrl ?? extractVideoFromHtml(html) ?? null
-  );
   const notes = Array.from(
     new Set([
       ...cleanedIngredients.notes,
@@ -678,7 +633,6 @@ export async function importRecipeFromUrl(formData: FormData) {
       description,
       sourceUrl,
       imageUrl,
-      videoUrl,
       servings: scrapedRecipe?.servings ?? null,
       prepTime: scrapedRecipe?.prepTime ?? null,
       cookTime: scrapedRecipe?.cookTime ?? null,
