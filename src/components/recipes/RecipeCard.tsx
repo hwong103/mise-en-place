@@ -46,7 +46,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/15 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/20 to-transparent" />
           </>
         ) : (
           <div className="h-full w-full bg-slate-100" />
@@ -54,13 +54,10 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         <div className="absolute inset-x-0 top-0 p-5">
           <Link
             href={`/recipes/${recipe.id}`}
-            className="text-lg font-bold text-white drop-shadow-sm transition-colors"
+            className="inline-block rounded-xl bg-black/45 px-3 py-1 text-xl font-bold text-white drop-shadow-sm transition-colors"
           >
             {recipe.title}
           </Link>
-          {recipe.description ? (
-            <p className="mt-1 text-xs text-white/85 line-clamp-2">{recipe.description}</p>
-          ) : null}
         </div>
       </div>
 
@@ -82,19 +79,6 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
           </span>
         ) : null}
         </div>
-
-        {tags.length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
 
         {ingredientCount > 0 ? (
           <div className="mt-4 text-xs text-slate-400">

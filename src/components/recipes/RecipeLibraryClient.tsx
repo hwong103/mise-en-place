@@ -173,16 +173,18 @@ export default function RecipeLibraryClient({
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1">
-            <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">Search</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-widest text-slate-400">Search</label>
+              <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                {filtered.length} of {recipes.length}
+              </div>
+            </div>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search recipes or tags"
               className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
             />
-          </div>
-          <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            {filtered.length} of {recipes.length}
           </div>
         </div>
       </div>
