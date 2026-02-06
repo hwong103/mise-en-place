@@ -201,7 +201,7 @@ const extractImageUrl = (value: unknown) => {
   return undefined;
 };
 
-const extractVideoUrl = (value: unknown) => {
+const extractVideoUrl = (value: unknown): string | undefined => {
   if (!value) {
     return undefined;
   }
