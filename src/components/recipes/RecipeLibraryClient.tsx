@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
 import RecipeForm from "@/components/recipes/RecipeForm";
-import OcrImportCard from "@/components/recipes/OcrImportCard";
 
 const normalize = (value: string) =>
   value
@@ -25,7 +24,7 @@ export default function RecipeLibraryClient({
 }: RecipeLibraryClientProps) {
   const [query, setQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [selected, setSelected] = useState<"url" | "photo" | "manual" | null>(null);
+  const [selected, setSelected] = useState<"url" | "manual" | null>(null);
 
   const filtered = useMemo(() => {
     const needle = normalize(query);
@@ -48,7 +47,7 @@ export default function RecipeLibraryClient({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Your Recipes</h1>
-          <p className="text-slate-500">Manage and ingest recipes from books, URLs, or manual entry.</p>
+          <p className="text-slate-500">Manage and ingest recipes from URLs or manual entry.</p>
         </div>
         <button
           type="button"
@@ -64,7 +63,7 @@ export default function RecipeLibraryClient({
 
       {isAddOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-5xl rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl md:p-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Add a Recipe</h2>
@@ -83,7 +82,7 @@ export default function RecipeLibraryClient({
             </div>
 
             {!selected ? (
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setSelected("url")}
@@ -92,16 +91,6 @@ export default function RecipeLibraryClient({
                   <h3 className="text-lg font-bold text-slate-900">Import from URL</h3>
                   <p className="mt-2 text-sm text-slate-500">
                     Paste a recipe link and we&apos;ll import it.
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelected("photo")}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300"
-                >
-                  <h3 className="text-lg font-bold text-slate-900">Take a Photo</h3>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Upload a cookbook photo and extract the text.
                   </p>
                 </button>
                 <button
@@ -150,8 +139,6 @@ export default function RecipeLibraryClient({
                     </form>
                   </section>
                 ) : null}
-
-                {selected === "photo" ? <OcrImportCard /> : null}
 
                 {selected === "manual" ? (
                   <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
