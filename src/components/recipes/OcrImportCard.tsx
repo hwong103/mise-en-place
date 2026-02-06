@@ -13,6 +13,21 @@ type ProgressState = {
   progress: number;
 };
 
+type ToastState = {
+  type: "success" | "error";
+  message: string;
+};
+
+const isHeicFile = (file: File) => {
+  const name = file.name.toLowerCase();
+  return (
+    file.type === "image/heic" ||
+    file.type === "image/heif" ||
+    name.endsWith(".heic") ||
+    name.endsWith(".heif")
+  );
+};
+
 export default function OcrImportCard() {
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -20,6 +35,7 @@ export default function OcrImportCard() {
   const [title, setTitle] = useState("");
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [isPending, startTransition] = useTransition();
   const canRun = Boolean(file);
 
@@ -45,6 +61,12 @@ export default function OcrImportCard() {
     setTitle("");
     setError(null);
     setProgress(null);
+    if (nextFile && isHeicFile(nextFile)) {
+      const message = "HEIC photos aren’t supported yet. Please convert to JPG or PNG.";
+      setError(message);
+      setToast({ type: "error", message });
+      return;
+    }
     if (nextFile) {
       setImageUrl(nextFile.name);
     }
@@ -52,6 +74,9 @@ export default function OcrImportCard() {
 
   const handleRunOcr = async () => {
     if (!file) {
+      const message = "Add a photo first.";
+      setError(message);
+      setToast({ type: "error", message });
       return;
     }
 
@@ -67,8 +92,11 @@ export default function OcrImportCard() {
       });
       setOcrText(result.data.text?.trim() ?? "");
       setProgress({ status: "complete", progress: 1 });
+      setToast({ type: "success", message: "Import complete. Review the text before saving." });
     } catch (err) {
-      setError("OCR failed. Please try a clearer image.");
+      const message = "Import failed. Please try a clearer JPG or PNG image.";
+      setError(message);
+      setToast({ type: "error", message });
       setProgress(null);
     }
   };
@@ -79,8 +107,17 @@ export default function OcrImportCard() {
 
     startTransition(async () => {
       await createRecipeFromOcr(formData);
+      setToast({ type: "success", message: "Recipe created from photo." });
     });
   };
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const timer = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -90,6 +127,19 @@ export default function OcrImportCard() {
           Upload a cookbook photo and we&apos;ll extract the recipe text for you to review.
         </p>
       </div>
+
+      {toast ? (
+        <div
+          className={
+            "mb-4 rounded-2xl px-4 py-3 text-sm font-semibold " +
+            (toast.type === "success"
+              ? "border border-emerald-100 bg-emerald-50 text-emerald-700"
+              : "border border-rose-100 bg-rose-50 text-rose-700")
+          }
+        >
+          {toast.message}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
         <div className="space-y-4">
@@ -120,7 +170,7 @@ export default function OcrImportCard() {
           <button
             type="button"
             onClick={handleRunOcr}
-            disabled={!canRun}
+            disabled={!canRun || Boolean(error)}
             className="w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
           >
             {progress?.status === "complete" ? "Re-import" : "Import"}
