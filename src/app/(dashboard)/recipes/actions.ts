@@ -65,6 +65,66 @@ const normalizeUrlCandidate = (value: string) =>
     .replace(/^[("'`\\[]+/, "")
     .replace(/[)"'`\\]>.,;]+$/, "");
 
+const normalizeSourceUrl = (value: string | undefined) => {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    url.search = "";
+    url.hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+    if (url.protocol === "http:") {
+      url.protocol = "https:";
+    }
+    if (url.pathname !== "/") {
+      url.pathname = url.pathname.replace(/\/+$/, "");
+    }
+    return `${url.protocol}//${url.hostname}${url.pathname}`;
+  } catch {
+    return undefined;
+  }
+};
+
+const buildSourceUrlCandidates = (value: string | undefined) => {
+  if (!value) {
+    return [];
+  }
+
+  const normalized = normalizeSourceUrl(value);
+  const candidates = new Set<string>();
+
+  if (normalized) {
+    candidates.add(normalized);
+    candidates.add(`${normalized}/`);
+    candidates.add(`${normalized}?`);
+    candidates.add(`${normalized}#`);
+  }
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "");
+    const altHosts = new Set([host, `www.${host}`]);
+    const protocols = new Set([url.protocol, url.protocol === "http:" ? "https:" : "http:"]);
+
+    for (const protocol of protocols) {
+      for (const hostname of altHosts) {
+        const base = `${protocol}//${hostname}${url.pathname.replace(/\/+$/, "")}`;
+        candidates.add(base);
+        candidates.add(`${base}/`);
+        candidates.add(`${base}?`);
+        candidates.add(`${base}#`);
+      }
+    }
+  } catch {
+    candidates.add(value);
+  }
+
+  candidates.add(value);
+  return Array.from(candidates);
+};
+
 const toOptionalUrlString = (value: unknown) => {
   if (typeof value !== "string") {
     return undefined;
@@ -319,6 +379,32 @@ const normalizeVideoUrl = (value: string | undefined) => {
   return value;
 };
 
+const findRecipeBySourceUrl = async (
+  householdId: string,
+  sourceUrl: string | undefined
+) => {
+  if (!sourceUrl) {
+    return null;
+  }
+
+  const candidates = buildSourceUrlCandidates(sourceUrl);
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return prisma.recipe.findFirst({
+    where: {
+      householdId,
+      OR: candidates.map((candidate) => ({
+        sourceUrl: {
+          startsWith: candidate,
+        },
+      })),
+    },
+    select: { id: true },
+  });
+};
+
 const cleanDescription = (value: string | undefined) => {
   if (!value) {
     return undefined;
@@ -499,7 +585,7 @@ const buildRecipePayload = (formData: FormData) => {
   return {
     title,
     description,
-    sourceUrl,
+    sourceUrl: normalizeSourceUrl(sourceUrl) ?? sourceUrl,
     imageUrl,
     videoUrl,
     servings,
@@ -688,6 +774,12 @@ export async function importRecipeFromUrl(formData: FormData) {
     return;
   }
 
+  const householdId = await getDefaultHouseholdId();
+  const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
+  if (existingRecipe) {
+    redirect(`/recipes/${existingRecipe.id}`);
+  }
+
   let html = "";
 
   try {
@@ -749,14 +841,14 @@ export async function importRecipeFromUrl(formData: FormData) {
     ])
   ).filter((note) => !/^note\s*\d+$/i.test(note));
 
-  const householdId = await getDefaultHouseholdId();
+  const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
 
   const recipe = await prisma.recipe.create({
     data: {
       householdId,
       title: scrapedRecipe?.title || title,
       description,
-      sourceUrl,
+      sourceUrl: normalizedSourceUrl,
       imageUrl,
       videoUrl,
       servings: scrapedRecipe?.servings ?? null,

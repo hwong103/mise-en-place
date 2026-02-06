@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
 import RecipeForm from "@/components/recipes/RecipeForm";
+import SubmitButton from "@/components/forms/SubmitButton";
 
 const normalize = (value: string) =>
   value
@@ -130,12 +131,11 @@ export default function RecipeLibraryClient({
                         placeholder="https://example.com/recipe"
                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
                       />
-                      <button
-                        type="submit"
-                        className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg"
-                      >
-                        Import Recipe
-                      </button>
+                      <SubmitButton
+                        label="Import Recipe"
+                        pendingLabel="Importing..."
+                        className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-70"
+                      />
                     </form>
                   </section>
                 ) : null}

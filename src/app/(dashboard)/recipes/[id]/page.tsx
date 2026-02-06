@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
 import RecipeForm from "@/components/recipes/RecipeForm";
+import SubmitButton from "@/components/forms/SubmitButton";
 import { getRecipeById } from "@/lib/recipes";
 import {
   coercePrepGroups,
@@ -142,12 +143,11 @@ export default async function RecipeDetailPage({
           </Link>
           <form action={deleteRecipe}>
             <input type="hidden" name="recipeId" value={recipe.id} />
-            <button
-              type="submit"
-              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100"
-            >
-              Delete
-            </button>
+            <SubmitButton
+              label="Delete"
+              pendingLabel="Deleting..."
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-70"
+            />
           </form>
         </div>
       </div>
