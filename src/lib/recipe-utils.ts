@@ -189,8 +189,10 @@ const balanceParentheses = (value: string) => {
 
 const cleanLineBase = (line: string) => {
   const cleaned = decodeHtmlEntities(line)
+    .replace(/^\s*\[\s*[xX]?\s*\]\s*/g, "")
     .replace(/^\s*(?:[•·▪◦□☐☑■]|\-|\*)\s+/g, "")
-    .replace(/^\s*[□☐☑]\s*/g, "")
+    .replace(/^\s*[□☐☑■]\s*/g, "")
+    .replace(/[\u2610-\u2612\u25A0-\u25A9\u25AA\u25AB\u25FB\u25FC]/g, "")
     .replace(PAREN_COMMA_PATTERN, "(")
     .replace(EMPTY_PAREN_PATTERN, "")
     .replace(SPACE_BEFORE_PAREN_CLOSE, ")")
