@@ -69,6 +69,8 @@ const decodeHtml = (value: string) =>
     .replace(/&gt;/g, ">")
     .replace(/&nbsp;/g, " ");
 
+const normalizeText = (value: string) => decodeHtml(value).replace(/\s+/g, " ").trim();
+
 const extractMeta = (html: string, key: string, attribute: "name" | "property") => {
   const regex = new RegExp(
     `<meta[^>]+${attribute}=[\"']${key}[\"'][^>]+content=[\"']([^\"']+)[\"'][^>]*>`,
@@ -154,7 +156,7 @@ const extractTextList = (value: unknown): string[] => {
   }
 
   if (typeof value === "string") {
-    return value
+    return decodeHtml(value)
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean);
@@ -198,6 +200,86 @@ const extractImageUrl = (value: unknown) => {
   }
   return undefined;
 };
+
+const extractVideoUrl = (value: unknown) => {
+  if (!value) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const candidate = extractVideoUrl(entry);
+      if (candidate) {
+        return candidate;
+      }
+    }
+    return undefined;
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (typeof record.embedUrl === "string") {
+      return record.embedUrl;
+    }
+    if (typeof record.contentUrl === "string") {
+      return record.contentUrl;
+    }
+    if (typeof record.url === "string") {
+      return record.url;
+    }
+  }
+  return undefined;
+};
+
+const cleanDescription = (value: string | undefined) => {
+  if (!value) {
+    return undefined;
+  }
+
+  const cleaned = normalizeText(value)
+    .replace(/\brecipe video above\b\.?/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return cleaned.length > 0 ? cleaned : undefined;
+};
+
+const extractNotesFromDescription = (value: string | undefined) => {
+  if (!value) {
+    return { description: undefined, notes: [] as string[] };
+  }
+
+  const sentences = value.split(/(?<=[.!?])\s+/g).map((sentence) => sentence.trim());
+  const notes: string[] = [];
+  const kept: string[] = [];
+
+  for (const sentence of sentences) {
+    if (!sentence) {
+      continue;
+    }
+
+    if (/\bsee\s+note\s*\d+/i.test(sentence) || /^note\s*\d+/i.test(sentence)) {
+      notes.push(sentence);
+      continue;
+    }
+
+    kept.push(sentence);
+  }
+
+  const description = kept.join(" ").trim();
+  return {
+    description: description.length > 0 ? description : undefined,
+    notes,
+  };
+};
+
+const extractVideoFromHtml = (html: string) =>
+  extractMeta(html, "og:video", "property") ||
+  extractMeta(html, "og:video:url", "property") ||
+  extractMeta(html, "og:video:secure_url", "property") ||
+  extractMeta(html, "twitter:player", "name") ||
+  extractMeta(html, "twitter:player:stream", "name");
 
 const parseYield = (value: unknown) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -283,16 +365,17 @@ const extractRecipeFromHtml = (html: string) => {
   }
 
   const title =
-    (typeof recipe.name === "string" && recipe.name.trim()) ||
-    (typeof recipe.headline === "string" && recipe.headline.trim()) ||
+    (typeof recipe.name === "string" && normalizeText(recipe.name)) ||
+    (typeof recipe.headline === "string" && normalizeText(recipe.headline)) ||
     undefined;
   const description =
-    (typeof recipe.description === "string" && recipe.description.trim()) || undefined;
+    (typeof recipe.description === "string" && normalizeText(recipe.description)) || undefined;
   const imageUrl = extractImageUrl(recipe.image);
+  const videoUrl = extractVideoUrl(recipe.video);
   const ingredients = extractTextList(recipe.recipeIngredient ?? recipe.ingredients);
   const instructions = extractTextList(recipe.recipeInstructions);
   const tags = typeof recipe.keywords === "string"
-    ? parseTags(recipe.keywords)
+    ? parseTags(normalizeText(recipe.keywords))
     : extractTextList(recipe.keywords);
   const servings = parseYield(recipe.recipeYield);
   const prepTime = parseDurationMinutes(recipe.prepTime);
@@ -302,6 +385,7 @@ const extractRecipeFromHtml = (html: string) => {
     title,
     description,
     imageUrl,
+    videoUrl,
     ingredients,
     instructions,
     tags,
@@ -320,6 +404,7 @@ const buildRecipePayload = (formData: FormData) => {
   const description = toOptionalString(formData.get("description"));
   const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
   const imageUrl = toOptionalUrl(formData.get("imageUrl"));
+  const videoUrl = toOptionalUrl(formData.get("videoUrl"));
   const servings = toOptionalInt(formData.get("servings"));
   const prepTime = toOptionalInt(formData.get("prepTime"));
   const cookTime = toOptionalInt(formData.get("cookTime"));
@@ -336,6 +421,7 @@ const buildRecipePayload = (formData: FormData) => {
     description,
     sourceUrl,
     imageUrl,
+    videoUrl,
     servings,
     prepTime,
     cookTime,
@@ -548,9 +634,6 @@ export async function importRecipeFromUrl(formData: FormData) {
   const cleanedIngredients = cleanIngredientLines(scrapedRecipe?.ingredients ?? []);
   const cleanedInstructions = cleanInstructionLines(scrapedRecipe?.instructions ?? []);
   const htmlNotes = extractNotesFromHtml(html);
-  const notes = Array.from(
-    new Set([...cleanedIngredients.notes, ...cleanedInstructions.notes, ...htmlNotes])
-  ).filter((note) => !/^note\s*\d+$/i.test(note));
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
     cleanedIngredients.lines,
     cleanedInstructions.lines
@@ -559,17 +642,32 @@ export async function importRecipeFromUrl(formData: FormData) {
     instructionPrepGroups.length > 0
       ? instructionPrepGroups
       : buildPrepGroups(cleanedIngredients.lines);
-  const description =
+  const rawDescription =
     scrapedRecipe?.description ||
     extractMeta(html, "description", "name") ||
     extractMeta(html, "og:description", "property") ||
     extractMeta(html, "twitter:description", "name");
+  const descriptionCandidate = cleanDescription(rawDescription);
+  const { description, notes: descriptionNotes } = extractNotesFromDescription(
+    descriptionCandidate
+  );
   const imageUrl = toOptionalUrl(
     scrapedRecipe?.imageUrl ??
     extractMeta(html, "og:image", "property") ??
     extractMeta(html, "twitter:image", "name") ??
     null
   );
+  const videoUrl = toOptionalUrl(
+    scrapedRecipe?.videoUrl ?? extractVideoFromHtml(html) ?? null
+  );
+  const notes = Array.from(
+    new Set([
+      ...cleanedIngredients.notes,
+      ...cleanedInstructions.notes,
+      ...htmlNotes,
+      ...descriptionNotes,
+    ])
+  ).filter((note) => !/^note\s*\d+$/i.test(note));
 
   const householdId = await getDefaultHouseholdId();
 
@@ -580,6 +678,7 @@ export async function importRecipeFromUrl(formData: FormData) {
       description,
       sourceUrl,
       imageUrl,
+      videoUrl,
       servings: scrapedRecipe?.servings ?? null,
       prepTime: scrapedRecipe?.prepTime ?? null,
       cookTime: scrapedRecipe?.cookTime ?? null,

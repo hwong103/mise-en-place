@@ -6,7 +6,7 @@ import { buildShoppingList } from "@/lib/shopping";
 import { coerceStringArray } from "@/lib/recipe-utils";
 import { listShoppingItems } from "@/lib/shopping-list";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString("en-US", { month: "short", day: "numeric" });

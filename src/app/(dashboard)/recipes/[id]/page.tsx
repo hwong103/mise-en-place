@@ -12,9 +12,7 @@ import {
 
 import { deleteRecipe, updateRecipe, updateRecipeSection } from "../actions";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
+export const revalidate = 60;
 export const dynamicParams = true;
 
 const formatMinutes = (value?: number | null) =>
@@ -37,6 +35,51 @@ const getAuthorLabel = (sourceUrl?: string | null) => {
   }
 };
 
+const getVideoEmbed = (videoUrl?: string | null) => {
+  if (!videoUrl) {
+    return null;
+  }
+
+  const isVideoFile = /\.(mp4|webm|ogg)(\?.*)?$/i.test(videoUrl);
+  if (isVideoFile) {
+    return { type: "file" as const, url: videoUrl };
+  }
+
+  try {
+    const url = new URL(videoUrl);
+    const hostname = url.hostname.replace(/^www\./, "");
+
+    if (hostname === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      if (id) {
+        return { type: "iframe" as const, url: `https://www.youtube.com/embed/${id}` };
+      }
+    }
+
+    if (hostname.endsWith("youtube.com")) {
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      const id =
+        (pathParts[0] === "embed" && pathParts[1]) ||
+        (pathParts[0] === "shorts" && pathParts[1]) ||
+        url.searchParams.get("v");
+      if (id) {
+        return { type: "iframe" as const, url: `https://www.youtube.com/embed/${id}` };
+      }
+    }
+
+    if (hostname === "vimeo.com") {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      if (id) {
+        return { type: "iframe" as const, url: `https://player.vimeo.com/video/${id}` };
+      }
+    }
+  } catch {
+    // fall through to raw iframe
+  }
+
+  return { type: "iframe" as const, url: videoUrl };
+};
+
 export default async function RecipeDetailPage({
   params,
 }: {
@@ -55,11 +98,13 @@ export default async function RecipeDetailPage({
   const prepGroups = coercePrepGroups(recipe.prepGroups);
   const prepGroupsText = serializePrepGroupsToText(prepGroups);
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
+  const videoEmbed = getVideoEmbed(recipe.videoUrl);
   const initialValues = {
     title: recipe.title,
     description: recipe.description ?? undefined,
     sourceUrl: recipe.sourceUrl ?? undefined,
     imageUrl: recipe.imageUrl ?? undefined,
+    videoUrl: recipe.videoUrl ?? undefined,
     servings: recipe.servings ?? undefined,
     prepTime: recipe.prepTime ?? undefined,
     cookTime: recipe.cookTime ?? undefined,
@@ -275,6 +320,28 @@ export default async function RecipeDetailPage({
         </section>
 
         <aside className="space-y-6">
+          {videoEmbed ? (
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              {videoEmbed.type === "file" ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video
+                  src={videoEmbed.url}
+                  controls
+                  className="h-full w-full"
+                />
+              ) : (
+                <div className="aspect-video w-full">
+                  <iframe
+                    src={videoEmbed.url}
+                    title={`${recipe.title} video`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="h-full w-full"
+                  />
+                </div>
+              )}
+            </div>
+          ) : null}
           {recipe.imageUrl ? (
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
