@@ -1209,34 +1209,30 @@ export async function deleteRecipe(formData: FormData) {
 export async function addToMealPlan(formData: FormData) {
   const recipeId = toOptionalString(formData.get("recipeId"));
   const dateKey = toOptionalString(formData.get("date"));
-  const mealType = toOptionalString(formData.get("mealType"));
-
-  if (!recipeId || !dateKey || !mealType) {
+  if (!recipeId || !dateKey) {
     return;
   }
 
-  const normalizedMealType = mealType as "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
   const householdId = await getCurrentHouseholdId();
   const date = fromDateKey(dateKey);
 
-  await prisma.mealPlan.upsert({
-    where: {
-      householdId_date_mealType: {
+  await prisma.$transaction(async (tx) => {
+    await tx.mealPlan.deleteMany({
+      where: {
         householdId,
         date,
-        mealType: normalizedMealType,
       },
-    },
-    update: {
-      recipeId,
-    },
-    create: {
-      householdId,
-      recipeId,
-      date,
-      mealType: normalizedMealType,
-      servings: 2,
-    },
+    });
+
+    await tx.mealPlan.create({
+      data: {
+        householdId,
+        recipeId,
+        date,
+        mealType: "DINNER",
+        servings: 2,
+      },
+    });
   });
 
   revalidatePath("/planner");

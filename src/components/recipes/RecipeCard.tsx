@@ -1,9 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
 import Link from "next/link";
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
-import { getWeekRange } from "@/lib/date";
 
 const formatMinutes = (value?: number | null) => {
   if (!value) {
@@ -31,12 +29,7 @@ type RecipeCardProps = {
 
 export default function RecipeCard({ recipe }: RecipeCardProps) {
   const ingredientCount = recipe.ingredientCount;
-  const nextWeekDate = useMemo(() => {
-    const { start } = getWeekRange(new Date(), 1);
-    const nextWeek = new Date(start);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    return nextWeek.toISOString().split("T")[0];
-  }, []);
+  const defaultPlanDate = new Date().toISOString().split("T")[0];
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-indigo-300 hover:shadow-lg">
@@ -89,7 +82,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
           <AddToPlannerDialog
             recipeId={recipe.id}
             recipeTitle={recipe.title}
-            defaultDate={nextWeekDate}
+            defaultDate={defaultPlanDate}
           />
           <Link
             href={`/recipes/${recipe.id}`}

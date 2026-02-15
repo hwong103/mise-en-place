@@ -12,6 +12,22 @@ export function fromDateKey(key: string) {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
+export function normalizeToUtcDate(date: Date) {
+  return fromDateKey(toDateKey(date));
+}
+
+export function getUpcomingRange(referenceDate = new Date(), daysCount = 7) {
+  const start = normalizeToUtcDate(referenceDate);
+  const days = Array.from({ length: daysCount }, (_, index) => {
+    const day = new Date(start);
+    day.setUTCDate(start.getUTCDate() + index);
+    return day;
+  });
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + (daysCount - 1));
+  return { start, end, days };
+}
+
 export function getWeekRange(referenceDate = new Date(), weekStartsOn = 1) {
   const start = new Date(referenceDate);
   const dayOfWeek = start.getDay();

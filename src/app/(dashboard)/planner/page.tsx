@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import prisma from "@/lib/prisma";
-import { getWeekRange, toDateKey, fromDateKey } from "@/lib/date";
+import { getUpcomingRange, toDateKey } from "@/lib/date";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { listRecipeTitles } from "@/lib/recipes";
 import PlannerBoard from "@/components/planner/PlannerBoard";
@@ -12,9 +12,8 @@ const formatDate = (date: Date) =>
   date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
 export default async function PlannerPage() {
-  const { days } = getWeekRange();
+  const { days } = getUpcomingRange();
   const dateKeys = days.map((day) => toDateKey(day));
-  const weekDates = dateKeys.map((key) => fromDateKey(key));
 
   const householdId = await getCurrentHouseholdId();
   const [recipes, mealPlans] = await Promise.all([
@@ -22,7 +21,8 @@ export default async function PlannerPage() {
     prisma.mealPlan.findMany({
       where: {
         householdId,
-        date: { in: weekDates },
+        date: { in: days },
+        mealType: "DINNER",
       },
       include: {
         recipe: true,
@@ -33,7 +33,6 @@ export default async function PlannerPage() {
   const hasRecipes = recipes.length > 0;
   const slots = mealPlans.map((plan) => ({
     dateKey: toDateKey(plan.date),
-    mealType: plan.mealType,
     recipeId: plan.recipeId,
     recipeTitle: plan.recipe?.title ?? null,
   }));
@@ -42,8 +41,8 @@ export default async function PlannerPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Weekly Planner</h1>
-          <p className="text-slate-500">Assign recipes to meals and generate your shopping list.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Planner</h1>
+          <p className="text-slate-500">Plan one recipe per day for the next 7 days.</p>
         </div>
         <Link
           href="/shopping"
@@ -55,7 +54,7 @@ export default async function PlannerPage() {
 
       {!hasRecipes ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          Add a few recipes first so you can plan meals for the week.
+          Add a few recipes first so you can plan meals.
           <Link href="/recipes" className="ml-2 font-semibold text-indigo-600">
             Go to Recipes
           </Link>

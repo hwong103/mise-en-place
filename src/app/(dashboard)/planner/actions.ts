@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { fromDateKey } from "@/lib/date";
 
+const DAILY_MEAL_TYPE = "DINNER" as const;
+
 const toOptionalString = (value: FormDataEntryValue | null) => {
   if (value === null) {
     return undefined;
@@ -16,16 +18,12 @@ const toOptionalString = (value: FormDataEntryValue | null) => {
 
 export async function upsertMealPlan(formData: FormData) {
   const dateKey = toOptionalString(formData.get("date"));
-  const mealType = toOptionalString(formData.get("mealType"));
   const recipeId = toOptionalString(formData.get("recipeId"));
 
-  const allowedMealTypes = new Set(["BREAKFAST", "LUNCH", "DINNER", "SNACK"]);
-
-  if (!dateKey || !mealType || !allowedMealTypes.has(mealType)) {
+  if (!dateKey) {
     return;
   }
 
-  const normalizedMealType = mealType as "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
   const householdId = await getCurrentHouseholdId();
   const date = fromDateKey(dateKey);
 
@@ -34,7 +32,6 @@ export async function upsertMealPlan(formData: FormData) {
       where: {
         householdId,
         date,
-        mealType: normalizedMealType,
       },
     });
 
@@ -43,24 +40,23 @@ export async function upsertMealPlan(formData: FormData) {
     return;
   }
 
-  await prisma.mealPlan.upsert({
-    where: {
-      householdId_date_mealType: {
+  await prisma.$transaction(async (tx) => {
+    await tx.mealPlan.deleteMany({
+      where: {
         householdId,
         date,
-        mealType: normalizedMealType,
       },
-    },
-    update: {
-      recipeId,
-    },
-    create: {
-      householdId,
-      recipeId,
-      date,
-      mealType: normalizedMealType,
-      servings: 2,
-    },
+    });
+
+    await tx.mealPlan.create({
+      data: {
+        householdId,
+        recipeId,
+        date,
+        mealType: DAILY_MEAL_TYPE,
+        servings: 2,
+      },
+    });
   });
 
   revalidatePath("/planner");

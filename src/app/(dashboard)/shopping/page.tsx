@@ -1,7 +1,7 @@
 import ShoppingList from "@/components/shopping/ShoppingList";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
-import { fromDateKey, getWeekRange, toDateKey } from "@/lib/date";
+import { getUpcomingRange, toDateKey } from "@/lib/date";
 import { buildShoppingList } from "@/lib/shopping";
 import { coerceStringArray } from "@/lib/recipe-utils";
 import { listShoppingItems } from "@/lib/shopping-list";
@@ -12,9 +12,7 @@ const formatDate = (date: Date) =>
   date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 export default async function ShoppingPage() {
-  const { start, end } = getWeekRange();
-  const startDate = fromDateKey(toDateKey(start));
-  const endDate = fromDateKey(toDateKey(end));
+  const { start, end } = getUpcomingRange();
   const householdId = await getCurrentHouseholdId();
 
   const [mealPlans, persistedItems] = await Promise.all([
@@ -22,13 +20,13 @@ export default async function ShoppingPage() {
       where: {
         householdId,
         date: {
-          gte: startDate,
-          lte: endDate,
+          gte: start,
+          lte: end,
         },
       },
       include: { recipe: true },
     }),
-    listShoppingItems(startDate, householdId),
+    listShoppingItems(start, householdId),
   ]);
 
   const ingredientLines = mealPlans.flatMap((plan) =>
