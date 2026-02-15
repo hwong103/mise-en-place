@@ -1,14 +1,21 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const readRequiredEnv = (name: "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY") => {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing ${name}`);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+export const hasSupabasePublicEnv = Boolean(supabaseUrl && supabaseAnonKey);
+
+let browserClient: SupabaseClient | null | undefined;
+
+export const getBrowserSupabaseClient = () => {
+  if (!hasSupabasePublicEnv) {
+    return null;
   }
-  return value;
+
+  if (browserClient !== undefined) {
+    return browserClient;
+  }
+
+  browserClient = createClient(supabaseUrl!, supabaseAnonKey!);
+  return browserClient;
 };
-
-const supabaseUrl = readRequiredEnv("NEXT_PUBLIC_SUPABASE_URL");
-const supabaseAnonKey = readRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);

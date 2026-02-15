@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,6 +14,13 @@ export default function LoginPage() {
     setPending(true);
     setError(null);
     setMessage(null);
+
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) {
+      setPending(false);
+      setError("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+      return;
+    }
 
     const origin = window.location.origin;
     const { error: signInError } = await supabase.auth.signInWithOtp({
@@ -40,6 +47,12 @@ export default function LoginPage() {
         Use a magic link to sign in with Supabase Auth.
       </p>
 
+      {!hasSupabasePublicEnv ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Missing `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+        </div>
+      ) : null}
+
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
         <label className="block text-sm font-semibold text-slate-700" htmlFor="email">
           Email
@@ -56,7 +69,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || !hasSupabasePublicEnv}
           className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
         >
           {pending ? "Sending..." : "Send Magic Link"}

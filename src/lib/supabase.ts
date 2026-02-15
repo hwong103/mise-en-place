@@ -1,1 +1,1 @@
-export { supabase } from "@/lib/supabase/client";
+export { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";

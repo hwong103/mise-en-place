@@ -2,13 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase/client";
+import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 export default function AuthStatus() {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasSupabasePublicEnv);
 
   useEffect(() => {
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) {
+      return;
+    }
+
     let mounted = true;
 
     supabase.auth.getUser().then(({ data }) => {
@@ -40,6 +45,10 @@ export default function AuthStatus() {
     return user.email ?? user.user_metadata?.full_name ?? "Signed in";
   }, [user]);
 
+  if (!hasSupabasePublicEnv) {
+    return <span className="text-xs text-amber-600">Auth not configured</span>;
+  }
+
   if (loading) {
     return <span className="text-xs text-slate-400">Loading...</span>;
   }
@@ -61,6 +70,10 @@ export default function AuthStatus() {
       <button
         type="button"
         onClick={async () => {
+          const supabase = getBrowserSupabaseClient();
+          if (!supabase) {
+            return;
+          }
           await supabase.auth.signOut();
           window.location.assign("/login");
         }}
