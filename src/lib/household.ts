@@ -3,6 +3,9 @@ import { getOrCreateAppUserId, requireCurrentAuthUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
+const isAuthDisabled = () =>
+  /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "") ||
+  /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 
 export const ensureDefaultHouseholdForUser = async (userId: string) => {
   const existingMembership = await prisma.householdMember.findFirst({
@@ -41,6 +44,10 @@ type UnauthenticatedBehavior = "redirect" | "throw";
 export const getCurrentHouseholdId = async (
   unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
 ) => {
+  if (isAuthDisabled()) {
+    return getBootstrapHouseholdId();
+  }
+
   let authUser;
   try {
     authUser = await requireCurrentAuthUser();

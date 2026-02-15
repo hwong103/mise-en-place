@@ -78,6 +78,7 @@ Optional variables:
 - `SUPABASE_SERVICE_ROLE_KEY` (reserved for future admin flows)
 - `OPENAI_API_KEY` and `NEXT_PUBLIC_OCR_PROVIDER` (reserved for future OCR provider expansion)
 - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (reserved for future managed image storage)
+- `DISABLE_AUTH` and `NEXT_PUBLIC_DISABLE_AUTH` (set to `true` only for debugging to bypass auth; in Preview you can set `NEXT_PUBLIC_DISABLE_AUTH=true` alone)
 
 ## Quality Gates
 
