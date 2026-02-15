@@ -158,10 +158,10 @@ export default function OcrImportCard() {
   }, [toast]);
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">Take a Photo</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Take a Photo</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Upload a cookbook photo and we&apos;ll extract the recipe text for you to review.
         </p>
       </div>
@@ -171,8 +171,8 @@ export default function OcrImportCard() {
           className={
             "mb-4 rounded-2xl px-4 py-3 text-sm font-semibold " +
             (toast.type === "success"
-              ? "border border-emerald-100 bg-emerald-50 text-emerald-700"
-              : "border border-rose-100 bg-rose-50 text-rose-700")
+              ? "border border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200"
+              : "border border-rose-100 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200")
           }
         >
           {toast.message}
@@ -181,7 +181,7 @@ export default function OcrImportCard() {
 
       <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
         <div className="space-y-4">
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
             <input
               id="photo-upload"
               type="file"
@@ -199,7 +199,7 @@ export default function OcrImportCard() {
           </div>
 
           {previewUrl ? (
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={previewUrl} alt="OCR preview" className="h-56 w-full object-cover" />
             </div>
@@ -215,22 +215,22 @@ export default function OcrImportCard() {
           </button>
 
           {isConverting ? (
-            <div className="text-xs text-slate-500">Converting HEIC photo...</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Converting HEIC photo...</div>
           ) : null}
 
           {progress ? (
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
               {progress.status} {Math.round(progress.progress * 100)}%
             </div>
           ) : null}
 
-          {error ? <div className="text-xs text-rose-500">{error}</div> : null}
+          {error ? <div className="text-xs text-rose-500 dark:text-rose-300">{error}</div> : null}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <input type="hidden" name="ocrText" value={ocrText} />
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700" htmlFor="ocr-title">
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="ocr-title">
               Recipe Title
             </label>
             <input
@@ -239,16 +239,16 @@ export default function OcrImportCard() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Optional override"
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700">Extracted Text</label>
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Extracted Text</label>
             <textarea
               value={ocrText}
               onChange={(event) => setOcrText(event.target.value)}
               rows={10}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
               placeholder="Extracted text will appear here. You can edit before saving."
             />
           </div>
@@ -260,7 +260,7 @@ export default function OcrImportCard() {
             {isPending ? "Saving..." : "Create Recipe"}
           </button>
           {imageUrl ? (
-            <p className="text-xs text-slate-400">Source: {imageUrl}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Source: {imageUrl}</p>
           ) : null}
         </form>
       </div>

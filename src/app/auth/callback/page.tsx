@@ -3,11 +3,18 @@
 import { useEffect, useState } from "react";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
+const isAuthDisabled = /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+
 export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
+      if (isAuthDisabled) {
+        window.location.replace("/recipes");
+        return;
+      }
+
       if (!hasSupabasePublicEnv) {
         setError("Auth is not configured.");
         return;

@@ -38,7 +38,7 @@ export default function RecipeForm({
       {recipeId ? <input type="hidden" name="recipeId" value={recipeId} /> : null}
 
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="title">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="title">
           Title
         </label>
         <input
@@ -47,12 +47,12 @@ export default function RecipeForm({
           required
           defaultValue={initialValues?.title ?? ""}
           placeholder="Sheet-Pan Chicken Tacos"
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="description">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="description">
           Description
         </label>
         <textarea
@@ -61,13 +61,13 @@ export default function RecipeForm({
           rows={3}
           defaultValue={initialValues?.description ?? ""}
           placeholder="A quick, weeknight-friendly taco platter with roasted veggies."
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="sourceUrl">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="sourceUrl">
             Source URL
           </label>
           <input
@@ -76,12 +76,12 @@ export default function RecipeForm({
             type="url"
             defaultValue={initialValues?.sourceUrl ?? ""}
             placeholder="https://example.com/recipe"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="imageUrl">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="imageUrl">
             Image URL
           </label>
           <input
@@ -90,13 +90,13 @@ export default function RecipeForm({
             type="url"
             defaultValue={initialValues?.imageUrl ?? ""}
             placeholder="https://images..."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="videoUrl">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="videoUrl">
           Video URL
         </label>
         <input
@@ -105,13 +105,13 @@ export default function RecipeForm({
           type="url"
           defaultValue={initialValues?.videoUrl ?? ""}
           placeholder="https://youtu.be/..."
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="servings">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="servings">
             Servings
           </label>
           <input
@@ -121,12 +121,12 @@ export default function RecipeForm({
             min={1}
             defaultValue={initialValues?.servings ?? undefined}
             placeholder="4"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="prepTime">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="prepTime">
             Prep Time (min)
           </label>
           <input
@@ -136,12 +136,12 @@ export default function RecipeForm({
             min={1}
             defaultValue={initialValues?.prepTime ?? undefined}
             placeholder="15"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="cookTime">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="cookTime">
             Cook Time (min)
           </label>
           <input
@@ -151,13 +151,13 @@ export default function RecipeForm({
             min={1}
             defaultValue={initialValues?.cookTime ?? undefined}
             placeholder="25"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="tags">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="tags">
           Tags
         </label>
         <input
@@ -165,13 +165,13 @@ export default function RecipeForm({
           name="tags"
           defaultValue={joinTags(initialValues?.tags ?? null)}
           placeholder="Weeknight, Gluten-Free, Kid-Friendly"
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="ingredients">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="ingredients">
             Ingredients (one per line)
           </label>
           <textarea
@@ -180,12 +180,12 @@ export default function RecipeForm({
             rows={8}
             defaultValue={joinLines(initialValues?.ingredients ?? null)}
             placeholder="2 tbsp olive oil\n1 lb chicken thighs\n1 tsp cumin"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="instructions">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="instructions">
             Instructions (one per line)
           </label>
           <textarea
@@ -194,13 +194,13 @@ export default function RecipeForm({
             rows={8}
             defaultValue={joinLines(initialValues?.instructions ?? null)}
             placeholder="Preheat oven to 425F.\nToss chicken with spices.\nRoast 20 minutes."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="notes">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="notes">
           Notes (one per line)
         </label>
         <textarea
@@ -209,7 +209,7 @@ export default function RecipeForm({
           rows={4}
           defaultValue={joinLines(initialValues?.notes ?? null)}
           placeholder="Note 1: Use freshly grated parmesan.\nNote 2: Slice mushrooms 1/2 cm thick."
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 

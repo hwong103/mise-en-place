@@ -1,3 +1,5 @@
+import { classifyIngredient, type IngredientCategory } from "@/lib/ingredient-classifier";
+
 export type ShoppingIngredientEntry = {
   line: string;
   recipeTitle?: string | null;
@@ -14,219 +16,7 @@ export type ShoppingCategory = {
   items: ShoppingItem[];
 };
 
-type CategoryRule = {
-  name: string;
-  keywords: string[];
-};
-
-const CATEGORY_RULES: CategoryRule[] = [
-  {
-    name: "Produce",
-    keywords: [
-      "apple",
-      "banana",
-      "basil",
-      "carrot",
-      "cilantro",
-      "garlic",
-      "ginger",
-      "green onion",
-      "lemon",
-      "lime",
-      "lettuce",
-      "mushroom",
-      "mushrooms",
-      "onion",
-      "pepper",
-      "potato",
-      "shallot",
-      "shallots",
-      "eschalot",
-      "eschalots",
-      "eschallot",
-      "eschallots",
-      "eshallot",
-      "eshallots",
-      "spinach",
-      "tomato",
-    ],
-  },
-  {
-    name: "Dairy",
-    keywords: ["butter", "cheese", "cream", "milk", "yogurt"],
-  },
-  {
-    name: "Meat",
-    keywords: [
-      "bacon",
-      "beef",
-      "chicken",
-      "fish",
-      "lamb",
-      "pork",
-      "scallop",
-      "scallops",
-      "sausage",
-      "shrimp",
-      "turkey",
-    ],
-  },
-  {
-    name: "Pantry",
-    keywords: [
-      "beans",
-      "broth",
-      "canned",
-      "flour",
-      "oil",
-      "pasta",
-      "rice",
-      "salt",
-      "sauce",
-      "spice",
-      "stock",
-      "sugar",
-      "vinegar",
-    ],
-  },
-  {
-    name: "Other",
-    keywords: [],
-  },
-];
-
-const UNIT_WORDS = new Set([
-  "g",
-  "kg",
-  "mg",
-  "ml",
-  "l",
-  "oz",
-  "lb",
-  "lbs",
-  "pound",
-  "pounds",
-  "tbsp",
-  "tsp",
-  "cup",
-  "cups",
-  "tablespoon",
-  "tablespoons",
-  "teaspoon",
-  "teaspoons",
-  "clove",
-  "cloves",
-  "pinch",
-  "dash",
-  "package",
-  "packages",
-  "can",
-  "cans",
-  "slice",
-  "slices",
-  "inch",
-  "inches",
-  "cm",
-  "mm",
-  "meter",
-  "meters",
-  "stalk",
-  "stalks",
-]);
-
-const STOP_WORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "or",
-  "of",
-  "the",
-  "to",
-  "with",
-  "for",
-  "each",
-  "fresh",
-  "freshly",
-  "optional",
-  "taste",
-  "about",
-  "approx",
-  "part",
-  "parts",
-  "only",
-  "outer",
-  "layers",
-  "removed",
-  "sliced",
-  "slice",
-  "thick",
-  "finely",
-  "roughly",
-  "minced",
-  "peeled",
-  "whole",
-  "white",
-  "black",
-  "small",
-  "medium",
-  "large",
-  "raw",
-  "diced",
-  "chopped",
-  "julienned",
-  "crushed",
-  "ground",
-]);
-
-const normalize = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const isQuantityToken = (token: string) => /^\d+(?:[./]\d+)?$/.test(token);
-
-const singularizeToken = (token: string) => {
-  if (token.endsWith("ies") && token.length > 3) {
-    return `${token.slice(0, -3)}y`;
-  }
-
-  if (token.endsWith("oes") && token.length > 3) {
-    return token.slice(0, -2);
-  }
-
-  if (token.endsWith("s") && !token.endsWith("ss") && token.length > 3) {
-    return token.slice(0, -1);
-  }
-
-  return token;
-};
-
-const toIngredientKey = (line: string) => {
-  const normalized = normalize(line);
-  if (!normalized) {
-    return "";
-  }
-
-  const tokens = normalized
-    .split(" ")
-    .filter(Boolean)
-    .filter((token) => !isQuantityToken(token))
-    .filter((token) => !UNIT_WORDS.has(token))
-    .filter((token) => !STOP_WORDS.has(token));
-
-  const canonicalTokens = tokens
-    .map((token) => singularizeToken(token))
-    .filter((token) => token.length > 2 || token === "egg");
-
-  if (canonicalTokens.length === 0) {
-    return normalized;
-  }
-
-  return Array.from(new Set(canonicalTokens)).join(" ");
-};
+const CATEGORY_ORDER: IngredientCategory[] = ["Produce", "Dairy", "Meat", "Pantry", "Other"];
 
 const titleCase = (value: string) =>
   value
@@ -235,29 +25,11 @@ const titleCase = (value: string) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
-const resolveCategory = (line: string) => {
-  const normalized = normalize(line);
-  if (!normalized) {
-    return "Other";
-  }
-
-  for (const rule of CATEGORY_RULES) {
-    if (rule.keywords.length === 0) {
-      continue;
-    }
-
-    for (const keyword of rule.keywords) {
-      if (normalized.includes(keyword)) {
-        return rule.name;
-      }
-    }
-  }
-
-  return "Other";
-};
-
 export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingCategory[] {
-  const itemMap = new Map<string, { line: string; count: number; recipes: Set<string> }>();
+  const itemMap = new Map<
+    string,
+    { line: string; count: number; recipes: Set<string>; category: IngredientCategory }
+  >();
 
   for (const entry of entries) {
     const trimmed = entry.line.trim();
@@ -265,7 +37,8 @@ export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingC
       continue;
     }
 
-    const key = toIngredientKey(trimmed);
+    const classification = classifyIngredient(trimmed);
+    const key = classification.canonical || trimmed.toLowerCase();
     if (!key) {
       continue;
     }
@@ -273,6 +46,9 @@ export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingC
     const existing = itemMap.get(key);
     if (existing) {
       existing.count += 1;
+      if (existing.category === "Other" && classification.category !== "Other") {
+        existing.category = classification.category;
+      }
       if (entry.recipeTitle) {
         existing.recipes.add(entry.recipeTitle);
       }
@@ -280,27 +56,27 @@ export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingC
       itemMap.set(key, {
         line: titleCase(key),
         count: 1,
+        category: classification.category,
         recipes: new Set(entry.recipeTitle ? [entry.recipeTitle] : []),
       });
     }
   }
 
-  const categoryMap = new Map<string, ShoppingItem[]>();
+  const categoryMap = new Map<IngredientCategory, ShoppingItem[]>();
 
   for (const item of itemMap.values()) {
-    const category = resolveCategory(item.line);
-    const list = categoryMap.get(category) ?? [];
+    const list = categoryMap.get(item.category) ?? [];
     list.push({
       line: item.line,
       count: item.count,
       recipes: Array.from(item.recipes).sort((a, b) => a.localeCompare(b)),
     });
-    categoryMap.set(category, list);
+    categoryMap.set(item.category, list);
   }
 
-  return CATEGORY_RULES.map((rule) => {
-    const items = categoryMap.get(rule.name) ?? [];
+  return CATEGORY_ORDER.map((category) => {
+    const items = categoryMap.get(category) ?? [];
     items.sort((a, b) => a.line.localeCompare(b.line));
-    return { name: rule.name, items };
+    return { name: category, items };
   }).filter((category) => category.items.length > 0);
 }

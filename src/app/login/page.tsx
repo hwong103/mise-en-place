@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+const isAuthDisabled = /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -57,6 +58,12 @@ export default function LoginPage() {
         Use a magic link to sign in with Supabase Auth.
       </p>
 
+      {isAuthDisabled ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          Auth is disabled for debugging. You can go directly to the app routes.
+        </div>
+      ) : null}
+
       {!hasSupabasePublicEnv ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           Missing `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
@@ -79,7 +86,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={pending || !hasSupabasePublicEnv}
+          disabled={pending || !hasSupabasePublicEnv || isAuthDisabled}
           className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
         >
           {pending ? "Sending..." : "Send Magic Link"}

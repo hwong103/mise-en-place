@@ -304,7 +304,7 @@ export default function ShoppingList({
                                   {item.recipes.map((recipe) => (
                                     <span
                                       key={`${item.key}-${recipe}`}
-                                      className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600"
+                                      className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300"
                                     >
                                       {recipe}
                                     </span>
@@ -332,7 +332,7 @@ export default function ShoppingList({
                                   id: item.id,
                                 })
                               }
-                              className="text-xs font-semibold text-rose-500"
+                              className="text-xs font-semibold text-rose-500 dark:text-rose-300"
                               disabled={isSaving || isPending}
                             >
                               Remove

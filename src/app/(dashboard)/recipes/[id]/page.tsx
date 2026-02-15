@@ -164,14 +164,14 @@ export default async function RecipeDetailPage({
     <div className="space-y-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-2">
-          <Link href="/recipes" className="text-sm font-semibold text-indigo-600">
+          <Link href="/recipes" className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
             {"<- Back to Recipes"}
           </Link>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
             {recipe.title}
           </h1>
           {recipe.description ? (
-            <p className="max-w-2xl text-slate-500">{recipe.description}</p>
+            <p className="max-w-2xl text-slate-500 dark:text-slate-400">{recipe.description}</p>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-3">
@@ -182,7 +182,7 @@ export default async function RecipeDetailPage({
                 ? `/recipes/${recipe.id}#edit-recipe`
                 : `/recipes/${recipe.id}?edit=1#edit-recipe`
             }
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             Edit
           </Link>
@@ -191,7 +191,7 @@ export default async function RecipeDetailPage({
             <SubmitButton
               label="Delete"
               pendingLabel="Deleting..."
-              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-70"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-70 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/40"
             />
           </form>
         </div>
@@ -199,20 +199,20 @@ export default async function RecipeDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <section className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-wrap items-center gap-3">
               {recipe.servings ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                   {recipe.servings} servings
                 </span>
               ) : null}
               {formatMinutes(recipe.prepTime) ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                   Prep {formatMinutes(recipe.prepTime)}
                 </span>
               ) : null}
               {formatMinutes(recipe.cookTime) ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                   Cook {formatMinutes(recipe.cookTime)}
                 </span>
               ) : null}
@@ -221,7 +221,7 @@ export default async function RecipeDetailPage({
                   href={recipe.sourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600"
+                  className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-300"
                 >
                   {authorLabel ? `By ${authorLabel}` : "Source"}
                 </a>
@@ -233,7 +233,7 @@ export default async function RecipeDetailPage({
                 {recipe.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600"
+                    className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-300"
                   >
                     {tag}
                   </span>
@@ -244,19 +244,19 @@ export default async function RecipeDetailPage({
 
           <div className="grid gap-6 md:grid-cols-2">
             {recipe.videoUrl ? (
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-bold text-slate-900">Watch</h2>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
                   <a
                     href={recipe.videoUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm font-semibold text-indigo-600"
+                    className="text-sm font-semibold text-indigo-600 dark:text-indigo-400"
                   >
                     Open Video
                   </a>
                 </div>
-                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
                   {embedUrl ? (
                     <div className="aspect-[16/9] w-full">
                       <iframe
@@ -268,29 +268,29 @@ export default async function RecipeDetailPage({
                       />
                     </div>
                   ) : (
-                    <div className="flex h-40 items-center justify-center text-sm text-slate-500">
+                    <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                       Video preview not available.
                     </div>
                   )}
                 </div>
               </section>
             ) : null}
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">Ingredients</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
               </div>
               {ingredients.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500">
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
                   No ingredients listed yet.
                 </p>
               ) : ingredientGroups.length > 0 ? (
                 <div className="mt-4 space-y-5">
                   {ingredientGroups.map((group) => (
                     <div key={group.title}>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                         {group.title}
                       </h3>
-                      <ul className="mt-2 space-y-2 text-sm text-slate-700">
+                      <ul className="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                         {group.items.map((item) => (
                           <li key={`${group.title}-${item}`} className="flex items-start gap-2">
                             <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
@@ -302,7 +302,7 @@ export default async function RecipeDetailPage({
                   ))}
                 </div>
               ) : (
-                <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                   {ingredients.map((item) => (
                     <li key={item} className="flex items-start gap-2">
                       <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
@@ -312,7 +312,7 @@ export default async function RecipeDetailPage({
                 </ul>
               )}
               <details className="mt-6">
-                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                   Edit Ingredients
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
@@ -325,7 +325,7 @@ export default async function RecipeDetailPage({
                     name="ingredients"
                     rows={6}
                     defaultValue={ingredients.join("\n")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                   />
                   <button
                     type="submit"
@@ -337,19 +337,19 @@ export default async function RecipeDetailPage({
               </details>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">Instructions</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
               </div>
               {instructions.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500">
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
                   No instructions listed yet.
                 </p>
               ) : (
-                <ol className="mt-4 space-y-3 text-sm text-slate-700">
+                <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
                   {instructions.map((step, index) => (
                     <li key={`${index}-${step}`} className="flex gap-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                         {index + 1}
                       </span>
                       <span>{step}</span>
@@ -358,7 +358,7 @@ export default async function RecipeDetailPage({
                 </ol>
               )}
               <details className="mt-6">
-                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                   Edit Instructions
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
@@ -371,7 +371,7 @@ export default async function RecipeDetailPage({
                     name="instructions"
                     rows={6}
                     defaultValue={instructions.join("\n")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                   />
                   <button
                     type="submit"
@@ -384,21 +384,21 @@ export default async function RecipeDetailPage({
             </section>
           </div>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900">Notes</h2>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Notes</h2>
             {notes.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500">No notes saved yet.</p>
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No notes saved yet.</p>
             ) : (
-              <ul className="mt-4 space-y-2 text-sm text-slate-700">
+              <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                 {notes.map((note) => (
-                  <li key={note} className="rounded-xl bg-slate-50 px-3 py-2">
+                  <li key={note} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
                     {note}
                   </li>
                 ))}
               </ul>
             )}
             <details className="mt-6">
-              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                 Edit Notes
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
@@ -411,7 +411,7 @@ export default async function RecipeDetailPage({
                   name="notes"
                   rows={4}
                   defaultValue={notes.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
                 <button
                   type="submit"
@@ -426,7 +426,7 @@ export default async function RecipeDetailPage({
 
         <aside className="space-y-6">
           {recipe.imageUrl ? (
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={recipe.imageUrl}
@@ -436,20 +436,20 @@ export default async function RecipeDetailPage({
             </div>
           ) : null}
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900">Mise en Place</h2>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise en Place</h2>
             {prepGroups.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500">
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
                 Add ingredients to generate prep groups.
               </p>
             ) : (
               <div className="mt-4 space-y-4">
                 {prepGroups.map((group) => (
                   <div key={group.title}>
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                       {group.title}
                     </h3>
-                    <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                    <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
                       {group.items.map((item) => (
                         <li key={`${group.title}-${item}`}>
                           {item}
@@ -462,7 +462,7 @@ export default async function RecipeDetailPage({
             )}
 
             <details className="mt-6">
-              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                 Edit Prep Groups
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
@@ -476,7 +476,7 @@ export default async function RecipeDetailPage({
                   rows={8}
                   defaultValue={prepGroupsText}
                   placeholder="Prep\n- mince garlic\n- chop onions"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
                 <button
                   type="submit"
@@ -493,11 +493,11 @@ export default async function RecipeDetailPage({
       {isEditing ? (
         <section
           id="edit-recipe"
-          className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"
+          className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900"
         >
           <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900">Edit Recipe Details</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Edit Recipe Details</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Update the core recipe metadata, timings, and full ingredient list.
             </p>
           </div>

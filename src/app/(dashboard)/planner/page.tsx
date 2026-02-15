@@ -41,8 +41,8 @@ export default async function PlannerPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Planner</h1>
-          <p className="text-slate-500">Plan one recipe per day for the next 7 days.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Planner</h1>
+          <p className="text-slate-500 dark:text-slate-400">Plan one recipe per day for the next 7 days.</p>
         </div>
         <Link
           href="/shopping"
@@ -53,9 +53,9 @@ export default async function PlannerPage() {
       </div>
 
       {!hasRecipes ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
           Add a few recipes first so you can plan meals.
-          <Link href="/recipes" className="ml-2 font-semibold text-indigo-600">
+          <Link href="/recipes" className="ml-2 font-semibold text-indigo-600 dark:text-indigo-400">
             Go to Recipes
           </Link>
         </div>
