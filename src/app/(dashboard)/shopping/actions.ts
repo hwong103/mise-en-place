@@ -46,6 +46,7 @@ export async function toggleShoppingItem(input: {
     update: {
       line,
       checked: input.checked,
+      suppressed: false,
     },
     create: {
       householdId,
@@ -55,6 +56,7 @@ export async function toggleShoppingItem(input: {
       category,
       manual: input.manual,
       checked: input.checked,
+      suppressed: false,
     },
   });
 
@@ -90,6 +92,8 @@ export async function addManualShoppingItem(input: {
     },
     update: {
       line,
+      suppressed: false,
+      checked: false,
     },
     create: {
       householdId,
@@ -99,6 +103,7 @@ export async function addManualShoppingItem(input: {
       category,
       manual: true,
       checked: false,
+      suppressed: false,
     },
   });
 
@@ -115,6 +120,69 @@ export async function removeManualShoppingItem(input: { id: string }) {
 
   await prisma.shoppingListItem.deleteMany({
     where: { id, householdId, manual: true },
+  });
+
+  revalidatePath("/shopping");
+}
+
+export async function suppressShoppingItem(input: {
+  weekKey: string;
+  line: string;
+  category: string;
+  manual: boolean;
+}) {
+  const weekKey = toOptionalString(input.weekKey);
+  const line = toOptionalString(input.line);
+  const category = toOptionalString(input.category) ?? "Other";
+
+  if (!weekKey || !line) {
+    return;
+  }
+
+  const householdId = await getCurrentHouseholdId();
+  const lineNormalized = normalizeShoppingLine(line);
+  const date = fromDateKey(weekKey);
+
+  if (input.manual) {
+    await prisma.shoppingListItem.deleteMany({
+      where: {
+        householdId,
+        weekStart: date,
+        lineNormalized,
+        category,
+        manual: true,
+      },
+    });
+
+    revalidatePath("/shopping");
+    return;
+  }
+
+  await prisma.shoppingListItem.upsert({
+    where: {
+      householdId_weekStart_lineNormalized_category_manual: {
+        householdId,
+        weekStart: date,
+        lineNormalized,
+        category,
+        manual: false,
+      },
+    },
+    update: {
+      line,
+      suppressed: true,
+      checked: false,
+    },
+    create: {
+      householdId,
+      weekStart: date,
+      line,
+      lineNormalized,
+      category,
+      manual: false,
+      checked: false,
+      suppressed: true,
+    },
   });
 
   revalidatePath("/shopping");

@@ -29,10 +29,13 @@ export default async function ShoppingPage() {
     listShoppingItems(start, householdId),
   ]);
 
-  const ingredientLines = mealPlans.flatMap((plan) =>
-    plan.recipe ? coerceStringArray(plan.recipe.ingredients) : [],
-  );
-  const categories = buildShoppingList(ingredientLines);
+  const ingredientEntries = mealPlans.flatMap((plan) => {
+    const recipeTitle = plan.recipe?.title ?? null;
+    const ingredients = plan.recipe ? coerceStringArray(plan.recipe.ingredients) : [];
+    return ingredients.map((line) => ({ line, recipeTitle }));
+  });
+
+  const categories = buildShoppingList(ingredientEntries);
   return (
     <ShoppingList
       weekKey={toDateKey(start)}

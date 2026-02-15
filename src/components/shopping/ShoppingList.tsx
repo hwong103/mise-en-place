@@ -4,7 +4,12 @@ import { useMemo, useState, useTransition } from "react";
 import type { ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@prisma/client";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
-import { addManualShoppingItem, removeManualShoppingItem, toggleShoppingItem } from "@/app/(dashboard)/shopping/actions";
+import {
+  addManualShoppingItem,
+  removeManualShoppingItem,
+  suppressShoppingItem,
+  toggleShoppingItem,
+} from "@/app/(dashboard)/shopping/actions";
 
 const normalize = (value: string) =>
   value
@@ -31,6 +36,9 @@ export default function ShoppingList({
 }: ShoppingListProps) {
   const [manualLine, setManualLine] = useState("");
   const [manualCategory, setManualCategory] = useState("Other");
+  const [optimisticChecked, setOptimisticChecked] = useState<Record<string, boolean>>({});
+  const [suppressedKeys, setSuppressedKeys] = useState<Record<string, boolean>>({});
+  const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
 
   const persistedLookup = useMemo(() => {
@@ -43,18 +51,32 @@ export default function ShoppingList({
   }, [persistedItems]);
 
   const mergedCategories = useMemo(() => {
-    const map = new Map<string, { line: string; count: number; key: string; manual: boolean; id?: string }[]>();
+    const isItemSuppressed = (key: string) => {
+      if (suppressedKeys[key]) {
+        return true;
+      }
+      return persistedLookup.get(key)?.suppressed ?? false;
+    };
+
+    const map = new Map<
+      string,
+      { line: string; count: number; key: string; manual: boolean; id?: string; recipes: string[] }[]
+    >();
 
     categories.forEach((category) => {
       const list = map.get(category.name) ?? [];
       category.items.forEach((item) => {
         const key = buildItemKey(category.name, item.line, false);
+        if (isItemSuppressed(key)) {
+          return;
+        }
         list.push({
           line: item.line,
           count: item.count,
           key,
           manual: false,
           id: persistedLookup.get(key)?.id,
+          recipes: item.recipes,
         });
       });
       map.set(category.name, list);
@@ -65,21 +87,27 @@ export default function ShoppingList({
       .forEach((item) => {
         const list = map.get(item.category) ?? [];
         const key = buildItemKey(item.category, item.line, true);
+        if (isItemSuppressed(key)) {
+          return;
+        }
         list.push({
           line: item.line,
           count: 1,
           key,
           manual: true,
           id: item.id,
+          recipes: [],
         });
         map.set(item.category, list);
       });
 
-    return Array.from(map.entries()).map(([name, items]) => ({
-      name,
-      items,
-    }));
-  }, [categories, persistedItems, persistedLookup]);
+    return Array.from(map.entries())
+      .map(([name, items]) => ({
+        name,
+        items,
+      }))
+      .filter((category) => category.items.length > 0);
+  }, [categories, persistedItems, persistedLookup, suppressedKeys]);
 
   const shareText = useMemo(() => {
     if (mergedCategories.length === 0) {
@@ -89,7 +117,10 @@ export default function ShoppingList({
     const lines = mergedCategories
       .map((category) => {
         const items = category.items
-          .filter((item) => !persistedLookup.get(item.key)?.checked)
+          .filter((item) => {
+            const checked = optimisticChecked[item.key] ?? persistedLookup.get(item.key)?.checked ?? false;
+            return !checked;
+          })
           .map((item) => (item.count > 1 ? `- ${item.line} (x${item.count})` : `- ${item.line}`))
           .join("\n");
         if (!items) {
@@ -100,7 +131,7 @@ export default function ShoppingList({
       .filter(Boolean);
 
     return [`Shopping List (${weekLabel})`, "", ...lines].join("\n\n");
-  }, [mergedCategories, persistedLookup, weekLabel]);
+  }, [mergedCategories, optimisticChecked, persistedLookup, weekLabel]);
 
   const categoryOptions = useMemo(() => {
     const names = new Set<string>(categories.map((category) => category.name));
@@ -108,18 +139,57 @@ export default function ShoppingList({
     return Array.from(names);
   }, [categories]);
 
-  const handleToggle = (item: { key: string; line: string; manual: boolean; id?: string; category: string }) => {
+  const handleToggle = (item: { key: string; line: string; manual: boolean; category: string }) => {
     const current = persistedLookup.get(item.key);
-    const nextChecked = !(current?.checked ?? false);
+    const currentChecked = optimisticChecked[item.key] ?? (current?.checked ?? false);
+    const nextChecked = !currentChecked;
+
+    setOptimisticChecked((prev) => ({ ...prev, [item.key]: nextChecked }));
+    setPendingKeys((prev) => ({ ...prev, [item.key]: true }));
 
     startTransition(async () => {
-      await toggleShoppingItem({
-        weekKey,
-        line: item.line,
-        category: item.category,
-        manual: item.manual,
-        checked: nextChecked,
-      });
+      try {
+        await toggleShoppingItem({
+          weekKey,
+          line: item.line,
+          category: item.category,
+          manual: item.manual,
+          checked: nextChecked,
+        });
+      } finally {
+        setPendingKeys((prev) => {
+          const next = { ...prev };
+          delete next[item.key];
+          return next;
+        });
+      }
+    });
+  };
+
+  const handleSuppress = (item: { key: string; line: string; manual: boolean; category: string; id?: string }) => {
+    setSuppressedKeys((prev) => ({ ...prev, [item.key]: true }));
+    setPendingKeys((prev) => ({ ...prev, [item.key]: true }));
+
+    startTransition(async () => {
+      try {
+        if (item.manual && item.id) {
+          await removeManualShoppingItem({ id: item.id });
+          return;
+        }
+
+        await suppressShoppingItem({
+          weekKey,
+          line: item.line,
+          category: item.category,
+          manual: item.manual,
+        });
+      } finally {
+        setPendingKeys((prev) => {
+          const next = { ...prev };
+          delete next[item.key];
+          return next;
+        });
+      }
     });
   };
 
@@ -135,15 +205,6 @@ export default function ShoppingList({
         line: trimmed,
         category: manualCategory,
       });
-    });
-  };
-
-  const handleRemoveManual = (itemId?: string) => {
-    if (!itemId) {
-      return;
-    }
-    startTransition(async () => {
-      await removeManualShoppingItem({ id: itemId });
     });
   };
 
@@ -193,49 +254,75 @@ export default function ShoppingList({
           No ingredients yet. Add meals in the planner to generate your list.
         </div>
       ) : (
-        <div className="max-w-3xl space-y-8">
+        <div className="max-w-4xl space-y-8">
           {mergedCategories.map((category) => (
             <div key={category.name} className="space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">{category.name}</h3>
               <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
                 <ul className="divide-y divide-slate-100">
                   {category.items.map((item) => {
-                    const isChecked = persistedLookup.get(item.key)?.checked ?? false;
+                    const isChecked =
+                      optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
+                    const isSaving = pendingKeys[item.key] ?? false;
+
                     return (
-                      <li key={item.key} className="flex items-center justify-between px-6 py-4 text-sm text-slate-700">
-                        <label className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() =>
-                              handleToggle({
-                                key: item.key,
-                                line: item.line,
-                                manual: item.manual,
-                                id: item.id,
-                                category: category.name,
-                              })
-                            }
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                          <span className={isChecked ? "line-through text-slate-400" : ""}>{item.line}</span>
-                        </label>
-                        <div className="flex items-center gap-3">
-                          {item.count > 1 ? (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
-                              x{item.count}
-                            </span>
-                          ) : null}
-                          {item.manual ? (
+                      <li key={item.key} className="px-6 py-4 text-sm text-slate-700">
+                        <div className="flex items-start justify-between gap-4">
+                          <label className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() =>
+                                handleToggle({
+                                  key: item.key,
+                                  line: item.line,
+                                  manual: item.manual,
+                                  category: category.name,
+                                })
+                              }
+                              className="mt-1 h-4 w-4 rounded border-slate-300"
+                            />
+                            <div>
+                              <div className={isChecked ? "line-through text-slate-400" : ""}>{item.line}</div>
+                              {item.recipes.length > 0 ? (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {item.recipes.map((recipe) => (
+                                    <span
+                                      key={`${item.key}-${recipe}`}
+                                      className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600"
+                                    >
+                                      {recipe}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          </label>
+
+                          <div className="flex items-center gap-3">
+                            {item.count > 1 ?
+                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                                x{item.count}
+                              </span>
+                             : null}
+                            {isSaving ? <span className="text-xs text-slate-400">Saving...</span> : null}
                             <button
                               type="button"
-                              onClick={() => handleRemoveManual(item.id)}
+                              onClick={() =>
+                                handleSuppress({
+                                  key: item.key,
+                                  line: item.line,
+                                  manual: item.manual,
+                                  category: category.name,
+                                  id: item.id,
+                                })
+                              }
                               className="text-xs font-semibold text-rose-500"
-                              disabled={isPending}
+                              disabled={isSaving || isPending}
                             >
                               Remove
                             </button>
-                          ) : null}
+                          </div>
                         </div>
                       </li>
                     );
