@@ -70,6 +70,7 @@ Required runtime variables:
 - `DIRECT_URL`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_URL` (recommended for stable magic-link redirects, e.g. your deployed app URL)
 
 Optional variables:
 
@@ -93,3 +94,13 @@ CI runs all of the above on push and pull requests.
 - OCR quality depends on image clarity, lighting, and text layout.
 - Settings invite/member management is currently a documented stub.
 
+## Supabase Auth Redirect Setup
+
+To avoid magic links redirecting to the wrong host (for example `localhost`), configure both:
+
+- `NEXT_PUBLIC_SITE_URL` in your app environment
+- Supabase Auth URL configuration:
+  - `Site URL` set to your canonical app URL
+  - `Additional Redirect URLs` include:
+    - `http://localhost:3000/auth/callback` (dev)
+    - your deployed callback URL(s), e.g. `https://<your-domain>/auth/callback`

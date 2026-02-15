@@ -1,13 +1,20 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
+
+const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const configuredSiteUrl = useMemo(() => {
+    const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    return raw ? trimTrailingSlash(raw) : null;
+  }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -22,11 +29,14 @@ export default function LoginPage() {
       return;
     }
 
-    const origin = window.location.origin;
+    const origin = trimTrailingSlash(window.location.origin);
+    const baseUrl = configuredSiteUrl ?? origin;
+    const redirectTo = `${baseUrl}/auth/callback`;
+
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${origin}/recipes`,
+        emailRedirectTo: redirectTo,
       },
     });
 
@@ -37,7 +47,7 @@ export default function LoginPage() {
       return;
     }
 
-    setMessage("Check your email for the sign-in link.");
+    setMessage(`Check your email for the sign-in link. Redirect target: ${redirectTo}`);
   };
 
   return (
@@ -75,6 +85,10 @@ export default function LoginPage() {
           {pending ? "Sending..." : "Send Magic Link"}
         </button>
       </form>
+
+      {configuredSiteUrl ? (
+        <p className="mt-4 text-xs text-slate-400">Using NEXT_PUBLIC_SITE_URL={configuredSiteUrl}</p>
+      ) : null}
 
       {message ? <p className="mt-4 text-sm text-emerald-700">{message}</p> : null}
       {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
