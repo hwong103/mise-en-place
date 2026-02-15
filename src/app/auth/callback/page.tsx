@@ -21,20 +21,14 @@ export default function AuthCallbackPage() {
 
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
+      let exchangeErrorMessage: string | null = null;
 
       if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
           window.location.href
         );
         if (exchangeError) {
-          if (/code verifier/i.test(exchangeError.message)) {
-            setError(
-              "This sign-in link was opened in a different browser/device. Request a new magic link and open it in the same browser."
-            );
-            return;
-          }
-          setError(exchangeError.message);
-          return;
+          exchangeErrorMessage = exchangeError.message;
         }
       }
 
@@ -44,12 +38,19 @@ export default function AuthCallbackPage() {
       }
 
       const retry = await supabase.auth.getSession();
-      if (!retry.data.session) {
-        setError("Could not complete sign-in. Please request a new link.");
+      if (retry.data.session) {
+        window.location.replace("/recipes");
         return;
       }
 
-      window.location.replace("/recipes");
+      if (exchangeErrorMessage && /code verifier/i.test(exchangeErrorMessage)) {
+        setError(
+          "This sign-in link was opened in a different browser/device. Request a new magic link and open it in the same browser."
+        );
+        return;
+      }
+
+      setError(exchangeErrorMessage ?? "Could not complete sign-in. Please request a new link.");
     };
 
     run();
