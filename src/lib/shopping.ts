@@ -34,9 +34,19 @@ const CATEGORY_RULES: CategoryRule[] = [
       "lemon",
       "lime",
       "lettuce",
+      "mushroom",
+      "mushrooms",
       "onion",
       "pepper",
       "potato",
+      "shallot",
+      "shallots",
+      "eschalot",
+      "eschalots",
+      "eschallot",
+      "eschallots",
+      "eshallot",
+      "eshallots",
       "spinach",
       "tomato",
     ],
@@ -54,6 +64,8 @@ const CATEGORY_RULES: CategoryRule[] = [
       "fish",
       "lamb",
       "pork",
+      "scallop",
+      "scallops",
       "sausage",
       "shrimp",
       "turkey",
@@ -114,6 +126,10 @@ const UNIT_WORDS = new Set([
   "slices",
   "inch",
   "inches",
+  "cm",
+  "mm",
+  "meter",
+  "meters",
   "stalk",
   "stalks",
 ]);
@@ -151,6 +167,15 @@ const STOP_WORDS = new Set([
   "whole",
   "white",
   "black",
+  "small",
+  "medium",
+  "large",
+  "raw",
+  "diced",
+  "chopped",
+  "julienned",
+  "crushed",
+  "ground",
 ]);
 
 const normalize = (value: string) =>
@@ -162,6 +187,22 @@ const normalize = (value: string) =>
     .trim();
 
 const isQuantityToken = (token: string) => /^\d+(?:[./]\d+)?$/.test(token);
+
+const singularizeToken = (token: string) => {
+  if (token.endsWith("ies") && token.length > 3) {
+    return `${token.slice(0, -3)}y`;
+  }
+
+  if (token.endsWith("oes") && token.length > 3) {
+    return token.slice(0, -2);
+  }
+
+  if (token.endsWith("s") && !token.endsWith("ss") && token.length > 3) {
+    return token.slice(0, -1);
+  }
+
+  return token;
+};
 
 const toIngredientKey = (line: string) => {
   const normalized = normalize(line);
@@ -176,11 +217,15 @@ const toIngredientKey = (line: string) => {
     .filter((token) => !UNIT_WORDS.has(token))
     .filter((token) => !STOP_WORDS.has(token));
 
-  if (tokens.length === 0) {
+  const canonicalTokens = tokens
+    .map((token) => singularizeToken(token))
+    .filter((token) => token.length > 2 || token === "egg");
+
+  if (canonicalTokens.length === 0) {
     return normalized;
   }
 
-  return Array.from(new Set(tokens)).join(" ");
+  return Array.from(new Set(canonicalTokens)).join(" ");
 };
 
 const titleCase = (value: string) =>

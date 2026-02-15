@@ -227,25 +227,25 @@ export default function ShoppingList({
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Shopping List</h1>
-          <p className="text-slate-500">Confirm what you have and what you need.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Shopping List</h1>
+          <p className="text-slate-500 dark:text-slate-400">Confirm what you have and what you need.</p>
         </div>
         <ShoppingActions shareText={shareText} />
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-900">Add Manual Items</h2>
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add Manual Items</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1.5fr_1fr_auto]">
           <input
             value={manualLine}
             onChange={(event) => setManualLine(event.target.value)}
             placeholder="Paper towels, coffee, etc."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
           <select
             value={manualCategory}
             onChange={(event) => setManualCategory(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
           >
             {categoryOptions.map((name) => (
               <option key={name} value={name}>
@@ -265,23 +265,23 @@ export default function ShoppingList({
       </section>
 
       {mergedCategories.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
           No ingredients yet. Add meals in the planner to generate your list.
         </div>
       ) : (
         <div className="max-w-4xl space-y-8">
           {mergedCategories.map((category) => (
             <div key={category.name} className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">{category.name}</h3>
-              <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-                <ul className="divide-y divide-slate-100">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{category.name}</h3>
+              <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                   {category.items.map((item) => {
                     const isChecked =
                       optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
                     const isSaving = pendingKeys[item.key] ?? false;
 
                     return (
-                      <li key={item.key} className="px-6 py-4 text-sm text-slate-700">
+                      <li key={item.key} className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
                         <div className="flex items-start justify-between gap-4">
                           <label className="flex items-start gap-3">
                             <input
@@ -295,10 +295,10 @@ export default function ShoppingList({
                                   category: category.name,
                                 })
                               }
-                              className="mt-1 h-4 w-4 rounded border-slate-300"
+                              className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900"
                             />
                             <div>
-                              <div className={isChecked ? "line-through text-slate-400" : ""}>{item.line}</div>
+                              <div className={isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""}>{item.line}</div>
                               {item.recipes.length > 0 ? (
                                 <div className="mt-2 flex flex-wrap gap-1">
                                   {item.recipes.map((recipe) => (
@@ -316,11 +316,11 @@ export default function ShoppingList({
 
                           <div className="flex items-center gap-3">
                             {item.count > 1 ? (
-                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                                 x{item.count}
                               </span>
                             ) : null}
-                            {isSaving ? <span className="text-xs text-slate-400">Saving...</span> : null}
+                            {isSaving ? <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span> : null}
                             <button
                               type="button"
                               onClick={() =>

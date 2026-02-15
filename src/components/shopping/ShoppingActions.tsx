@@ -51,7 +51,7 @@ export default function ShoppingActions({ shareText }: ShoppingActionsProps) {
       <button
         type="button"
         onClick={handlePrint}
-        className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+        className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
       >
         Print List
       </button>
