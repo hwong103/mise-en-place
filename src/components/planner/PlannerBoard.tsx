@@ -158,30 +158,6 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
 
   return (
     <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-      <aside className="space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-700">Recipes</h2>
-          <p className="text-xs text-slate-500">Search and drag onto a day.</p>
-        </div>
-
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search recipes"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
-        />
-
-        <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
-          {filteredRecipes.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500">
-              No matching recipes.
-            </div>
-          ) : (
-            filteredRecipes.map((recipe) => <RecipeTile key={recipe.id} recipe={recipe} />)
-          )}
-        </div>
-      </aside>
-
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -203,6 +179,30 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
           handleAssign(dateKey, recipeId);
         }}
       >
+        <aside className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-700">Recipes</h2>
+            <p className="text-xs text-slate-500">Search and drag onto a day.</p>
+          </div>
+
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search recipes"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          />
+
+          <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
+            {filteredRecipes.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500">
+                No matching recipes.
+              </div>
+            ) : (
+              filteredRecipes.map((recipe) => <RecipeTile key={recipe.id} recipe={recipe} />)
+            )}
+          </div>
+        </aside>
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {days.map((day) => {
             const slotKey = buildSlotKey(day.dateKey);
