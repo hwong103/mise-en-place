@@ -89,7 +89,6 @@ model ShoppingListItem {
   category       String
   manual         Boolean  @default(false)
   checked        Boolean  @default(false)
-  suppressed     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

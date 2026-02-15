@@ -11,6 +11,11 @@ import {
   toggleShoppingItem,
 } from "@/app/(dashboard)/shopping/actions";
 
+const SUPPRESS_PREFIX = "__suppress__:";
+const isSuppressedMarkerLine = (line: string) => line.startsWith(SUPPRESS_PREFIX);
+const parseSuppressedMarkerLine = (line: string) =>
+  isSuppressedMarkerLine(line) ? line.slice(SUPPRESS_PREFIX.length) : line;
+
 const normalize = (value: string) =>
   value
     .toLowerCase()
@@ -44,19 +49,29 @@ export default function ShoppingList({
   const persistedLookup = useMemo(() => {
     const map = new Map<string, ShoppingListItem>();
     persistedItems.forEach((item) => {
+      if (isSuppressedMarkerLine(item.line)) {
+        return;
+      }
       const key = buildItemKey(item.category, item.line, item.manual);
       map.set(key, item);
     });
     return map;
   }, [persistedItems]);
 
-  const mergedCategories = useMemo(() => {
-    const isItemSuppressed = (key: string) => {
-      if (suppressedKeys[key]) {
-        return true;
+  const suppressedAutoKeySet = useMemo(() => {
+    const set = new Set<string>();
+    persistedItems.forEach((item) => {
+      if (!item.manual || !isSuppressedMarkerLine(item.line)) {
+        return;
       }
-      return persistedLookup.get(key)?.suppressed ?? false;
-    };
+      const targetLine = parseSuppressedMarkerLine(item.line);
+      set.add(buildItemKey(item.category, targetLine, false));
+    });
+    return set;
+  }, [persistedItems]);
+
+  const mergedCategories = useMemo(() => {
+    const isItemSuppressed = (key: string) => suppressedKeys[key] || suppressedAutoKeySet.has(key);
 
     const map = new Map<
       string,
@@ -83,7 +98,7 @@ export default function ShoppingList({
     });
 
     persistedItems
-      .filter((item) => item.manual)
+      .filter((item) => item.manual && !isSuppressedMarkerLine(item.line))
       .forEach((item) => {
         const list = map.get(item.category) ?? [];
         const key = buildItemKey(item.category, item.line, true);
@@ -107,7 +122,7 @@ export default function ShoppingList({
         items,
       }))
       .filter((category) => category.items.length > 0);
-  }, [categories, persistedItems, persistedLookup, suppressedKeys]);
+  }, [categories, persistedItems, persistedLookup, suppressedAutoKeySet, suppressedKeys]);
 
   const shareText = useMemo(() => {
     if (mergedCategories.length === 0) {
@@ -300,11 +315,11 @@ export default function ShoppingList({
                           </label>
 
                           <div className="flex items-center gap-3">
-                            {item.count > 1 ?
+                            {item.count > 1 ? (
                               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
                                 x{item.count}
                               </span>
-                             : null}
+                            ) : null}
                             {isSaving ? <span className="text-xs text-slate-400">Saving...</span> : null}
                             <button
                               type="button"

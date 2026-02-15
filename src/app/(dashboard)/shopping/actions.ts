@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
-import { normalizeShoppingLine } from "@/lib/shopping-list";
+import {
+  buildSuppressedMarkerLine,
+  normalizeShoppingLine,
+} from "@/lib/shopping-list";
 import { fromDateKey } from "@/lib/date";
 
 const toOptionalString = (value: string | null | undefined) => {
@@ -46,7 +49,6 @@ export async function toggleShoppingItem(input: {
     update: {
       line,
       checked: input.checked,
-      suppressed: false,
     },
     create: {
       householdId,
@@ -56,7 +58,6 @@ export async function toggleShoppingItem(input: {
       category,
       manual: input.manual,
       checked: input.checked,
-      suppressed: false,
     },
   });
 
@@ -69,10 +70,15 @@ export async function addManualShoppingItem(input: {
   category: string;
 }) {
   const weekKey = toOptionalString(input.weekKey);
-  const line = toOptionalString(input.line);
+  const rawLine = toOptionalString(input.line);
   const category = toOptionalString(input.category) ?? "Other";
 
-  if (!weekKey || !line) {
+  if (!weekKey || !rawLine) {
+    return;
+  }
+
+  const line = rawLine.replace(/^__suppress__:/i, "").trim();
+  if (!line) {
     return;
   }
 
@@ -92,7 +98,6 @@ export async function addManualShoppingItem(input: {
     },
     update: {
       line,
-      suppressed: false,
       checked: false,
     },
     create: {
@@ -103,7 +108,6 @@ export async function addManualShoppingItem(input: {
       category,
       manual: true,
       checked: false,
-      suppressed: false,
     },
   });
 
@@ -140,10 +144,10 @@ export async function suppressShoppingItem(input: {
   }
 
   const householdId = await getCurrentHouseholdId();
-  const lineNormalized = normalizeShoppingLine(line);
   const date = fromDateKey(weekKey);
 
   if (input.manual) {
+    const lineNormalized = normalizeShoppingLine(line);
     await prisma.shoppingListItem.deleteMany({
       where: {
         householdId,
@@ -158,30 +162,31 @@ export async function suppressShoppingItem(input: {
     return;
   }
 
+  const markerLine = buildSuppressedMarkerLine(line);
+  const markerNormalized = normalizeShoppingLine(markerLine);
+
   await prisma.shoppingListItem.upsert({
     where: {
       householdId_weekStart_lineNormalized_category_manual: {
         householdId,
         weekStart: date,
-        lineNormalized,
+        lineNormalized: markerNormalized,
         category,
-        manual: false,
+        manual: true,
       },
     },
     update: {
-      line,
-      suppressed: true,
-      checked: false,
+      line: markerLine,
+      checked: true,
     },
     create: {
       householdId,
       weekStart: date,
-      line,
-      lineNormalized,
+      line: markerLine,
+      lineNormalized: markerNormalized,
       category,
-      manual: false,
-      checked: false,
-      suppressed: true,
+      manual: true,
+      checked: true,
     },
   });
 
