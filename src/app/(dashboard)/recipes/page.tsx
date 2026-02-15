@@ -6,7 +6,16 @@ import { createRecipe, importRecipeFromUrl } from "./actions";
 
 export const revalidate = 30;
 
-export default async function RecipesPage() {
+export default async function RecipesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const importError = Array.isArray(resolvedSearchParams.importError)
+    ? resolvedSearchParams.importError[0]
+    : resolvedSearchParams.importError;
+
   const recipes = await listRecipes();
   const summaries = recipes.map((recipe) => ({
     id: recipe.id,
@@ -25,6 +34,7 @@ export default async function RecipesPage() {
       recipes={summaries}
       createAction={createRecipe}
       importAction={importRecipeFromUrl}
+      importError={importError}
     />
   );
 }

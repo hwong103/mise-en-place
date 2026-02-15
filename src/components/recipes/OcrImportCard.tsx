@@ -5,8 +5,8 @@ import { createRecipeFromOcr } from "@/app/(dashboard)/recipes/actions";
 import { cleanOcrText } from "@/lib/ocr";
 
 const loadTesseract = async () => {
-  const module = await import("tesseract.js");
-  return module;
+  const tesseractModule = await import("tesseract.js");
+  return tesseractModule;
 };
 
 type ProgressState = {
@@ -87,7 +87,7 @@ export default function OcrImportCard() {
         setFile(convertedFile);
         setImageUrl(convertedFile.name);
         setToast({ type: "success", message: "Converted HEIC to JPG. Ready to import." });
-      } catch (err) {
+      } catch {
         const message = "HEIC conversion failed. Please convert to JPG/PNG and try again.";
         setError(message);
         setToast({ type: "error", message });
@@ -131,7 +131,7 @@ export default function OcrImportCard() {
       setOcrText(cleanOcrText(rawText));
       setProgress({ status: "complete", progress: 1 });
       setToast({ type: "success", message: "Import complete. Review the text before saving." });
-    } catch (err) {
+    } catch {
       const message = "Import failed. Please try a clearer JPG or PNG image.";
       setError(message);
       setToast({ type: "error", message });

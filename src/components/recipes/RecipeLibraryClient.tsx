@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
 import RecipeForm from "@/components/recipes/RecipeForm";
 import SubmitButton from "@/components/forms/SubmitButton";
+import OcrImportCard from "@/components/recipes/OcrImportCard";
 
 const normalize = (value: string) =>
   value
@@ -16,16 +17,18 @@ type RecipeLibraryClientProps = {
   recipes: RecipeSummary[];
   createAction: (formData: FormData) => Promise<void>;
   importAction: (formData: FormData) => Promise<void>;
+  importError?: string;
 };
 
 export default function RecipeLibraryClient({
   recipes,
   createAction,
   importAction,
+  importError,
 }: RecipeLibraryClientProps) {
   const [query, setQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [selected, setSelected] = useState<"url" | "manual" | null>(null);
+  const [selected, setSelected] = useState<"url" | "manual" | "ocr" | null>(null);
 
   const filtered = useMemo(() => {
     const needle = normalize(query);
@@ -42,6 +45,22 @@ export default function RecipeLibraryClient({
       return haystack.includes(needle);
     });
   }, [query, recipes]);
+
+  const importErrorMessage = useMemo(() => {
+    if (!importError) {
+      return null;
+    }
+    if (importError === "invalid_url") {
+      return "Please enter a valid recipe URL.";
+    }
+    if (importError === "fetch_failed") {
+      return "Could not fetch that URL. The site may block scraping or be unavailable.";
+    }
+    if (importError === "no_recipe_data") {
+      return "No usable recipe data was found. Try another URL or add it manually.";
+    }
+    return "Recipe import failed. Please try again.";
+  }, [importError]);
 
   return (
     <div className="space-y-10">
@@ -61,6 +80,12 @@ export default function RecipeLibraryClient({
           <span>Add Recipe</span>
         </button>
       </div>
+
+      {importErrorMessage ? (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {importErrorMessage}
+        </div>
+      ) : null}
 
       {isAddOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
@@ -83,7 +108,7 @@ export default function RecipeLibraryClient({
             </div>
 
             {!selected ? (
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setSelected("url")}
@@ -104,6 +129,16 @@ export default function RecipeLibraryClient({
                     Type the recipe in a structured form.
                   </p>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected("ocr")}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300"
+                >
+                  <h3 className="text-lg font-bold text-slate-900">Import from Photo</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Upload a cookbook photo and extract recipe text.
+                  </p>
+                </button>
               </div>
             ) : (
               <div className="mt-6 space-y-6">
@@ -120,7 +155,7 @@ export default function RecipeLibraryClient({
                     <div className="mb-6">
                       <h3 className="text-xl font-bold text-slate-900">Import from URL</h3>
                       <p className="text-sm text-slate-500">
-                        Drop in a recipe link to create a quick placeholder entry.
+                        Drop in a recipe link and we&apos;ll import the full recipe when possible.
                       </p>
                     </div>
                     <form action={importAction} className="space-y-4">
@@ -151,6 +186,8 @@ export default function RecipeLibraryClient({
                     <RecipeForm action={createAction} submitLabel="Add Recipe" />
                   </section>
                 ) : null}
+
+                {selected === "ocr" ? <OcrImportCard /> : null}
               </div>
             )}
           </div>

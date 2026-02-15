@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentHouseholdId } from "@/lib/household";
 
 export const dynamic = "force-dynamic";
 
@@ -7,9 +8,17 @@ export async function GET(
   _: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let householdId: string;
+
+  try {
+    householdId = await getCurrentHouseholdId("throw");
+  } catch {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const resolved = await params;
-  const recipe = await prisma.recipe.findUnique({
-    where: { id: resolved.id },
+  const recipe = await prisma.recipe.findFirst({
+    where: { id: resolved.id, householdId },
   });
 
   if (!recipe) {
@@ -20,7 +29,6 @@ export async function GET(
     id: recipe.id,
     title: recipe.title,
     sourceUrl: recipe.sourceUrl,
-    householdId: recipe.householdId,
     createdAt: recipe.createdAt,
   });
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
+import AuthStatus from "@/components/auth/AuthStatus";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,9 +32,7 @@ export default function RootLayout({
               </nav>
               <div className="ml-auto flex items-center space-x-4">
                 <Link href="/settings" className="text-sm font-medium transition-colors hover:text-indigo-600">Settings</Link>
-                <button className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90">
-                  Login
-                </button>
+                <AuthStatus />
               </div>
             </div>
           </header>

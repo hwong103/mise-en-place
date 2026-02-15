@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import prisma from "@/lib/prisma";
 import { getWeekRange, toDateKey, fromDateKey } from "@/lib/date";
-import { getDefaultHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { listRecipeTitles } from "@/lib/recipes";
 import PlannerBoard from "@/components/planner/PlannerBoard";
 
@@ -16,7 +16,7 @@ export default async function PlannerPage() {
   const dateKeys = days.map((day) => toDateKey(day));
   const weekDates = dateKeys.map((key) => fromDateKey(key));
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   const [recipes, mealPlans] = await Promise.all([
     listRecipeTitles(householdId),
     prisma.mealPlan.findMany({

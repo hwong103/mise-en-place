@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import { getDefaultHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { normalizeShoppingLine } from "@/lib/shopping-list";
 import { fromDateKey } from "@/lib/date";
 
@@ -29,7 +29,7 @@ export async function toggleShoppingItem(input: {
     return;
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   const lineNormalized = normalizeShoppingLine(line);
   const date = fromDateKey(weekKey);
 
@@ -74,7 +74,7 @@ export async function addManualShoppingItem(input: {
     return;
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   const lineNormalized = normalizeShoppingLine(line);
   const date = fromDateKey(weekKey);
 
@@ -111,7 +111,7 @@ export async function removeManualShoppingItem(input: { id: string }) {
     return;
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
 
   await prisma.shoppingListItem.deleteMany({
     where: { id, householdId, manual: true },

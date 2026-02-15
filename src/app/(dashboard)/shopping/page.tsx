@@ -1,6 +1,6 @@
 import ShoppingList from "@/components/shopping/ShoppingList";
 import prisma from "@/lib/prisma";
-import { getDefaultHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { fromDateKey, getWeekRange, toDateKey } from "@/lib/date";
 import { buildShoppingList } from "@/lib/shopping";
 import { coerceStringArray } from "@/lib/recipe-utils";
@@ -15,7 +15,7 @@ export default async function ShoppingPage() {
   const { start, end } = getWeekRange();
   const startDate = fromDateKey(toDateKey(start));
   const endDate = fromDateKey(toDateKey(end));
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
 
   const [mealPlans, persistedItems] = await Promise.all([
     prisma.mealPlan.findMany({

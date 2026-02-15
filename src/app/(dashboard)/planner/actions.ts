@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import { getDefaultHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { fromDateKey } from "@/lib/date";
 
 const toOptionalString = (value: FormDataEntryValue | null) => {
@@ -26,7 +26,7 @@ export async function upsertMealPlan(formData: FormData) {
   }
 
   const normalizedMealType = mealType as "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   const date = fromDateKey(dateKey);
 
   if (!recipeId) {

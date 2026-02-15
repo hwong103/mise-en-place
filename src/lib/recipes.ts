@@ -1,8 +1,8 @@
 import prisma from "@/lib/prisma";
-import { getDefaultHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId } from "@/lib/household";
 
 const resolveHouseholdId = async (householdId?: string) =>
-  householdId ?? getDefaultHouseholdId();
+  householdId ?? getCurrentHouseholdId();
 
 export async function listRecipes(householdId?: string) {
   const resolvedHouseholdId = await resolveHouseholdId(householdId);
@@ -36,7 +36,7 @@ export async function listRecipeTitles(householdId?: string) {
 }
 
 export async function getRecipeById(recipeId: string) {
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   return prisma.recipe.findFirst({
     where: { id: recipeId, householdId },
   });

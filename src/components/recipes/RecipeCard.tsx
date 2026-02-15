@@ -30,7 +30,6 @@ type RecipeCardProps = {
 };
 
 export default function RecipeCard({ recipe }: RecipeCardProps) {
-  const tags = recipe.tags ?? [];
   const ingredientCount = recipe.ingredientCount;
   const nextWeekDate = useMemo(() => {
     const { start } = getWeekRange(new Date(), 1);

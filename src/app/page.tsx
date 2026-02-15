@@ -9,7 +9,7 @@ export default function HomePage() {
           Cooking, <span className="text-indigo-600">Simplified.</span>
         </h1>
         <p className="mx-auto max-w-[600px] text-lg text-slate-600 md:text-xl">
-          Your household's shared recipe repository with smart prep-groups, automated planning, and seamless shopping lists.
+          Your household&apos;s shared recipe repository with smart prep-groups, automated planning, and seamless shopping lists.
         </p>
       </div>
 

@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { getDefaultHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId } from "@/lib/household";
 import { fromDateKey } from "@/lib/date";
+import { parseMarkdownRecipe } from "@/lib/recipe-import";
 import {
   buildPrepGroups,
   buildPrepGroupsFromInstructions,
@@ -197,13 +198,6 @@ const extractMeta = (html: string, key: string, attribute: "name" | "property") 
 const extractTitle = (html: string) => {
   const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   return match ? decodeHtml(match[1].trim()) : undefined;
-};
-
-const asArray = <T,>(value: T | T[] | null | undefined) => {
-  if (!value) {
-    return [];
-  }
-  return Array.isArray(value) ? value : [value];
 };
 
 const isRecipeType = (value: unknown) => {
@@ -748,6 +742,62 @@ const extractRecipeFromHtml = (html: string) => {
   };
 };
 
+type MarkdownFetchResponse = {
+  success?: boolean;
+  title?: string;
+  content?: string;
+};
+
+const MARKDOWN_TOOL_URL = "https://markdown.new/";
+
+const fetchMarkdownFromUrl = async (sourceUrl: string) => {
+  try {
+    const response = await fetch(MARKDOWN_TOOL_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      body: JSON.stringify({ url: sourceUrl }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as MarkdownFetchResponse;
+    if (!payload.success || typeof payload.content !== "string") {
+      return null;
+    }
+
+    return {
+      title: typeof payload.title === "string" ? normalizeText(payload.title) : undefined,
+      content: payload.content,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const extractRecipeFromMarkdown = (markdown: string, fallbackTitle?: string) => {
+  const parsed = parseMarkdownRecipe(markdown, fallbackTitle);
+
+  const imageMatch = markdown.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
+  const imageUrl = toOptionalUrlString(imageMatch?.[1] ?? "");
+  const videoUrl = normalizeVideoUrl(extractVideoFromHtml(markdown));
+
+  return {
+    title: parsed.title,
+    description: parsed.description,
+    imageUrl,
+    videoUrl,
+    ingredients: parsed.ingredients,
+    instructions: parsed.instructions,
+    notes: parsed.notes,
+    tags: parsed.tags,
+  };
+};
+
 const buildRecipePayload = (formData: FormData) => {
   const title = toOptionalString(formData.get("title"));
   if (!title) {
@@ -792,7 +842,7 @@ export async function createRecipe(formData: FormData) {
     return;
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
 
   await prisma.recipe.create({
     data: {
@@ -815,7 +865,7 @@ export async function createRecipeFromOcr(formData: FormData) {
   const title = toOptionalString(formData.get("title"));
   const payload = buildOcrRecipePayload(ocrText);
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
 
   const recipe = await prisma.recipe.create({
     data: {
@@ -851,7 +901,7 @@ export async function updateRecipe(formData: FormData) {
     return;
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
 
   await prisma.recipe.updateMany({
     where: { id: recipeId, householdId },
@@ -872,7 +922,7 @@ export async function updateRecipeSection(formData: FormData) {
     return;
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   const recipe = await prisma.recipe.findFirst({
     where: { id: recipeId, householdId },
   });
@@ -958,42 +1008,59 @@ export async function updateRecipeSection(formData: FormData) {
 export async function importRecipeFromUrl(formData: FormData) {
   const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
   if (!sourceUrl) {
-    return;
+    redirect("/recipes?importError=invalid_url");
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
+
+  const markdownResult = await fetchMarkdownFromUrl(sourceUrl);
+  const markdownRecipe = markdownResult?.content
+    ? extractRecipeFromMarkdown(markdownResult.content, markdownResult.title)
+    : null;
+
+  const needsHtmlFallback =
+    !markdownRecipe ||
+    (markdownRecipe.ingredients.length === 0 && markdownRecipe.instructions.length === 0);
 
   let html = "";
 
-  try {
-    const response = await fetch(sourceUrl, {
-      headers: {
-        "User-Agent": "MiseEnPlaceBot/1.0",
-      },
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      return;
+  if (needsHtmlFallback) {
+    try {
+      const response = await fetch(sourceUrl, {
+        headers: {
+          "User-Agent": "MiseEnPlaceBot/1.0",
+        },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        redirect("/recipes?importError=fetch_failed");
+      }
+      html = await response.text();
+    } catch {
+      if (existingRecipe) {
+        redirect(`/recipes/${existingRecipe.id}`);
+      }
+      redirect("/recipes?importError=fetch_failed");
     }
-    html = await response.text();
-  } catch {
-    if (existingRecipe) {
-      redirect(`/recipes/${existingRecipe.id}`);
-    }
-    return;
   }
 
   const title =
+    markdownRecipe?.title ||
+    markdownResult?.title ||
     extractMeta(html, "og:title", "property") ||
     extractMeta(html, "twitter:title", "name") ||
     extractTitle(html) ||
     new URL(sourceUrl).hostname;
-  const scrapedRecipe = extractRecipeFromHtml(html);
+  const scrapedRecipe = html ? extractRecipeFromHtml(html) : null;
+  const ingredientLines =
+    scrapedRecipe?.ingredients?.length
+      ? scrapedRecipe.ingredients
+      : markdownRecipe?.ingredients ?? [];
   const ingredientGroupCandidates =
     scrapedRecipe?.ingredientGroups?.length
       ? scrapedRecipe.ingredientGroups
-      : extractIngredientGroupsFromLines(scrapedRecipe?.ingredients ?? []);
+      : extractIngredientGroupsFromLines(ingredientLines);
   const groupedIngredients =
     ingredientGroupCandidates.length > 0
       ? cleanIngredientGroups(ingredientGroupCandidates)
@@ -1005,9 +1072,13 @@ export async function importRecipeFromUrl(formData: FormData) {
   );
   const cleanedIngredients = hasGroupedIngredients
     ? { lines: groupedIngredients!.ingredients, notes: groupedIngredients!.notes }
-    : cleanIngredientLines(scrapedRecipe?.ingredients ?? []);
-  const cleanedInstructions = cleanInstructionLines(scrapedRecipe?.instructions ?? []);
-  const htmlNotes = extractNotesFromHtml(html);
+    : cleanIngredientLines(ingredientLines);
+  const cleanedInstructions = cleanInstructionLines(
+    scrapedRecipe?.instructions?.length
+      ? scrapedRecipe.instructions
+      : markdownRecipe?.instructions ?? []
+  );
+  const htmlNotes = html ? extractNotesFromHtml(html) : [];
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
     cleanedIngredients.lines,
     cleanedInstructions.lines
@@ -1020,6 +1091,7 @@ export async function importRecipeFromUrl(formData: FormData) {
         : buildPrepGroups(cleanedIngredients.lines);
   const rawDescription =
     scrapedRecipe?.description ||
+    markdownRecipe?.description ||
     extractMeta(html, "description", "name") ||
     extractMeta(html, "og:description", "property") ||
     extractMeta(html, "twitter:description", "name");
@@ -1029,11 +1101,12 @@ export async function importRecipeFromUrl(formData: FormData) {
   );
   const imageUrl = toOptionalUrl(
     scrapedRecipe?.imageUrl ??
+    markdownRecipe?.imageUrl ??
     extractMeta(html, "og:image", "property") ??
     extractMeta(html, "twitter:image", "name") ??
     null
   );
-  const rawVideoUrl = scrapedRecipe?.videoUrl ?? extractVideoFromHtml(html);
+  const rawVideoUrl = scrapedRecipe?.videoUrl ?? markdownRecipe?.videoUrl ?? extractVideoFromHtml(html);
   const normalizedVideoUrl = normalizeVideoUrl(rawVideoUrl);
   const videoUrl =
     getVideoKind(normalizedVideoUrl) === "youtube"
@@ -1043,12 +1116,19 @@ export async function importRecipeFromUrl(formData: FormData) {
     new Set([
       ...cleanedIngredients.notes,
       ...cleanedInstructions.notes,
+      ...(markdownRecipe?.notes ?? []),
       ...htmlNotes,
       ...descriptionNotes,
     ])
   ).filter((note) => !/^note\s*\d+$/i.test(note));
 
   const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
+  const hasImportedContent =
+    cleanedIngredients.lines.length > 0 || cleanedInstructions.lines.length > 0 || Boolean(description);
+
+  if (!hasImportedContent) {
+    redirect("/recipes?importError=no_recipe_data");
+  }
 
   if (existingRecipe) {
     const existing = await prisma.recipe.findFirst({
@@ -1088,7 +1168,10 @@ export async function importRecipeFromUrl(formData: FormData) {
       servings: scrapedRecipe?.servings ?? null,
       prepTime: scrapedRecipe?.prepTime ?? null,
       cookTime: scrapedRecipe?.cookTime ?? null,
-      tags: scrapedRecipe?.tags ?? [],
+      tags:
+        scrapedRecipe?.tags?.length
+          ? scrapedRecipe.tags
+          : markdownRecipe?.tags ?? [],
       ingredients: cleanedIngredients.lines,
       instructions: cleanedInstructions.lines,
       notes,
@@ -1107,7 +1190,7 @@ export async function deleteRecipe(formData: FormData) {
     return;
   }
 
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
 
   await prisma.mealPlan.deleteMany({
     where: { recipeId, householdId },
@@ -1133,7 +1216,7 @@ export async function addToMealPlan(formData: FormData) {
   }
 
   const normalizedMealType = mealType as "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
-  const householdId = await getDefaultHouseholdId();
+  const householdId = await getCurrentHouseholdId();
   const date = fromDateKey(dateKey);
 
   await prisma.mealPlan.upsert({

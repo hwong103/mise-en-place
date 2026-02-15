@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { getDefaultHouseholdId } from "@/lib/household";
+import { getCurrentHouseholdId } from "@/lib/household";
 
 export const normalizeShoppingLine = (value: string) =>
   value
@@ -9,7 +9,7 @@ export const normalizeShoppingLine = (value: string) =>
     .trim();
 
 export async function listShoppingItems(weekStart: Date, householdId?: string) {
-  const resolvedHouseholdId = householdId ?? (await getDefaultHouseholdId());
+  const resolvedHouseholdId = householdId ?? (await getCurrentHouseholdId());
   return prisma.shoppingListItem.findMany({
     where: { householdId: resolvedHouseholdId, weekStart },
     orderBy: { createdAt: "asc" },
