@@ -17,6 +17,13 @@ export const getBrowserSupabaseClient = () => {
     return browserClient;
   }
 
-  browserClient = createBrowserClient(supabaseUrl!, supabaseAnonKey!);
+  browserClient = createBrowserClient(supabaseUrl!, supabaseAnonKey!, {
+    auth: {
+      flowType: "implicit",
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
   return browserClient;
 };
