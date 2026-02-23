@@ -28,15 +28,6 @@ const navItems = [
   { href: "/shopping", label: "Shopping" },
 ];
 
-const isAuthBypassedForLayout = () => {
-  if (/^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "")) {
-    return true;
-  }
-
-  const isPreview = (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview";
-  return isPreview && /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
-};
-
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -46,19 +37,13 @@ export default async function RootLayout({
   let showSettings = false;
   let accessSource: "guest" | "auth" | "bootstrap" | null = null;
 
-  if (isAuthBypassedForLayout()) {
+  try {
+    const accessContext = await getCurrentAccessContext("throw");
     hasHouseholdAccess = true;
-    showSettings = true;
-    accessSource = "bootstrap";
-  } else {
-    try {
-      const accessContext = await getCurrentAccessContext("throw");
-      hasHouseholdAccess = true;
-      showSettings = accessContext.canManageLink;
-      accessSource = accessContext.source;
-    } catch {
-      // Anonymous visitors can still access public routes.
-    }
+    showSettings = accessContext.canManageLink;
+    accessSource = accessContext.source;
+  } catch {
+    // Anonymous visitors can still access public routes.
   }
 
   return (
