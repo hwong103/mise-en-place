@@ -21,7 +21,6 @@ import {
 } from "@/lib/recipe-utils";
 import { buildOcrRecipePayload } from "@/lib/ocr";
 import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
-import { extractRecipeFromReadability } from "@/lib/recipe-readability";
 import {
   HIGH_CONFIDENCE_INGESTION_SCORE,
   MIN_INGESTION_SCORE,
@@ -902,6 +901,11 @@ const classifyFetchStatus = (status: number): IngestionErrorCode => {
 const cleanCandidateLines = (value: string[] | undefined) =>
   (value ?? []).map((line) => normalizeText(line)).filter(Boolean);
 
+const getReadabilityExtractor = async () => {
+  const readabilityModule = await import("@/lib/recipe-readability");
+  return readabilityModule.extractRecipeFromReadability;
+};
+
 const buildCandidateFromHtml = ({
   stage,
   sourceUrl,
@@ -965,7 +969,7 @@ const buildCandidateFromHtml = ({
   };
 };
 
-const buildReadabilityCandidate = ({
+const buildReadabilityCandidate = async ({
   html,
   sourceUrl,
   latencyMs,
@@ -973,7 +977,8 @@ const buildReadabilityCandidate = ({
   html: string;
   sourceUrl: string;
   latencyMs: number;
-}): RecipeIngestionCandidate | null => {
+}): Promise<RecipeIngestionCandidate | null> => {
+  const extractRecipeFromReadability = await getReadabilityExtractor();
   const parsed = extractRecipeFromReadability(html, sourceUrl);
   if (!parsed) {
     return null;
@@ -1361,7 +1366,7 @@ export async function importRecipeFromUrl(formData: FormData) {
     const readabilitySourceHtml = renderedHtml || directHtml;
     if (readabilitySourceHtml) {
       const readabilityStartedAt = Date.now();
-      const readabilityCandidate = buildReadabilityCandidate({
+      const readabilityCandidate = await buildReadabilityCandidate({
         html: readabilitySourceHtml,
         sourceUrl,
         latencyMs: Date.now() - readabilityStartedAt,
