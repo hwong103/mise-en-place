@@ -92,10 +92,13 @@ const isIngredientGroupTitle = (value: string) => {
 
 export default async function RecipeDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { id } = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
   const recipe = await getRecipeById(id);
 
   if (!recipe) {
@@ -138,6 +141,10 @@ export default async function RecipeDetailPage({
   })();
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
   const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
+  const editParam = Array.isArray(resolvedSearchParams.edit)
+    ? resolvedSearchParams.edit[0]
+    : resolvedSearchParams.edit;
+  const isEditing = editParam === "1" || editParam === "true";
 
   return (
     <div className="space-y-10">
@@ -156,6 +163,16 @@ export default async function RecipeDetailPage({
         <div className="flex flex-wrap gap-3">
           <AddToPlannerDialog recipeId={recipe.id} recipeTitle={recipe.title} />
           <RecipeFocusMode title={recipe.title} prepGroups={prepGroups} ingredients={ingredients} instructions={instructions} />
+          <Link
+            href={
+              isEditing
+                ? `/recipes/${recipe.id}`
+                : `/recipes/${recipe.id}?edit=1`
+            }
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {isEditing ? "Done" : "Edit"}
+          </Link>
           <form action={deleteRecipe}>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <SubmitButton
@@ -211,7 +228,8 @@ export default async function RecipeDetailPage({
               </div>
             ) : null}
 
-            <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+            {isEditing ? (
+              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
               <input type="hidden" name="recipeId" value={recipe.id} />
               <input type="hidden" name="section" value="overview" />
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Inline Edit</p>
@@ -298,7 +316,8 @@ export default async function RecipeDetailPage({
               <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
                 Save Overview
               </button>
-            </form>
+              </form>
+            ) : null}
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -383,7 +402,7 @@ export default async function RecipeDetailPage({
                 <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
                   {instructions.map((step, index) => (
                     <li key={`${index}-${step}`} className="flex gap-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                         {index + 1}
                       </span>
                       <span>{step}</span>
@@ -391,7 +410,8 @@ export default async function RecipeDetailPage({
                   ))}
                 </ol>
               )}
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+              {isEditing ? (
+                <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
                 <input type="hidden" name="recipeId" value={recipe.id} />
                 <input type="hidden" name="section" value="instructions" />
                 <textarea
@@ -403,7 +423,8 @@ export default async function RecipeDetailPage({
                 <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
                   Save Instructions
                 </button>
-              </form>
+                </form>
+              ) : null}
             </section>
           </div>
 
@@ -420,7 +441,8 @@ export default async function RecipeDetailPage({
                 ))}
               </ul>
             )}
-            <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+            {isEditing ? (
+              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
               <input type="hidden" name="recipeId" value={recipe.id} />
               <input type="hidden" name="section" value="notes" />
               <textarea
@@ -432,7 +454,8 @@ export default async function RecipeDetailPage({
               <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
                 Save Notes
               </button>
-            </form>
+              </form>
+            ) : null}
           </section>
         </section>
 
@@ -463,7 +486,8 @@ export default async function RecipeDetailPage({
               </div>
             )}
 
-            <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+            {isEditing ? (
+              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
               <input type="hidden" name="recipeId" value={recipe.id} />
               <input type="hidden" name="section" value="prepGroups" />
               <textarea
@@ -476,7 +500,8 @@ export default async function RecipeDetailPage({
               <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
                 Save Prep Groups
               </button>
-            </form>
+              </form>
+            ) : null}
           </section>
         </aside>
       </div>

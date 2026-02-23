@@ -175,7 +175,7 @@ export default function RecipeFocusMode({
                   <ol className="mt-3 space-y-3 text-base leading-relaxed text-slate-800 dark:text-slate-100">
                     {instructions.map((step, index) => (
                       <li key={`${index}-${step}`} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                        <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           {index + 1}
                         </span>
                         <span>{step}</span>
