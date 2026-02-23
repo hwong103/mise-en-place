@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
@@ -16,11 +17,11 @@ const normalizeNextPath = (value: string | null) => {
 };
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [startError, setStartError] = useState(false);
 
   const configuredSiteUrl = useMemo(() => {
     const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
@@ -62,10 +63,7 @@ export default function LoginPage() {
     setMessage(`Check your email for the sign-in link. Redirect target: ${redirectTo}`);
   };
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    setStartError(searchParams.get("start") === "error");
-  }, []);
+  const startError = searchParams.get("start") === "error";
 
   return (
     <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
