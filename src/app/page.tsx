@@ -28,11 +28,21 @@ const highlights = [
   },
 ];
 
+const isAuthDisabled = () => {
+  if (/^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "")) {
+    return true;
+  }
+
+  const isPreview = (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview";
+  return isPreview && /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+};
+
 export default async function HomePage({
   searchParams,
 }: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const authDisabled = isAuthDisabled();
   const resolvedSearchParams = (await searchParams) ?? {};
   const joinStatus = Array.isArray(resolvedSearchParams.join)
     ? resolvedSearchParams.join[0]
@@ -64,14 +74,23 @@ export default async function HomePage({
               Open Recipes
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <form method="post" action="/start-household">
-              <button
-                type="submit"
+            {authDisabled ? (
+              <Link
+                href="/recipes"
                 className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
               >
-                Start Without Login
-              </button>
-            </form>
+                Continue Without Login
+              </Link>
+            ) : (
+              <form method="post" action="/start-household">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
+                >
+                  Start Without Login
+                </button>
+              </form>
+            )}
             <Link
               href="/login"
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"

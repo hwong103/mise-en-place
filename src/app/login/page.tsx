@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import Link from "next/link";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
@@ -104,18 +105,33 @@ export default function LoginPage() {
       </form>
 
       <div className="mt-6 border-t border-slate-200 pt-4">
-        <p className="text-sm font-semibold text-slate-700">Or start without login</p>
-        <p className="mt-1 text-xs text-slate-500">
-          Create a household instantly, then claim ownership later from Settings.
-        </p>
-        <form method="post" action="/start-household" className="mt-3">
-          <button
-            type="submit"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
-          >
-            Start Household Without Login
-          </button>
-        </form>
+        {isAuthDisabled ? (
+          <>
+            <p className="text-sm font-semibold text-slate-700">Continue without login</p>
+            <p className="mt-1 text-xs text-slate-500">Auth is disabled in this environment.</p>
+            <Link
+              href="/recipes"
+              className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+            >
+              Continue to Recipes
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-slate-700">Or start without login</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Create a household instantly, then claim ownership later from Settings.
+            </p>
+            <form method="post" action="/start-household" className="mt-3">
+              <button
+                type="submit"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+              >
+                Start Household Without Login
+              </button>
+            </form>
+          </>
+        )}
       </div>
 
       {configuredSiteUrl ? (
