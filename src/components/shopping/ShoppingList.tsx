@@ -75,7 +75,7 @@ export default function ShoppingList({
 
     const map = new Map<
       string,
-      { line: string; count: number; key: string; manual: boolean; id?: string; recipes: string[] }[]
+      { line: string; count: number; amountSummary?: string; key: string; manual: boolean; id?: string; recipes: string[] }[]
     >();
 
     categories.forEach((category) => {
@@ -88,6 +88,7 @@ export default function ShoppingList({
         list.push({
           line: item.line,
           count: item.count,
+          amountSummary: item.amountSummary,
           key,
           manual: false,
           id: persistedLookup.get(key)?.id,
@@ -108,6 +109,7 @@ export default function ShoppingList({
         list.push({
           line: item.line,
           count: 1,
+          amountSummary: undefined,
           key,
           manual: true,
           id: item.id,
@@ -136,7 +138,14 @@ export default function ShoppingList({
             const checked = optimisticChecked[item.key] ?? persistedLookup.get(item.key)?.checked ?? false;
             return !checked;
           })
-          .map((item) => (item.count > 1 ? `- ${item.line} (x${item.count})` : `- ${item.line}`))
+          .map((item) => {
+            const line = item.count > 1 ? `- ${item.line} (x${item.count})` : `- ${item.line}`;
+            const amountSummary = item.amountSummary;
+            if (!amountSummary) {
+              return line;
+            }
+            return `${line} [${amountSummary}]`;
+          })
           .join("\n");
         if (!items) {
           return null;
@@ -299,6 +308,11 @@ export default function ShoppingList({
                             />
                             <div>
                               <div className={isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""}>{item.line}</div>
+                              {item.amountSummary ? (
+                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                  Amount: {item.amountSummary}
+                                </div>
+                              ) : null}
                               {item.recipes.length > 0 ? (
                                 <div className="mt-2 flex flex-wrap gap-1">
                                   {item.recipes.map((recipe) => (

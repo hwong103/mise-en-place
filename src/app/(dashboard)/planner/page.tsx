@@ -35,6 +35,7 @@ export default async function PlannerPage() {
     dateKey: toDateKey(plan.date),
     recipeId: plan.recipeId,
     recipeTitle: plan.recipe?.title ?? null,
+    recipeImageUrl: plan.recipe?.imageUrl ?? null,
   }));
 
   return (
@@ -66,7 +67,7 @@ export default async function PlannerPage() {
           dateKey: dateKeys[index],
           label: formatDate(day),
         }))}
-        recipes={recipes.map((recipe) => ({ id: recipe.id, title: recipe.title }))}
+        recipes={recipes.map((recipe) => ({ id: recipe.id, title: recipe.title, imageUrl: recipe.imageUrl ?? null }))}
         slots={slots}
       />
     </div>

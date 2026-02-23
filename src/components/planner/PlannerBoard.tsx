@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import {
   closestCenter,
@@ -16,6 +17,7 @@ import { upsertMealPlan } from "@/app/(dashboard)/planner/actions";
 type PlannerRecipe = {
   id: string;
   title: string;
+  imageUrl?: string | null;
 };
 
 type PlannerDay = {
@@ -27,6 +29,7 @@ type PlannerSlot = {
   dateKey: string;
   recipeId: string | null;
   recipeTitle: string | null;
+  recipeImageUrl?: string | null;
 };
 
 type PlannerBoardProps = {
@@ -59,7 +62,15 @@ function RecipeTile({ recipe }: { recipe: PlannerRecipe }) {
       }
       type="button"
     >
-      {recipe.title}
+      <span className="flex items-center gap-3">
+        <span className="relative h-8 w-8 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+          {recipe.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
+          ) : null}
+        </span>
+        <span>{recipe.title}</span>
+      </span>
     </button>
   );
 }
@@ -67,12 +78,16 @@ function RecipeTile({ recipe }: { recipe: PlannerRecipe }) {
 function DayCard({
   slotKey,
   label,
+  recipeId,
   recipeTitle,
+  recipeImageUrl,
   onClear,
 }: {
   slotKey: string;
   label: string;
+  recipeId: string | null;
   recipeTitle: string | null;
+  recipeImageUrl?: string | null;
   onClear: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: slotKey });
@@ -99,7 +114,32 @@ function DayCard({
       </div>
 
       <div className="flex flex-1 items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
-        {recipeTitle ? <span className="font-semibold text-slate-700 dark:text-slate-200">{recipeTitle}</span> : "Drop recipe here"}
+        {recipeTitle && recipeId ? (
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+                {recipeImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={recipeImageUrl} alt="" className="h-full w-full object-cover" />
+                ) : null}
+              </div>
+              <Link
+                href={`/recipes/${recipeId}`}
+                className="truncate font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-emerald-700 dark:text-slate-200 dark:decoration-slate-600 dark:hover:text-emerald-300"
+              >
+                {recipeTitle}
+              </Link>
+            </div>
+            <Link
+              href={`/recipes/${recipeId}`}
+              className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-500/40 dark:hover:text-emerald-300"
+            >
+              Open
+            </Link>
+          </div>
+        ) : (
+          "Drop recipe here"
+        )}
       </div>
     </div>
   );
@@ -135,6 +175,7 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
   const handleAssign = (dateKey: string, recipeId: string | null) => {
     const slotKey = buildSlotKey(dateKey);
     const recipeTitle = recipeId ? recipeLookup.get(recipeId)?.title ?? "" : null;
+    const recipeImageUrl = recipeId ? recipeLookup.get(recipeId)?.imageUrl ?? null : null;
 
     setSlotState((prev) => {
       const next = new Map(prev);
@@ -142,6 +183,7 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
         dateKey,
         recipeId,
         recipeTitle,
+        recipeImageUrl,
       });
       return next;
     });
@@ -212,7 +254,9 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
                 key={slotKey}
                 slotKey={slotKey}
                 label={day.label}
+                recipeId={slot?.recipeId ?? null}
                 recipeTitle={slot?.recipeTitle ?? null}
+                recipeImageUrl={slot?.recipeImageUrl ?? null}
                 onClear={() => handleAssign(day.dateKey, null)}
               />
             );

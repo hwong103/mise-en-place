@@ -31,6 +31,7 @@ export async function listRecipeTitles(householdId?: string) {
     select: {
       id: true,
       title: true,
+      imageUrl: true,
     },
   });
 }
