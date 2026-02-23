@@ -52,7 +52,12 @@ const readSigningSecret = () => {
   }
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error("Missing HOUSEHOLD_SHARE_SIGNING_SECRET");
+    if ((process.env.VERCEL_ENV ?? "").toLowerCase() === "production") {
+      throw new Error("Missing HOUSEHOLD_SHARE_SIGNING_SECRET");
+    }
+
+    // Keep preview deployments operable while env wiring is in progress.
+    return DEV_SIGNING_SECRET;
   }
 
   return DEV_SIGNING_SECRET;

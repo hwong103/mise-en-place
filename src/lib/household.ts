@@ -69,26 +69,34 @@ export type AccessContext = {
 
 const resolveGuestAccessContext = async (): Promise<AccessContext | null> => {
   const cookieStore = await cookies();
-  const guestSession = readGuestSessionCookie(cookieStore);
-  if (!guestSession) {
-    return null;
-  }
+  try {
+    const guestSession = readGuestSessionCookie(cookieStore);
+    if (!guestSession) {
+      return null;
+    }
 
-  const validated = await validateGuestSession(guestSession);
-  if (!validated) {
+    const validated = await validateGuestSession(guestSession);
+    if (!validated) {
+      clearGuestSessionCookie(cookieStore);
+      return null;
+    }
+
+    setGuestSessionCookie(cookieStore, guestSession);
+
+    return {
+      householdId: validated.householdId,
+      actorType: validated.guestRole === "manager" ? "guest_manager" : "guest_member",
+      canManageLink: validated.canManageLink,
+      source: "guest",
+      shareTokenVersion: validated.shareTokenVersion,
+    };
+  } catch (error) {
+    console.warn("[household-share] failed to resolve guest session; clearing cookie", {
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
     clearGuestSessionCookie(cookieStore);
     return null;
   }
-
-  setGuestSessionCookie(cookieStore, guestSession);
-
-  return {
-    householdId: validated.householdId,
-    actorType: validated.guestRole === "manager" ? "guest_manager" : "guest_member",
-    canManageLink: validated.canManageLink,
-    source: "guest",
-    shareTokenVersion: validated.shareTokenVersion,
-  };
 };
 
 const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null> => {
