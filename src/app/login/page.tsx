@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
@@ -16,6 +17,7 @@ const normalizeNextPath = (value: string | null) => {
 };
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +63,8 @@ export default function LoginPage() {
     setMessage(`Check your email for the sign-in link. Redirect target: ${redirectTo}`);
   };
 
+  const startError = searchParams.get("start") === "error";
+
   return (
     <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
       <h1 className="text-2xl font-bold text-slate-900">Login</h1>
@@ -71,6 +75,12 @@ export default function LoginPage() {
       {isAuthDisabled ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           Auth is disabled for debugging. You can go directly to the app routes.
+        </div>
+      ) : null}
+
+      {startError ? (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          Could not start a household. Check preview environment setup and try again.
         </div>
       ) : null}
 
