@@ -63,7 +63,7 @@ export default function AuthStatus() {
     return (
       <a
         href="/login"
-        className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        className="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
       >
         Login
       </a>

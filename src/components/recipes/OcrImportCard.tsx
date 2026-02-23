@@ -191,7 +191,7 @@ export default function OcrImportCard() {
             />
             <label
               htmlFor="photo-upload"
-              className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
             >
               Add Photo
             </label>
@@ -209,7 +209,7 @@ export default function OcrImportCard() {
             type="button"
             onClick={handleRunOcr}
             disabled={!canRun || Boolean(error)}
-            className="w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
+            className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
           >
             {progress?.status === "complete" ? "Re-import" : "Import"}
           </button>
@@ -239,7 +239,7 @@ export default function OcrImportCard() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Optional override"
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
           </div>
           <div className="space-y-2">
@@ -248,7 +248,7 @@ export default function OcrImportCard() {
               value={ocrText}
               onChange={(event) => setOcrText(event.target.value)}
               rows={10}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
               placeholder="Extracted text will appear here. You can edit before saving."
             />
           </div>

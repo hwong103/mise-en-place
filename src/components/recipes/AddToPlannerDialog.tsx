@@ -27,7 +27,7 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
       >
         Plan this Day
       </button>
@@ -39,7 +39,7 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
       <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add to Planner</h3>
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
-          Schedule <span className="font-semibold text-indigo-600 dark:text-indigo-400">{recipeTitle}</span> for a day.
+          Schedule <span className="font-semibold text-emerald-600 dark:text-emerald-400">{recipeTitle}</span> for a day.
         </p>
 
         <form action={clientAction} className="space-y-4">
@@ -52,7 +52,7 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
               name="date"
               defaultValue={dateValue}
               required
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
           </div>
 
@@ -68,7 +68,7 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-xl bg-indigo-600 px-6 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-50"
+              className="rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-50"
             >
               {isPending ? "Saving..." : "Add to Plan"}
             </button>

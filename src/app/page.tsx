@@ -1,54 +1,85 @@
 import Link from "next/link";
-import { Plus, Utensils, Calendar, ShoppingCart } from "lucide-react";
+import { ArrowRight, Calendar, ClipboardList, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+
+const highlights = [
+  {
+    title: "Recipe Library",
+    detail: "Import URLs, extract cookbook pages with OCR, and keep one searchable source of truth.",
+    href: "/recipes",
+    icon: UtensilsCrossed,
+  },
+  {
+    title: "7-Day Planner",
+    detail: "Drag and schedule dinner plans by day so your week is clear before grocery runs.",
+    href: "/planner",
+    icon: Calendar,
+  },
+  {
+    title: "Smart Shopping",
+    detail: "Generate grouped ingredient lists from planned recipes and check off items in-store.",
+    href: "/shopping",
+    icon: ShoppingBasket,
+  },
+  {
+    title: "Quick Capture",
+    detail: "Add recipe notes and prep details fast so anyone in the household can cook.",
+    href: "/recipes#add-recipe",
+    icon: ClipboardList,
+  },
+];
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col items-center justify-center space-y-12 py-12 text-center">
-      <div className="space-y-4">
-        <h1 className="text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl dark:text-slate-100">
-          Cooking, <span className="text-indigo-600 dark:text-indigo-400">Simplified.</span>
+    <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:gap-10">
+      <section className="relative overflow-hidden rounded-[2rem] border border-emerald-900/10 bg-white px-6 py-8 shadow-[0_20px_40px_-20px_rgba(5,46,22,0.2)] md:px-10 md:py-12 dark:border-emerald-200/10 dark:bg-slate-900/70">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Household Meal OS</p>
+        <h1 className="mt-5 text-4xl leading-none tracking-tighter text-slate-900 md:text-6xl dark:text-slate-100">
+          Plan dinners with fewer tabs, fewer texts, and fewer forgotten ingredients.
         </h1>
-        <p className="mx-auto max-w-[600px] text-lg text-slate-600 md:text-xl dark:text-slate-300">
-          Your household&apos;s shared recipe repository with smart prep-groups, automated planning, and seamless shopping lists.
+        <p className="mt-6 max-w-[65ch] text-base leading-relaxed text-slate-600 dark:text-slate-300">
+          Mise en Place keeps recipes, weekly planning, and grocery execution in one shared flow so anyone can pick up dinner without guesswork.
         </p>
-      </div>
 
-      <div className="grid w-full max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/recipes" className="group flex flex-col items-center space-y-4 rounded-3xl border border-slate-200 bg-white p-8 transition-all hover:border-indigo-600 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-400">
-          <div className="rounded-2xl bg-indigo-50 p-4 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white dark:bg-indigo-950/40 dark:text-indigo-300 dark:group-hover:bg-indigo-500">
-            <Utensils size={32} />
-          </div>
-          <h3 className="text-xl font-bold dark:text-slate-100">Recipes</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Manage your household library with OCR and scraping.</p>
-        </Link>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/recipes"
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition-transform duration-300 hover:bg-emerald-600 active:translate-y-[1px]"
+          >
+            Open Recipes
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/planner"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
+          >
+            Review This Week
+          </Link>
+        </div>
+      </section>
 
-        <Link href="/planner" className="group flex flex-col items-center space-y-4 rounded-3xl border border-slate-200 bg-white p-8 transition-all hover:border-indigo-600 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-400">
-          <div className="rounded-2xl bg-blue-50 p-4 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-950/40 dark:text-blue-300 dark:group-hover:bg-blue-500">
-            <Calendar size={32} />
-          </div>
-          <h3 className="text-xl font-bold dark:text-slate-100">Planner</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Drag & drop recipes into your weekly schedule.</p>
-        </Link>
-
-        <Link href="/shopping" className="group flex flex-col items-center space-y-4 rounded-3xl border border-slate-200 bg-white p-8 transition-all hover:border-indigo-600 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-400">
-          <div className="rounded-2xl bg-emerald-50 p-4 text-emerald-600 transition-colors group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-950/40 dark:text-emerald-300 dark:group-hover:bg-emerald-500">
-            <ShoppingCart size={32} />
-          </div>
-          <h3 className="text-xl font-bold dark:text-slate-100">Shopping</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Auto-generated lists based on your meal plan.</p>
-        </Link>
-
-        <Link
-          href="/recipes#add-recipe"
-          className="group flex flex-col items-center justify-center space-y-4 rounded-3xl border-2 border-dashed border-slate-200 p-8 transition-all hover:border-indigo-600 dark:border-slate-700 dark:hover:border-indigo-400"
-        >
-          <div className="rounded-2xl bg-slate-50 p-4 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
-            <Plus size={32} />
-          </div>
-          <h3 className="text-xl font-bold text-slate-400 dark:text-slate-500">Add New</h3>
-          <p className="text-center text-sm text-balance text-slate-400 dark:text-slate-500">Add your first household recipe.</p>
-        </Link>
-      </div>
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+        {highlights.map((item, index) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="group rounded-3xl border border-slate-200/90 bg-white px-5 py-5 transition duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_16px_28px_-20px_rgba(5,46,22,0.35)] active:translate-y-[1px] dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-emerald-500/30"
+              style={{ animationDelay: `${index * 90}ms` }}
+            >
+              <div className="flex items-start gap-4">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-2.5 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  <Icon className="h-5 w-5" strokeWidth={1.8} />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">{item.title}</h2>
+                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{item.detail}</p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </section>
     </div>
   );
 }

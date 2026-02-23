@@ -1,16 +1,30 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import AuthStatus from "@/components/auth/AuthStatus";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 
-const inter = Inter({ subsets: ["latin"] });
+const geistSans = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist-sans",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+});
 
 export const metadata: Metadata = {
   title: "Mise en Place",
   description: "Your household recipe repository & prep-efficiency tool",
 };
+
+const navItems = [
+  { href: "/recipes", label: "Recipes" },
+  { href: "/planner", label: "Planner" },
+  { href: "/shopping", label: "Shopping" },
+];
 
 export default function RootLayout({
   children,
@@ -19,28 +33,43 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-          <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-slate-800 dark:bg-slate-950/90 dark:supports-[backdrop-filter]:bg-slate-950/70">
-            <div className="container mx-auto flex h-16 items-center px-4">
-              <Link href="/" className="mr-6 flex items-center space-x-2">
-                <span className="text-xl font-bold tracking-tight text-indigo-600">Mise en Place</span>
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <div className="min-h-[100dvh] text-slate-900 dark:text-slate-100">
+          <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/75 dark:border-emerald-200/10 dark:bg-slate-950/80 dark:supports-[backdrop-filter]:bg-slate-950/55">
+            <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center px-4 md:px-8">
+              <Link href="/" className="mr-8 flex items-center gap-2">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  MP
+                </span>
+                <span className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">Mise en Place</span>
               </Link>
-              <nav className="flex items-center space-x-6 text-sm font-medium text-slate-600 dark:text-slate-300">
-                <Link href="/recipes" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">Recipes</Link>
-                <Link href="/planner" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">Planner</Link>
-                <Link href="/shopping" className="transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">Shopping</Link>
+
+              <nav className="hidden items-center gap-1 rounded-full border border-slate-200/80 bg-white/80 p-1 md:flex dark:border-slate-800 dark:bg-slate-900/70">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="rounded-full px-4 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
               </nav>
-              <div className="ml-auto flex items-center space-x-4">
+
+              <div className="ml-auto flex items-center gap-3">
                 <ThemeToggle />
-                <Link href="/settings" className="text-sm font-medium text-slate-600 transition-colors hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400">Settings</Link>
+                <Link
+                  href="/settings"
+                  className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:border-emerald-200 hover:text-emerald-700 md:inline-flex dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-400/30 dark:hover:text-emerald-300"
+                >
+                  Settings
+                </Link>
                 <AuthStatus />
               </div>
             </div>
           </header>
-          <main className="container mx-auto p-4 md:p-8">
-            {children}
-          </main>
+
+          <main className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-8 md:py-10">{children}</main>
         </div>
       </body>
     </html>

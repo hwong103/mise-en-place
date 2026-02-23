@@ -47,7 +47,7 @@ export default function RecipeForm({
           required
           defaultValue={initialValues?.title ?? ""}
           placeholder="Sheet-Pan Chicken Tacos"
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
@@ -61,7 +61,7 @@ export default function RecipeForm({
           rows={3}
           defaultValue={initialValues?.description ?? ""}
           placeholder="A quick, weeknight-friendly taco platter with roasted veggies."
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
@@ -76,7 +76,7 @@ export default function RecipeForm({
             type="url"
             defaultValue={initialValues?.sourceUrl ?? ""}
             placeholder="https://example.com/recipe"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
@@ -90,7 +90,7 @@ export default function RecipeForm({
             type="url"
             defaultValue={initialValues?.imageUrl ?? ""}
             placeholder="https://images..."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
       </div>
@@ -105,7 +105,7 @@ export default function RecipeForm({
           type="url"
           defaultValue={initialValues?.videoUrl ?? ""}
           placeholder="https://youtu.be/..."
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
@@ -121,7 +121,7 @@ export default function RecipeForm({
             min={1}
             defaultValue={initialValues?.servings ?? undefined}
             placeholder="4"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
@@ -136,7 +136,7 @@ export default function RecipeForm({
             min={1}
             defaultValue={initialValues?.prepTime ?? undefined}
             placeholder="15"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
@@ -151,7 +151,7 @@ export default function RecipeForm({
             min={1}
             defaultValue={initialValues?.cookTime ?? undefined}
             placeholder="25"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
       </div>
@@ -165,7 +165,7 @@ export default function RecipeForm({
           name="tags"
           defaultValue={joinTags(initialValues?.tags ?? null)}
           placeholder="Weeknight, Gluten-Free, Kid-Friendly"
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
@@ -180,7 +180,7 @@ export default function RecipeForm({
             rows={8}
             defaultValue={joinLines(initialValues?.ingredients ?? null)}
             placeholder="2 tbsp olive oil\n1 lb chicken thighs\n1 tsp cumin"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
 
@@ -194,7 +194,7 @@ export default function RecipeForm({
             rows={8}
             defaultValue={joinLines(initialValues?.instructions ?? null)}
             placeholder="Preheat oven to 425F.\nToss chicken with spices.\nRoast 20 minutes."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
       </div>
@@ -209,14 +209,14 @@ export default function RecipeForm({
           rows={4}
           defaultValue={joinLines(initialValues?.notes ?? null)}
           placeholder="Note 1: Use freshly grated parmesan.\nNote 2: Slice mushrooms 1/2 cm thick."
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
       </div>
 
       <div className="flex items-center justify-end gap-3">
         <button
           type="submit"
-          className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform active:scale-95"
+          className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform active:scale-95"
         >
           {submitLabel}
         </button>

@@ -32,7 +32,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
   const defaultPlanDate = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-indigo-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-400">
+    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-emerald-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-400">
       <div className="relative h-44 w-full">
         {recipe.imageUrl ? (
           <>

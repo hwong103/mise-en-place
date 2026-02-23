@@ -54,7 +54,7 @@ function RecipeTile({ recipe }: { recipe: PlannerRecipe }) {
       {...listeners}
       {...attributes}
       className={
-        "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400" +
+        "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-emerald-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400" +
         (isDragging ? " opacity-70" : "")
       }
       type="button"
@@ -82,7 +82,7 @@ function DayCard({
       ref={setNodeRef}
       className={
         "flex min-h-[140px] flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all dark:border-slate-800 dark:bg-slate-900" +
-        (isOver ? " border-indigo-400 bg-indigo-50/40 dark:border-indigo-500/60 dark:bg-indigo-950/40" : "")
+        (isOver ? " border-emerald-400 bg-emerald-50/40 dark:border-emerald-500/60 dark:bg-emerald-950/40" : "")
       }
     >
       <div className="mb-3 flex items-center justify-between">
@@ -189,7 +189,7 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search recipes"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
 
           <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
@@ -221,7 +221,7 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
 
         <DragOverlay>
           {activeRecipeId ? (
-            <div className="rounded-2xl border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-lg dark:border-indigo-500/40 dark:bg-slate-900 dark:text-slate-200">
+            <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-lg dark:border-emerald-500/40 dark:bg-slate-900 dark:text-slate-200">
               {recipeLookup.get(activeRecipeId)?.title ?? "Recipe"}
             </div>
           ) : null}

@@ -240,7 +240,7 @@ export default function ShoppingList({
             value={manualLine}
             onChange={(event) => setManualLine(event.target.value)}
             placeholder="Paper towels, coffee, etc."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
           <select
             value={manualCategory}
@@ -256,7 +256,7 @@ export default function ShoppingList({
           <button
             type="button"
             onClick={handleAddManual}
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             disabled={isPending}
           >
             Add
@@ -304,7 +304,7 @@ export default function ShoppingList({
                                   {item.recipes.map((recipe) => (
                                     <span
                                       key={`${item.key}-${recipe}`}
-                                      className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300"
+                                      className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"
                                     >
                                       {recipe}
                                     </span>

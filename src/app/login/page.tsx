@@ -80,14 +80,14 @@ export default function LoginPage() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none"
           placeholder="you@example.com"
         />
 
         <button
           type="submit"
           disabled={pending || !hasSupabasePublicEnv || isAuthDisabled}
-          className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
+          className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
         >
           {pending ? "Sending..." : "Send Magic Link"}
         </button>

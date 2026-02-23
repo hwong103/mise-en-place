@@ -75,7 +75,7 @@ export default function RecipeLibraryClient({
             setIsAddOpen(true);
             setSelected(null);
           }}
-          className="flex items-center space-x-2 rounded-xl bg-indigo-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
+          className="flex items-center space-x-2 rounded-xl bg-emerald-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
         >
           <span>Add Recipe</span>
         </button>
@@ -112,7 +112,7 @@ export default function RecipeLibraryClient({
                 <button
                   type="button"
                   onClick={() => setSelected("url")}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-indigo-400"
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-emerald-300 dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-emerald-400"
                 >
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import from URL</h3>
                   <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -122,7 +122,7 @@ export default function RecipeLibraryClient({
                 <button
                   type="button"
                   onClick={() => setSelected("manual")}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-indigo-400"
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-emerald-300 dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-emerald-400"
                 >
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Manual Entry</h3>
                   <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -132,7 +132,7 @@ export default function RecipeLibraryClient({
                 <button
                   type="button"
                   onClick={() => setSelected("ocr")}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-indigo-400"
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-emerald-300 dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-emerald-400"
                 >
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import from Photo</h3>
                   <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -145,7 +145,7 @@ export default function RecipeLibraryClient({
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
-                  className="text-sm font-semibold text-indigo-600 dark:text-indigo-400"
+                  className="text-sm font-semibold text-emerald-600 dark:text-emerald-400"
                 >
                   ← Back to options
                 </button>
@@ -164,12 +164,12 @@ export default function RecipeLibraryClient({
                         name="sourceUrl"
                         required
                         placeholder="https://example.com/recipe"
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                       />
                       <SubmitButton
                         label="Import Recipe"
                         pendingLabel="Importing..."
-                        className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-70"
+                        className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-70"
                       />
                     </form>
                   </section>
@@ -207,7 +207,7 @@ export default function RecipeLibraryClient({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search recipes or tags"
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
           </div>
         </div>

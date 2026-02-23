@@ -2,8 +2,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f7f4;
+  --surface: #ffffff;
+  --foreground: #14221a;
+  --muted: #58665d;
+  --accent: #0f766e;
 }
 
 @theme inline {
@@ -15,19 +18,34 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0e1612;
+    --surface: #121d18;
+    --foreground: #e9f2ed;
+    --muted: #9eb0a4;
+    --accent: #34d399;
   }
 }
 
 :root.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #0e1612;
+  --surface: #121d18;
+  --foreground: #e9f2ed;
+  --muted: #9eb0a4;
+  --accent: #34d399;
 }
 
 body {
-  background: var(--background);
+  min-height: 100dvh;
+  background:
+    radial-gradient(1200px 600px at 92% -15%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(700px 500px at -10% 90%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 55%),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), "Segoe UI", "Noto Sans", sans-serif;
   transition: background-color 150ms ease, color 150ms ease;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 32%, white);
+  color: #0f1f17;
 }

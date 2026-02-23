@@ -46,7 +46,7 @@ export default async function PlannerPage() {
         </div>
         <Link
           href="/shopping"
-          className="rounded-xl bg-indigo-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
+          className="rounded-xl bg-emerald-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
         >
           Generate Shopping List
         </Link>
@@ -55,7 +55,7 @@ export default async function PlannerPage() {
       {!hasRecipes ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
           Add a few recipes first so you can plan meals.
-          <Link href="/recipes" className="ml-2 font-semibold text-indigo-600 dark:text-indigo-400">
+          <Link href="/recipes" className="ml-2 font-semibold text-emerald-600 dark:text-emerald-400">
             Go to Recipes
           </Link>
         </div>

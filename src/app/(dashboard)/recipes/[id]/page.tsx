@@ -164,7 +164,7 @@ export default async function RecipeDetailPage({
     <div className="space-y-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-2">
-          <Link href="/recipes" className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+          <Link href="/recipes" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
             {"<- Back to Recipes"}
           </Link>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
@@ -221,7 +221,7 @@ export default async function RecipeDetailPage({
                   href={recipe.sourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-300"
+                  className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
                 >
                   {authorLabel ? `By ${authorLabel}` : "Source"}
                 </a>
@@ -233,7 +233,7 @@ export default async function RecipeDetailPage({
                 {recipe.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-300"
+                    className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
                   >
                     {tag}
                   </span>
@@ -251,7 +251,7 @@ export default async function RecipeDetailPage({
                     href={recipe.videoUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm font-semibold text-indigo-600 dark:text-indigo-400"
+                    className="text-sm font-semibold text-emerald-600 dark:text-emerald-400"
                   >
                     Open Video
                   </a>
@@ -293,7 +293,7 @@ export default async function RecipeDetailPage({
                       <ul className="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                         {group.items.map((item) => (
                           <li key={`${group.title}-${item}`} className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
                             <span>{item}</span>
                           </li>
                         ))}
@@ -305,7 +305,7 @@ export default async function RecipeDetailPage({
                 <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                   {ingredients.map((item) => (
                     <li key={item} className="flex items-start gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -325,11 +325,11 @@ export default async function RecipeDetailPage({
                     name="ingredients"
                     rows={6}
                     defaultValue={ingredients.join("\n")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                   />
                   <button
                     type="submit"
-                    className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
                   >
                     Save Ingredients
                   </button>
@@ -371,11 +371,11 @@ export default async function RecipeDetailPage({
                     name="instructions"
                     rows={6}
                     defaultValue={instructions.join("\n")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                   />
                   <button
                     type="submit"
-                    className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
                   >
                     Save Instructions
                   </button>
@@ -411,11 +411,11 @@ export default async function RecipeDetailPage({
                   name="notes"
                   rows={4}
                   defaultValue={notes.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
                 <button
                   type="submit"
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
                 >
                   Save Notes
                 </button>
@@ -476,11 +476,11 @@ export default async function RecipeDetailPage({
                   rows={8}
                   defaultValue={prepGroupsText}
                   placeholder="Prep\n- mince garlic\n- chop onions"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
                 <button
                   type="submit"
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
                 >
                   Save Prep Groups
                 </button>
