@@ -5,13 +5,7 @@ import { getBootstrapHouseholdId } from "@/lib/household";
 import { ensureHouseholdShareToken, setGuestSessionCookie } from "@/lib/household-access";
 
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
-const isServerAuthBypassed = () => {
-  const disableAuth = /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
-  const previewPublicDisable =
-    (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview" &&
-    /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
-  return disableAuth || previewPublicDisable;
-};
+const isServerAuthBypassed = () => /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
 
 export async function POST(request: NextRequest) {
   if (isServerAuthBypassed()) {

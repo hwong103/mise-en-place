@@ -10,11 +10,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
-const isServerAuthDisabled = () => /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
-const isPreviewPublicAuthDisabled = () =>
-  (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview" &&
-  /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
-const isAuthDisabled = () => isServerAuthDisabled() || isPreviewPublicAuthDisabled();
+const isAuthDisabled = () => /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
 
 export const ensureDefaultHouseholdForUser = async (userId: string) => {
   const existingMembership = await prisma.householdMember.findFirst({
