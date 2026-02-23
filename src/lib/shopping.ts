@@ -33,6 +33,89 @@ const normalizeAmountText = (value: string) =>
     .replace(/\s*(,|;)\s*/g, "$1 ")
     .trim();
 
+const parseFraction = (value: string) => {
+  if (!/^\d+\/\d+$/.test(value)) {
+    return null;
+  }
+  const [numeratorText, denominatorText] = value.split("/");
+  const numerator = Number(numeratorText);
+  const denominator = Number(denominatorText);
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
+    return null;
+  }
+  return numerator / denominator;
+};
+
+const parseAmountValue = (tokens: string[]) => {
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const first = tokens[0];
+  if (/^\d+(?:\.\d+)?$/.test(first)) {
+    const whole = Number(first);
+    if (!Number.isFinite(whole)) {
+      return null;
+    }
+
+    if (tokens.length > 1) {
+      const fractional = parseFraction(tokens[1]);
+      if (fractional !== null) {
+        return {
+          value: whole + fractional,
+          consumedTokens: 2,
+        };
+      }
+    }
+
+    return { value: whole, consumedTokens: 1 };
+  }
+
+  const fraction = parseFraction(first);
+  if (fraction !== null) {
+    return { value: fraction, consumedTokens: 1 };
+  }
+
+  return null;
+};
+
+const formatAmountNumber = (value: number) => {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  const rounded = Math.round(value * 100) / 100;
+  return rounded.toString();
+};
+
+const aggregateAmountTexts = (amounts: string[]) => {
+  if (amounts.length === 0) {
+    return undefined;
+  }
+
+  const numericByUnit = new Map<string, number>();
+  const unstructured: string[] = [];
+
+  for (const amount of amounts) {
+    const parts = amount.split(" ").filter(Boolean);
+    const parsed = parseAmountValue(parts);
+    if (!parsed) {
+      unstructured.push(amount);
+      continue;
+    }
+
+    const unit = parts.slice(parsed.consumedTokens).join(" ").trim();
+    const unitKey = unit || "__count__";
+    numericByUnit.set(unitKey, (numericByUnit.get(unitKey) ?? 0) + parsed.value);
+  }
+
+  const numericSummaries = Array.from(numericByUnit.entries())
+    .map(([unit, total]) => `${formatAmountNumber(total)}${unit === "__count__" ? "" : ` ${unit}`}`)
+    .sort((a, b) => a.localeCompare(b));
+
+  const mixed = [...numericSummaries, ...unstructured];
+  return mixed.length > 0 ? mixed.join(" + ") : undefined;
+};
+
 const extractAmountText = (line: string) => {
   const normalized = normalizeAmountText(line);
   if (!normalized) {
@@ -71,7 +154,7 @@ const extractAmountText = (line: string) => {
 export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingCategory[] {
   const itemMap = new Map<
     string,
-    { line: string; count: number; amounts: Set<string>; recipes: Set<string>; category: IngredientCategory }
+    { line: string; count: number; amounts: string[]; recipes: Set<string>; category: IngredientCategory }
   >();
 
   for (const entry of entries) {
@@ -91,7 +174,7 @@ export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingC
     if (existing) {
       existing.count += 1;
       if (amountText) {
-        existing.amounts.add(amountText);
+        existing.amounts.push(amountText);
       }
       if (existing.category === "Other" && classification.category !== "Other") {
         existing.category = classification.category;
@@ -103,7 +186,7 @@ export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingC
       itemMap.set(key, {
         line: titleCase(key),
         count: 1,
-        amounts: new Set(amountText ? [amountText] : []),
+        amounts: amountText ? [amountText] : [],
         category: classification.category,
         recipes: new Set(entry.recipeTitle ? [entry.recipeTitle] : []),
       });
@@ -117,9 +200,7 @@ export function buildShoppingList(entries: ShoppingIngredientEntry[]): ShoppingC
     list.push({
       line: item.line,
       count: item.count,
-      amountSummary: Array.from(item.amounts)
-        .sort((a, b) => a.localeCompare(b))
-        .join(" + "),
+      amountSummary: aggregateAmountTexts(item.amounts),
       recipes: Array.from(item.recipes).sort((a, b) => a.localeCompare(b)),
     });
     categoryMap.set(item.category, list);

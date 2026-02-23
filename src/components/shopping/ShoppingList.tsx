@@ -329,7 +329,11 @@ export default function ShoppingList({
                           </label>
 
                           <div className="flex items-center gap-3">
-                            {item.count > 1 ? (
+                            {item.amountSummary ? (
+                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                {item.amountSummary}
+                              </span>
+                            ) : item.count > 1 ? (
                               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                                 x{item.count}
                               </span>
