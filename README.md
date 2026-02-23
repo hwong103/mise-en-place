@@ -89,6 +89,7 @@ Optional variables:
 - `INGEST_RENDER_WORKER_TOKEN` (bearer token passed to the render worker)
 - `INGEST_RENDER_TIMEOUT_MS` (default: `12000`)
 - `INGEST_ENABLE_WEBMCP` (default: `false`; placeholder for future WebMCP-backed ingestion experiments)
+- `PERF_LOGGING_ENABLED` (default: `true`; emits structured server timing logs for auth/household/recipe flows)
 
 ## Quality Gates
 

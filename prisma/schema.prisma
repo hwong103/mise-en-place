@@ -61,6 +61,7 @@ model Recipe {
   servings     Int?
   prepTime     Int? // minutes
   cookTime     Int? // minutes
+  ingredientCount Int @default(0)
   ingredients  Json // Structured ingredient list
   instructions Json // Step-by-step instructions
   notes        Json? // Notes or tips
@@ -71,6 +72,8 @@ model Recipe {
 
   household Household  @relation(fields: [householdId], references: [id])
   mealPlans MealPlan[]
+
+  @@index([householdId, createdAt])
 }
 
 model MealPlan {

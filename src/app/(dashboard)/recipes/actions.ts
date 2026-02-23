@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
+import { logServerPerf } from "@/lib/server-perf";
 import { fromDateKey } from "@/lib/date";
 import { parseMarkdownRecipe } from "@/lib/recipe-import";
 import {
@@ -1031,6 +1032,7 @@ const buildRecipePayload = (formData: FormData) => {
     prepTime,
     cookTime,
     tags,
+    ingredientCount: ingredients.length,
     ingredients,
     instructions,
     notes,
@@ -1080,6 +1082,7 @@ export async function createRecipeFromOcr(formData: FormData) {
       prepTime: payload.prepTime,
       cookTime: payload.cookTime,
       tags: [],
+      ingredientCount: payload.ingredients.length,
       ingredients: payload.ingredients,
       instructions: payload.instructions,
       notes: payload.notes,
@@ -1118,117 +1121,160 @@ export async function updateRecipe(formData: FormData) {
 }
 
 export async function updateRecipeSection(formData: FormData) {
+  const startedAt = Date.now();
   const recipeId = toOptionalString(formData.get("recipeId"));
   const section = toOptionalString(formData.get("section"));
   if (!recipeId || !section) {
+    logServerPerf({
+      phase: "recipes.update_section_write",
+      route: "/recipes/[id]",
+      startedAt,
+      success: false,
+      meta: { recipe_id: recipeId ?? null, section: section ?? null, reason: "missing_input" },
+    });
     return;
   }
 
-  const householdId = await getCurrentHouseholdId();
-  const recipe = await prisma.recipe.findFirst({
-    where: { id: recipeId, householdId },
+  let householdId: string | undefined;
+  try {
+    householdId = await getCurrentHouseholdId();
+    const recipe = await prisma.recipe.findFirst({
+      where: { id: recipeId, householdId },
+    });
+
+    if (!recipe) {
+      logServerPerf({
+        phase: "recipes.update_section_write",
+        route: "/recipes/[id]",
+        startedAt,
+        success: false,
+        householdId,
+        meta: { recipe_id: recipeId, section, reason: "missing_recipe" },
+      });
+      return;
+    }
+
+    const existingNotes = coerceStringArray(recipe.notes);
+    const existingIngredients = coerceStringArray(recipe.ingredients);
+    const existingInstructions = coerceStringArray(recipe.instructions);
+
+    if (section === "ingredients") {
+      const raw = parseLines(formData.get("ingredients")?.toString() ?? "");
+      const cleanedIngredients = cleanIngredientLines(raw);
+      const cleanedInstructions = cleanInstructionLines(existingInstructions);
+      const instructionPrepGroups = buildPrepGroupsFromInstructions(
+        cleanedIngredients.lines,
+        cleanedInstructions.lines
+      );
+
+      await prisma.recipe.updateMany({
+        where: { id: recipeId, householdId },
+        data: {
+          ingredientCount: cleanedIngredients.lines.length,
+          ingredients: cleanedIngredients.lines,
+          notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
+          prepGroups:
+            instructionPrepGroups.length > 0
+              ? instructionPrepGroups
+              : buildPrepGroups(cleanedIngredients.lines),
+        },
+      });
+    }
+
+    if (section === "instructions") {
+      const raw = parseLines(formData.get("instructions")?.toString() ?? "");
+      const cleanedInstructions = cleanInstructionLines(raw);
+      const cleanedIngredients = cleanIngredientLines(existingIngredients);
+      const instructionPrepGroups = buildPrepGroupsFromInstructions(
+        cleanedIngredients.lines,
+        cleanedInstructions.lines
+      );
+
+      await prisma.recipe.updateMany({
+        where: { id: recipeId, householdId },
+        data: {
+          instructions: cleanedInstructions.lines,
+          notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
+          prepGroups:
+            instructionPrepGroups.length > 0
+              ? instructionPrepGroups
+              : buildPrepGroups(cleanedIngredients.lines),
+        },
+      });
+    }
+
+    if (section === "notes") {
+      const raw = parseLines(formData.get("notes")?.toString() ?? "");
+      const cleanedNotes = cleanTextLines(raw);
+      await prisma.recipe.updateMany({
+        where: { id: recipeId, householdId },
+        data: {
+          notes: cleanedNotes,
+        },
+      });
+    }
+
+    if (section === "prepGroups") {
+      const raw = formData.get("prepGroups")?.toString() ?? "";
+      const prepGroups = parsePrepGroupsFromText(raw);
+      await prisma.recipe.updateMany({
+        where: { id: recipeId, householdId },
+        data: {
+          prepGroups,
+        },
+      });
+    }
+
+    if (section === "overview") {
+      const title = toOptionalString(formData.get("title")) ?? recipe.title;
+      const description = toOptionalString(formData.get("description"));
+      const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
+      const imageUrl = toOptionalUrl(formData.get("imageUrl"));
+      const videoUrl = toOptionalUrl(formData.get("videoUrl"));
+      const servings = toOptionalInt(formData.get("servings"));
+      const prepTime = toOptionalInt(formData.get("prepTime"));
+      const cookTime = toOptionalInt(formData.get("cookTime"));
+      const tags = parseTags(formData.get("tags")?.toString() ?? "");
+
+      await prisma.recipe.updateMany({
+        where: { id: recipeId, householdId },
+        data: {
+          title,
+          description: description ?? recipe.description,
+          sourceUrl: normalizeSourceUrl(sourceUrl) ?? sourceUrl ?? recipe.sourceUrl,
+          imageUrl: imageUrl ?? recipe.imageUrl,
+          videoUrl: normalizeVideoUrl(videoUrl) ?? videoUrl ?? recipe.videoUrl,
+          servings: servings ?? recipe.servings,
+          prepTime: prepTime ?? recipe.prepTime,
+          cookTime: cookTime ?? recipe.cookTime,
+          tags: tags.length > 0 ? tags : recipe.tags,
+        },
+      });
+    }
+  } catch (error) {
+    logServerPerf({
+      phase: "recipes.update_section_write",
+      route: "/recipes/[id]",
+      startedAt,
+      success: false,
+      householdId,
+      meta: {
+        recipe_id: recipeId,
+        section,
+        error: error instanceof Error ? error.message : "unknown_error",
+      },
+    });
+    throw error;
+  }
+
+  logServerPerf({
+    phase: "recipes.update_section_write",
+    route: "/recipes/[id]",
+    startedAt,
+    success: true,
+    householdId,
+    meta: { recipe_id: recipeId, section },
   });
-
-  if (!recipe) {
-    return;
-  }
-
-  const existingNotes = coerceStringArray(recipe.notes);
-  const existingIngredients = coerceStringArray(recipe.ingredients);
-  const existingInstructions = coerceStringArray(recipe.instructions);
-
-  if (section === "ingredients") {
-    const raw = parseLines(formData.get("ingredients")?.toString() ?? "");
-    const cleanedIngredients = cleanIngredientLines(raw);
-    const cleanedInstructions = cleanInstructionLines(existingInstructions);
-    const instructionPrepGroups = buildPrepGroupsFromInstructions(
-      cleanedIngredients.lines,
-      cleanedInstructions.lines
-    );
-
-    await prisma.recipe.updateMany({
-      where: { id: recipeId, householdId },
-      data: {
-        ingredients: cleanedIngredients.lines,
-        notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-        prepGroups:
-          instructionPrepGroups.length > 0
-            ? instructionPrepGroups
-            : buildPrepGroups(cleanedIngredients.lines),
-      },
-    });
-  }
-
-  if (section === "instructions") {
-    const raw = parseLines(formData.get("instructions")?.toString() ?? "");
-    const cleanedInstructions = cleanInstructionLines(raw);
-    const cleanedIngredients = cleanIngredientLines(existingIngredients);
-    const instructionPrepGroups = buildPrepGroupsFromInstructions(
-      cleanedIngredients.lines,
-      cleanedInstructions.lines
-    );
-
-    await prisma.recipe.updateMany({
-      where: { id: recipeId, householdId },
-      data: {
-        instructions: cleanedInstructions.lines,
-        notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-        prepGroups:
-          instructionPrepGroups.length > 0
-            ? instructionPrepGroups
-            : buildPrepGroups(cleanedIngredients.lines),
-      },
-    });
-  }
-
-  if (section === "notes") {
-    const raw = parseLines(formData.get("notes")?.toString() ?? "");
-    const cleanedNotes = cleanTextLines(raw);
-    await prisma.recipe.updateMany({
-      where: { id: recipeId, householdId },
-      data: {
-        notes: cleanedNotes,
-      },
-    });
-  }
-
-  if (section === "prepGroups") {
-    const raw = formData.get("prepGroups")?.toString() ?? "";
-    const prepGroups = parsePrepGroupsFromText(raw);
-    await prisma.recipe.updateMany({
-      where: { id: recipeId, householdId },
-      data: {
-        prepGroups,
-      },
-    });
-  }
-
-  if (section === "overview") {
-    const title = toOptionalString(formData.get("title")) ?? recipe.title;
-    const description = toOptionalString(formData.get("description"));
-    const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
-    const imageUrl = toOptionalUrl(formData.get("imageUrl"));
-    const videoUrl = toOptionalUrl(formData.get("videoUrl"));
-    const servings = toOptionalInt(formData.get("servings"));
-    const prepTime = toOptionalInt(formData.get("prepTime"));
-    const cookTime = toOptionalInt(formData.get("cookTime"));
-    const tags = parseTags(formData.get("tags")?.toString() ?? "");
-
-    await prisma.recipe.updateMany({
-      where: { id: recipeId, householdId },
-      data: {
-        title,
-        description: description ?? recipe.description,
-        sourceUrl: normalizeSourceUrl(sourceUrl) ?? sourceUrl ?? recipe.sourceUrl,
-        imageUrl: imageUrl ?? recipe.imageUrl,
-        videoUrl: normalizeVideoUrl(videoUrl) ?? videoUrl ?? recipe.videoUrl,
-        servings: servings ?? recipe.servings,
-        prepTime: prepTime ?? recipe.prepTime,
-        cookTime: cookTime ?? recipe.cookTime,
-        tags: tags.length > 0 ? tags : recipe.tags,
-      },
-    });
-  }
 
   revalidatePath(`/recipes/${recipeId}`);
   redirect(`/recipes/${recipeId}`);
@@ -1544,6 +1590,7 @@ export async function importRecipeFromUrl(formData: FormData) {
         selectedCandidate.tags?.length
           ? selectedCandidate.tags
           : markdownRecipe?.tags ?? [],
+      ingredientCount: cleanedIngredients.lines.length,
       ingredients: cleanedIngredients.lines,
       instructions: cleanedInstructions.lines,
       notes,

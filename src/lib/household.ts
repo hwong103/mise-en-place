@@ -6,6 +6,7 @@ import {
   setGuestSessionCookie,
   validateGuestSession,
 } from "@/lib/household-access";
+import { logServerPerf } from "@/lib/server-perf";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -149,31 +150,68 @@ const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null
 export const getCurrentAccessContext = async (
   unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
 ): Promise<AccessContext> => {
-  const guestContext = await resolveGuestAccessContext();
-  if (guestContext) {
-    return guestContext;
-  }
+  const startedAt = Date.now();
+  try {
+    const guestContext = await resolveGuestAccessContext();
+    if (guestContext) {
+      logServerPerf({
+        phase: "household.resolve_access_context",
+        route: "/server/household/access-context",
+        startedAt,
+        householdId: guestContext.householdId,
+        success: true,
+        meta: { source: guestContext.source, actor: guestContext.actorType },
+      });
+      return guestContext;
+    }
 
-  if (isAuthDisabled()) {
-    return {
-      householdId: await getBootstrapHouseholdId(),
-      actorType: "debug_manager",
-      canManageLink: true,
-      source: "bootstrap",
-      shareTokenVersion: 0,
-    };
-  }
+    if (isAuthDisabled()) {
+      const context = {
+        householdId: await getBootstrapHouseholdId(),
+        actorType: "debug_manager" as const,
+        canManageLink: true,
+        source: "bootstrap" as const,
+        shareTokenVersion: 0,
+      };
+      logServerPerf({
+        phase: "household.resolve_access_context",
+        route: "/server/household/access-context",
+        startedAt,
+        householdId: context.householdId,
+        success: true,
+        meta: { source: context.source, actor: context.actorType },
+      });
+      return context;
+    }
 
-  const authContext = await resolveAuthenticatedAccessContext();
-  if (authContext) {
-    return authContext;
-  }
+    const authContext = await resolveAuthenticatedAccessContext();
+    if (authContext) {
+      logServerPerf({
+        phase: "household.resolve_access_context",
+        route: "/server/household/access-context",
+        startedAt,
+        householdId: authContext.householdId,
+        success: true,
+        meta: { source: authContext.source, actor: authContext.actorType },
+      });
+      return authContext;
+    }
 
-  if (unauthenticatedBehavior === "redirect") {
-    redirect("/login");
-  }
+    if (unauthenticatedBehavior === "redirect") {
+      redirect("/login");
+    }
 
-  throw new Error("UNAUTHORIZED");
+    throw new Error("UNAUTHORIZED");
+  } catch (error) {
+    logServerPerf({
+      phase: "household.resolve_access_context",
+      route: "/server/household/access-context",
+      startedAt,
+      success: false,
+      meta: { error: error instanceof Error ? error.message : "unknown_error" },
+    });
+    throw error;
+  }
 };
 
 export const getCurrentHouseholdId = async (
