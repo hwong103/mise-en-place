@@ -1,0 +1,12 @@
+{
+  "generatedAt": "1970-01-01T00:00:00.000Z",
+  "totalUrls": 0,
+  "successRate": 0,
+  "stageWinRate": {
+    "markdown": 0,
+    "http_html": 0,
+    "rendered_html": 0,
+    "readability": 0
+  },
+  "results": []
+}

@@ -20,6 +20,21 @@ import {
   type PrepGroup,
 } from "@/lib/recipe-utils";
 import { buildOcrRecipePayload } from "@/lib/ocr";
+import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
+import { extractRecipeFromReadability } from "@/lib/recipe-readability";
+import {
+  HIGH_CONFIDENCE_INGESTION_SCORE,
+  MIN_INGESTION_SCORE,
+  classifyIngestionFailure,
+  selectBestRecipeIngestionCandidate,
+} from "@/lib/recipe-ingestion-quality";
+import { logRecipeIngestionDiagnostics } from "@/lib/recipe-ingestion-diagnostics";
+import { applyRecipeSiteAdapters } from "@/lib/recipe-site-adapters";
+import type {
+  IngestionAttemptResult,
+  IngestionErrorCode,
+  RecipeIngestionCandidate,
+} from "@/lib/recipe-ingestion-types";
 
 const toOptionalInt = (value: FormDataEntryValue | null) => {
   if (value === null) {
@@ -258,16 +273,19 @@ const parseJsonLdBlocks = (html: string) => {
   return blocks;
 };
 
+const normalizeExtractedList = (value: string) =>
+  decodeHtml(value)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
 const extractTextList = (value: unknown): string[] => {
   if (!value) {
     return [];
   }
 
   if (typeof value === "string") {
-    return decodeHtml(value)
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+    return normalizeExtractedList(value);
   }
 
   if (Array.isArray(value)) {
@@ -276,14 +294,74 @@ const extractTextList = (value: unknown): string[] => {
 
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
+    if (typeof record.name === "string" && typeof record.text !== "string") {
+      const sections = extractTextList(record.itemListElement ?? record.recipeInstructions ?? record.steps);
+      if (sections.length > 0) {
+        return sections;
+      }
+      return normalizeExtractedList(record.name);
+    }
     if (typeof record.text === "string") {
       return extractTextList(record.text);
+    }
+    if (record.recipeInstructions) {
+      return extractTextList(record.recipeInstructions);
+    }
+    if (record.recipeIngredient) {
+      return extractTextList(record.recipeIngredient);
     }
     if (record.itemListElement) {
       return extractTextList(record.itemListElement);
     }
     if (record.steps) {
       return extractTextList(record.steps);
+    }
+    if (record["@type"] === "HowToSection" && record.itemListElement) {
+      return extractTextList(record.itemListElement);
+    }
+  }
+
+  return [];
+};
+
+const extractIngredientValue = (value: unknown): string[] => {
+  if (!value) {
+    return [];
+  }
+
+  if (typeof value === "string") {
+    return normalizeExtractedList(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => extractIngredientValue(entry));
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (typeof record.name === "string" && typeof record.value === "string") {
+      const quantity = normalizeText(record.value);
+      const name = normalizeText(record.name);
+      return quantity && name ? [`${quantity} ${name}`.trim()] : [];
+    }
+    if (typeof record.name === "string" && typeof record.unitText === "string") {
+      const amount = typeof record.value === "string" ? normalizeText(record.value) : "";
+      const combined = [amount, normalizeText(record.unitText), normalizeText(record.name)]
+        .filter(Boolean)
+        .join(" ");
+      return combined ? [combined] : [];
+    }
+    if (record.recipeIngredient) {
+      return extractIngredientValue(record.recipeIngredient);
+    }
+    if (record.ingredients) {
+      return extractIngredientValue(record.ingredients);
+    }
+    if (record.itemListElement) {
+      return extractIngredientValue(record.itemListElement);
+    }
+    if (typeof record.text === "string") {
+      return extractIngredientValue(record.text);
     }
   }
 
@@ -691,8 +769,8 @@ const cleanIngredientGroups = (groups: PrepGroup[]) => {
   return { groups: cleanedGroups, ingredients, notes };
 };
 
-const extractRecipeFromHtml = (html: string) => {
-  const blocks = parseJsonLdBlocks(html);
+const extractRecipeFromHtml = (html: string, preParsedBlocks?: unknown[]) => {
+  const blocks = preParsedBlocks && preParsedBlocks.length > 0 ? preParsedBlocks : parseJsonLdBlocks(html);
   const recipeNodes: Record<string, unknown>[] = [];
   blocks.forEach((block) => collectRecipeNodes(block, recipeNodes));
 
@@ -716,7 +794,7 @@ const extractRecipeFromHtml = (html: string) => {
   const description =
     (typeof recipe.description === "string" && normalizeText(recipe.description)) || undefined;
   const imageUrl = extractImageUrl(recipe.image);
-  const ingredients = extractTextList(recipe.recipeIngredient ?? recipe.ingredients);
+  const ingredients = extractIngredientValue(recipe.recipeIngredient ?? recipe.ingredients);
   const ingredientGroups = extractIngredientGroupsFromHtml(html);
   const instructions = extractTextList(recipe.recipeInstructions);
   const tags = typeof recipe.keywords === "string"
@@ -795,6 +873,125 @@ const extractRecipeFromMarkdown = (markdown: string, fallbackTitle?: string) => 
     instructions: parsed.instructions,
     notes: parsed.notes,
     tags: parsed.tags,
+  };
+};
+
+const createFailedAttempt = (
+  stage: IngestionAttemptResult["stage"],
+  errorCode: IngestionErrorCode,
+  latencyMs: number
+): IngestionAttemptResult => ({
+  stage,
+  success: false,
+  title: undefined,
+  ingredients: [],
+  instructions: [],
+  notes: [],
+  errorCode,
+  latencyMs,
+});
+
+const classifyFetchStatus = (status: number): IngestionErrorCode => {
+  if (status === 401 || status === 403 || status === 429) {
+    return "blocked";
+  }
+
+  return "fetch_failed";
+};
+
+const cleanCandidateLines = (value: string[] | undefined) =>
+  (value ?? []).map((line) => normalizeText(line)).filter(Boolean);
+
+const buildCandidateFromHtml = ({
+  stage,
+  sourceUrl,
+  html,
+  jsonLdBlocks,
+  latencyMs,
+}: {
+  stage: RecipeIngestionCandidate["stage"];
+  sourceUrl: string;
+  html: string;
+  jsonLdBlocks?: unknown[];
+  latencyMs: number;
+}): RecipeIngestionCandidate | null => {
+  const adapted = applyRecipeSiteAdapters(sourceUrl, html);
+  const parsed = extractRecipeFromHtml(adapted.html, jsonLdBlocks);
+  if (!parsed) {
+    return null;
+  }
+
+  const title =
+    parsed.title ||
+    extractMeta(adapted.html, "og:title", "property") ||
+    extractMeta(adapted.html, "twitter:title", "name") ||
+    extractTitle(adapted.html);
+
+  const description =
+    parsed.description ||
+    extractMeta(adapted.html, "description", "name") ||
+    extractMeta(adapted.html, "og:description", "property") ||
+    extractMeta(adapted.html, "twitter:description", "name");
+
+  const imageUrl = toOptionalUrlString(
+    parsed.imageUrl ??
+    extractMeta(adapted.html, "og:image", "property") ??
+    extractMeta(adapted.html, "twitter:image", "name") ??
+    ""
+  );
+  const videoUrl = normalizeVideoUrl(parsed.videoUrl ?? extractVideoFromHtml(adapted.html));
+  const hasContent = Boolean(
+    title || description || parsed.ingredients.length > 0 || parsed.instructions.length > 0
+  );
+
+  return {
+    stage,
+    success: hasContent,
+    title,
+    description,
+    imageUrl,
+    videoUrl,
+    ingredients: cleanCandidateLines(parsed.ingredients),
+    instructions: cleanCandidateLines(parsed.instructions),
+    notes: extractNotesFromHtml(adapted.html),
+    tags: parsed.tags,
+    servings: parsed.servings,
+    prepTime: parsed.prepTime,
+    cookTime: parsed.cookTime,
+    ingredientGroups: parsed.ingredientGroups,
+    latencyMs,
+    html: adapted.html,
+    errorCode: undefined,
+  };
+};
+
+const buildReadabilityCandidate = ({
+  html,
+  sourceUrl,
+  latencyMs,
+}: {
+  html: string;
+  sourceUrl: string;
+  latencyMs: number;
+}): RecipeIngestionCandidate | null => {
+  const parsed = extractRecipeFromReadability(html, sourceUrl);
+  if (!parsed) {
+    return null;
+  }
+
+  return {
+    stage: "readability",
+    success: parsed.ingredients.length > 0 || parsed.instructions.length > 0 || Boolean(parsed.description),
+    title: parsed.title,
+    description: parsed.description,
+    imageUrl: toOptionalUrlString(parsed.imageUrl ?? ""),
+    videoUrl: normalizeVideoUrl(extractVideoFromHtml(html)),
+    ingredients: cleanCandidateLines(parsed.ingredients),
+    instructions: cleanCandidateLines(parsed.instructions),
+    notes: cleanCandidateLines(parsed.notes),
+    latencyMs,
+    html,
+    errorCode: undefined,
   };
 };
 
@@ -1040,54 +1237,186 @@ export async function importRecipeFromUrl(formData: FormData) {
 
   const householdId = await getCurrentHouseholdId();
   const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
+  const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
+  const webMcpTrackingEnabled = process.env.INGEST_ENABLE_WEBMCP === "true";
+  const attempts: IngestionAttemptResult[] = [];
+  const candidates: RecipeIngestionCandidate[] = [];
 
+  let markdownRecipe: ReturnType<typeof extractRecipeFromMarkdown> | null = null;
+  let directHtml = "";
+  let renderedHtml = "";
+
+  const markdownStartedAt = Date.now();
   const markdownResult = await fetchMarkdownFromUrl(sourceUrl);
-  const markdownRecipe = markdownResult?.content
-    ? extractRecipeFromMarkdown(markdownResult.content, markdownResult.title)
-    : null;
+  const markdownLatencyMs = Date.now() - markdownStartedAt;
+  const markdownTitle = markdownResult?.title;
 
-  const needsHtmlFallback =
-    !markdownRecipe ||
-    (markdownRecipe.ingredients.length === 0 && markdownRecipe.instructions.length === 0);
+  if (markdownResult?.content) {
+    markdownRecipe = extractRecipeFromMarkdown(markdownResult.content, markdownResult.title);
+    const markdownCandidate: RecipeIngestionCandidate = {
+      stage: "markdown",
+      success: Boolean(
+        markdownRecipe.title ||
+        markdownRecipe.description ||
+        markdownRecipe.ingredients.length > 0 ||
+        markdownRecipe.instructions.length > 0
+      ),
+      title: markdownRecipe.title,
+      description: markdownRecipe.description,
+      imageUrl: markdownRecipe.imageUrl,
+      videoUrl: markdownRecipe.videoUrl,
+      ingredients: cleanCandidateLines(markdownRecipe.ingredients),
+      instructions: cleanCandidateLines(markdownRecipe.instructions),
+      notes: cleanCandidateLines(markdownRecipe.notes),
+      tags: markdownRecipe.tags,
+      latencyMs: markdownLatencyMs,
+      errorCode: undefined,
+    };
 
-  let html = "";
+    if (markdownCandidate.success) {
+      attempts.push(markdownCandidate);
+      candidates.push(markdownCandidate);
+    } else {
+      attempts.push(createFailedAttempt("markdown", "parse_failed", markdownLatencyMs));
+    }
+  } else {
+    attempts.push(createFailedAttempt("markdown", "fetch_failed", markdownLatencyMs));
+  }
 
-  if (needsHtmlFallback) {
+  let selected = selectBestRecipeIngestionCandidate(candidates);
+  const markdownIsHighConfidence =
+    selected.candidate?.stage === "markdown" && selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE;
+
+  if (!markdownIsHighConfidence) {
+    const htmlStartedAt = Date.now();
+    const htmlController = new AbortController();
+    const htmlTimeout = setTimeout(() => htmlController.abort(), 10000);
     try {
       const response = await fetch(sourceUrl, {
         headers: {
-          "User-Agent": "MiseEnPlaceBot/1.0",
+          "User-Agent": "MiseEnPlaceBot/2.0",
         },
         cache: "no-store",
+        signal: htmlController.signal,
       });
+      const htmlLatencyMs = Date.now() - htmlStartedAt;
       if (!response.ok) {
-        redirect("/recipes?importError=fetch_failed");
+        attempts.push(createFailedAttempt("http_html", classifyFetchStatus(response.status), htmlLatencyMs));
+      } else {
+        directHtml = await response.text();
+        const htmlCandidate = buildCandidateFromHtml({
+          stage: "http_html",
+          sourceUrl,
+          html: directHtml,
+          latencyMs: htmlLatencyMs,
+        });
+        if (htmlCandidate?.success) {
+          attempts.push(htmlCandidate);
+          candidates.push(htmlCandidate);
+        } else {
+          attempts.push(createFailedAttempt("http_html", "parse_failed", htmlLatencyMs));
+        }
       }
-      html = await response.text();
-    } catch {
-      if (existingRecipe) {
-        redirect(`/recipes/${existingRecipe.id}`);
-      }
-      redirect("/recipes?importError=fetch_failed");
+    } catch (error) {
+      const htmlLatencyMs = Date.now() - htmlStartedAt;
+      const timeoutError =
+        error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
+      attempts.push(createFailedAttempt("http_html", timeoutError, htmlLatencyMs));
+    } finally {
+      clearTimeout(htmlTimeout);
     }
   }
 
+  selected = selectBestRecipeIngestionCandidate(candidates);
+
+  if (selected.score < MIN_INGESTION_SCORE && isRenderFallbackEnabled()) {
+    const renderedStartedAt = Date.now();
+    const renderedCandidatePayload = await fetchRenderedRecipeCandidate(sourceUrl);
+    const renderedLatencyMs = Date.now() - renderedStartedAt;
+
+    if (renderedCandidatePayload) {
+      renderedHtml = renderedCandidatePayload.html;
+      const renderedCandidate = buildCandidateFromHtml({
+        stage: "rendered_html",
+        sourceUrl: renderedCandidatePayload.finalUrl ?? sourceUrl,
+        html: renderedCandidatePayload.html,
+        jsonLdBlocks: renderedCandidatePayload.jsonLd,
+        latencyMs: renderedLatencyMs,
+      });
+
+      if (renderedCandidate?.success) {
+        attempts.push(renderedCandidate);
+        candidates.push(renderedCandidate);
+      } else {
+        attempts.push(createFailedAttempt("rendered_html", "parse_failed", renderedLatencyMs));
+      }
+    } else {
+      attempts.push(createFailedAttempt("rendered_html", "fetch_failed", renderedLatencyMs));
+    }
+  }
+
+  selected = selectBestRecipeIngestionCandidate(candidates);
+
+  if (selected.score < MIN_INGESTION_SCORE) {
+    const readabilitySourceHtml = renderedHtml || directHtml;
+    if (readabilitySourceHtml) {
+      const readabilityStartedAt = Date.now();
+      const readabilityCandidate = buildReadabilityCandidate({
+        html: readabilitySourceHtml,
+        sourceUrl,
+        latencyMs: Date.now() - readabilityStartedAt,
+      });
+
+      if (readabilityCandidate?.success) {
+        attempts.push(readabilityCandidate);
+        candidates.push(readabilityCandidate);
+      } else {
+        attempts.push(
+          createFailedAttempt("readability", "parse_failed", Date.now() - readabilityStartedAt)
+        );
+      }
+    }
+  }
+
+  selected = selectBestRecipeIngestionCandidate(candidates);
+  const selectedCandidate = selected.candidate;
+  const failureReason = classifyIngestionFailure(attempts, selectedCandidate);
+
+  if (!selectedCandidate || selected.score < MIN_INGESTION_SCORE) {
+    logRecipeIngestionDiagnostics({
+      sourceUrl,
+      sourceHost,
+      resultQualityScore: selected.score,
+      failureReason,
+      attempts: attempts.map((attempt) => ({
+        stage: attempt.stage,
+        success: attempt.success,
+        latencyMs: attempt.latencyMs,
+        errorCode: attempt.errorCode,
+        ingredients: attempt.ingredients.length,
+        instructions: attempt.instructions.length,
+      })),
+    });
+
+    if (existingRecipe) {
+      redirect(`/recipes/${existingRecipe.id}`);
+    }
+
+    redirect(`/recipes?importError=${failureReason}`);
+  }
+
+  const candidateHtml = selectedCandidate.html ?? renderedHtml ?? directHtml;
   const title =
-    markdownRecipe?.title ||
-    markdownResult?.title ||
-    extractMeta(html, "og:title", "property") ||
-    extractMeta(html, "twitter:title", "name") ||
-    extractTitle(html) ||
-    new URL(sourceUrl).hostname;
-  const scrapedRecipe = html ? extractRecipeFromHtml(html) : null;
-  const ingredientLines =
-    scrapedRecipe?.ingredients?.length
-      ? scrapedRecipe.ingredients
-      : markdownRecipe?.ingredients ?? [];
+    selectedCandidate.title ||
+    markdownTitle ||
+    extractMeta(candidateHtml, "og:title", "property") ||
+    extractMeta(candidateHtml, "twitter:title", "name") ||
+    extractTitle(candidateHtml) ||
+    sourceHost;
   const ingredientGroupCandidates =
-    scrapedRecipe?.ingredientGroups?.length
-      ? scrapedRecipe.ingredientGroups
-      : extractIngredientGroupsFromLines(ingredientLines);
+    selectedCandidate.ingredientGroups?.length
+      ? selectedCandidate.ingredientGroups
+      : extractIngredientGroupsFromLines(selectedCandidate.ingredients);
   const groupedIngredients =
     ingredientGroupCandidates.length > 0
       ? cleanIngredientGroups(ingredientGroupCandidates)
@@ -1099,13 +1428,9 @@ export async function importRecipeFromUrl(formData: FormData) {
   );
   const cleanedIngredients = hasGroupedIngredients
     ? { lines: groupedIngredients!.ingredients, notes: groupedIngredients!.notes }
-    : cleanIngredientLines(ingredientLines);
-  const cleanedInstructions = cleanInstructionLines(
-    scrapedRecipe?.instructions?.length
-      ? scrapedRecipe.instructions
-      : markdownRecipe?.instructions ?? []
-  );
-  const htmlNotes = html ? extractNotesFromHtml(html) : [];
+    : cleanIngredientLines(selectedCandidate.ingredients);
+  const cleanedInstructions = cleanInstructionLines(selectedCandidate.instructions);
+  const htmlNotes = candidateHtml ? extractNotesFromHtml(candidateHtml) : [];
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
     cleanedIngredients.lines,
     cleanedInstructions.lines
@@ -1117,23 +1442,21 @@ export async function importRecipeFromUrl(formData: FormData) {
         ? instructionPrepGroups
         : buildPrepGroups(cleanedIngredients.lines);
   const rawDescription =
-    scrapedRecipe?.description ||
-    markdownRecipe?.description ||
-    extractMeta(html, "description", "name") ||
-    extractMeta(html, "og:description", "property") ||
-    extractMeta(html, "twitter:description", "name");
+    selectedCandidate.description ||
+    extractMeta(candidateHtml, "description", "name") ||
+    extractMeta(candidateHtml, "og:description", "property") ||
+    extractMeta(candidateHtml, "twitter:description", "name");
   const descriptionCandidate = cleanDescription(rawDescription);
   const { description, notes: descriptionNotes } = extractNotesFromDescription(
     descriptionCandidate
   );
   const imageUrl = toOptionalUrl(
-    scrapedRecipe?.imageUrl ??
-    markdownRecipe?.imageUrl ??
-    extractMeta(html, "og:image", "property") ??
-    extractMeta(html, "twitter:image", "name") ??
+    selectedCandidate.imageUrl ??
+    extractMeta(candidateHtml, "og:image", "property") ??
+    extractMeta(candidateHtml, "twitter:image", "name") ??
     null
   );
-  const rawVideoUrl = scrapedRecipe?.videoUrl ?? markdownRecipe?.videoUrl ?? extractVideoFromHtml(html);
+  const rawVideoUrl = selectedCandidate.videoUrl ?? extractVideoFromHtml(candidateHtml);
   const normalizedVideoUrl = normalizeVideoUrl(rawVideoUrl);
   const videoUrl =
     getVideoKind(normalizedVideoUrl) === "youtube"
@@ -1144,18 +1467,35 @@ export async function importRecipeFromUrl(formData: FormData) {
       ...cleanedIngredients.notes,
       ...cleanedInstructions.notes,
       ...(markdownRecipe?.notes ?? []),
+      ...selectedCandidate.notes,
       ...htmlNotes,
       ...descriptionNotes,
     ])
   ).filter((note) => !/^note\s*\d+$/i.test(note));
 
-  const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
-  const hasImportedContent =
-    cleanedIngredients.lines.length > 0 || cleanedInstructions.lines.length > 0 || Boolean(description);
+  logRecipeIngestionDiagnostics({
+    sourceUrl,
+    sourceHost,
+    stageUsed: selectedCandidate.stage,
+    resultQualityScore: selected.score,
+    attempts: attempts.map((attempt) => ({
+      stage: attempt.stage,
+      success: attempt.success,
+      latencyMs: attempt.latencyMs,
+      errorCode: attempt.errorCode,
+      ingredients: attempt.ingredients.length,
+      instructions: attempt.instructions.length,
+    })),
+    selected: {
+      stage: selectedCandidate.stage,
+      title: selectedCandidate.title,
+      ingredients: selectedCandidate.ingredients,
+      instructions: selectedCandidate.instructions,
+    },
+    webMcpTrackingEnabled,
+  });
 
-  if (!hasImportedContent) {
-    redirect("/recipes?importError=no_recipe_data");
-  }
+  const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
 
   if (existingRecipe) {
     const existing = await prisma.recipe.findFirst({
@@ -1187,17 +1527,17 @@ export async function importRecipeFromUrl(formData: FormData) {
   const recipe = await prisma.recipe.create({
     data: {
       householdId,
-      title: scrapedRecipe?.title || title,
+      title,
       description,
       sourceUrl: normalizedSourceUrl,
       imageUrl,
       videoUrl,
-      servings: scrapedRecipe?.servings ?? null,
-      prepTime: scrapedRecipe?.prepTime ?? null,
-      cookTime: scrapedRecipe?.cookTime ?? null,
+      servings: selectedCandidate.servings ?? null,
+      prepTime: selectedCandidate.prepTime ?? null,
+      cookTime: selectedCandidate.cookTime ?? null,
       tags:
-        scrapedRecipe?.tags?.length
-          ? scrapedRecipe.tags
+        selectedCandidate.tags?.length
+          ? selectedCandidate.tags
           : markdownRecipe?.tags ?? [],
       ingredients: cleanedIngredients.lines,
       instructions: cleanedInstructions.lines,

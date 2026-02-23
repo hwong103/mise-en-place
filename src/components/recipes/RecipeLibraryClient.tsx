@@ -56,6 +56,12 @@ export default function RecipeLibraryClient({
     if (importError === "fetch_failed") {
       return "Could not fetch that URL. The site may block scraping or be unavailable.";
     }
+    if (importError === "blocked") {
+      return "That site blocked automated access. Try another URL or add the recipe manually.";
+    }
+    if (importError === "insufficient_steps") {
+      return "We found ingredients but not enough instructions. You can still add this recipe manually.";
+    }
     if (importError === "no_recipe_data") {
       return "No usable recipe data was found. Try another URL or add it manually.";
     }

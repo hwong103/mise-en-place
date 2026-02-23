@@ -79,6 +79,11 @@ Optional variables:
 - `OPENAI_API_KEY` and `NEXT_PUBLIC_OCR_PROVIDER` (reserved for future OCR provider expansion)
 - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (reserved for future managed image storage)
 - `DISABLE_AUTH` and `NEXT_PUBLIC_DISABLE_AUTH` (set to `true` only for debugging to bypass auth; in Preview you can set `NEXT_PUBLIC_DISABLE_AUTH=true` alone)
+- `INGEST_ENABLE_RENDER_FALLBACK` (default: `true`; set `false` to disable rendered-page fallback)
+- `INGEST_RENDER_WORKER_URL` (URL of the dedicated render worker endpoint)
+- `INGEST_RENDER_WORKER_TOKEN` (bearer token passed to the render worker)
+- `INGEST_RENDER_TIMEOUT_MS` (default: `12000`)
+- `INGEST_ENABLE_WEBMCP` (default: `false`; placeholder for future WebMCP-backed ingestion experiments)
 
 ## Quality Gates
 
@@ -86,12 +91,36 @@ Optional variables:
 - Typecheck: `npm run typecheck`
 - Tests: `npm run test:run`
 - Build: `npm run build`
+- Ingestion benchmark: `npm run ingestion:benchmark`
+- Ingestion regression check: `npm run ingestion:regression-check`
 
 CI runs all of the above on push and pull requests.
 
+## URL Ingestion Pipeline
+
+The URL import flow now uses a staged strategy with quality scoring:
+
+1. `markdown.new` markdown extraction
+2. direct HTTP HTML + JSON-LD parsing
+3. rendered HTML fallback via dedicated Playwright worker
+4. readability/article fallback for noisy pages
+
+Structured import diagnostics are logged as JSON with source host, stage used, attempt latencies, quality score, and failure reason.
+
+### Render Worker (Optional, recommended)
+
+The rendered-page fallback expects a dedicated worker service at `/workers/recipe-render-worker`.
+
+```bash
+cd workers/recipe-render-worker
+npm install
+npx playwright install chromium
+npm start
+```
+
 ## Known Limitations
 
-- URL import quality depends on source website structure and anti-bot protections.
+- URL import quality still depends on source website structure and anti-bot protections (render fallback improves, but does not eliminate, hard failures).
 - OCR quality depends on image clarity, lighting, and text layout.
 - Settings invite/member management is currently a documented stub.
 
