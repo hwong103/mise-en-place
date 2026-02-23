@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
@@ -20,7 +20,6 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [startError, setStartError] = useState(false);
 
   const configuredSiteUrl = useMemo(() => {
     const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
@@ -62,9 +61,12 @@ export default function LoginPage() {
     setMessage(`Check your email for the sign-in link. Redirect target: ${redirectTo}`);
   };
 
-  useEffect(() => {
+  const startError = useMemo(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
     const searchParams = new URLSearchParams(window.location.search);
-    setStartError(searchParams.get("start") === "error");
+    return searchParams.get("start") === "error";
   }, []);
 
   return (
