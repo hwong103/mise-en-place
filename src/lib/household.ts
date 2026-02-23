@@ -185,12 +185,18 @@ export const getCurrentHouseholdId = async (
 
 // Kept only for local/dev bootstrap scripts; do not use this in request authorization paths.
 export const getBootstrapHouseholdId = async () => {
-  const existing = await prisma.household.findFirst({ orderBy: { createdAt: "asc" } });
+  const existing = await prisma.household.findFirst({
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
   if (existing) {
     return existing.id;
   }
 
   const name = process.env.DEFAULT_HOUSEHOLD_NAME?.trim() || DEFAULT_HOUSEHOLD_NAME;
-  const created = await prisma.household.create({ data: { name } });
+  const created = await prisma.household.create({
+    data: { name },
+    select: { id: true },
+  });
   return created.id;
 };
