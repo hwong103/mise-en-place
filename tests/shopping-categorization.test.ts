@@ -54,6 +54,17 @@ describe("shopping ingredient categorization", () => {
     );
   });
 
+  it("sums compact amount tokens for same canonical ingredient", () => {
+    const categories = buildShoppingList([
+      { line: "200g mushrooms", recipeTitle: "Recipe A" },
+      { line: "400g mushroom", recipeTitle: "Recipe B" },
+    ]);
+
+    const produce = categories.find((category) => category.name === "Produce");
+    const mushroom = produce?.items.find((item) => item.line === "Mushroom");
+    expect(mushroom?.amountSummary).toBe("600 g");
+  });
+
   it("meets 99% accuracy on the labeled ingredient fixture", () => {
     const failures: Array<{ line: string; expected: IngredientCategory; actual: IngredientCategory }> = [];
 

@@ -52,6 +52,19 @@ const parseAmountValue = (tokens: string[]) => {
   }
 
   const first = tokens[0];
+  const compactMatch = first.match(/^(\d+(?:\.\d+)?)([a-z]+)$/i);
+  if (compactMatch) {
+    const numeric = Number(compactMatch[1]);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    return {
+      value: numeric,
+      consumedTokens: 1,
+      inlineUnit: compactMatch[2].toLowerCase(),
+    };
+  }
+
   if (/^\d+(?:\.\d+)?$/.test(first)) {
     const whole = Number(first);
     if (!Number.isFinite(whole)) {
@@ -73,7 +86,7 @@ const parseAmountValue = (tokens: string[]) => {
 
   const fraction = parseFraction(first);
   if (fraction !== null) {
-    return { value: fraction, consumedTokens: 1 };
+    return { value: fraction, consumedTokens: 1, inlineUnit: "" };
   }
 
   return null;
@@ -103,7 +116,10 @@ const aggregateAmountTexts = (amounts: string[]) => {
       continue;
     }
 
-    const unit = parts.slice(parsed.consumedTokens).join(" ").trim();
+    const unitFromRemaining = parts.slice(parsed.consumedTokens).join(" ").trim();
+    const inlineUnit =
+      "inlineUnit" in parsed && typeof parsed.inlineUnit === "string" ? parsed.inlineUnit : "";
+    const unit = (inlineUnit || unitFromRemaining).trim();
     const unitKey = unit || "__count__";
     numericByUnit.set(unitKey, (numericByUnit.get(unitKey) ?? 0) + parsed.value);
   }
