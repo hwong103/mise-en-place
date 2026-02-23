@@ -5,6 +5,15 @@ import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/c
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const isAuthDisabled = /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+const normalizeNextPath = (value: string | null) => {
+  if (!value) {
+    return "/recipes";
+  }
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return "/recipes";
+  }
+  return value;
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -32,7 +41,8 @@ export default function LoginPage() {
 
     const origin = trimTrailingSlash(window.location.origin);
     const baseUrl = configuredSiteUrl ?? origin;
-    const redirectTo = `${baseUrl}/auth/callback`;
+    const nextPath = normalizeNextPath(new URLSearchParams(window.location.search).get("next"));
+    const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`;
 
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email,
@@ -92,6 +102,21 @@ export default function LoginPage() {
           {pending ? "Sending..." : "Send Magic Link"}
         </button>
       </form>
+
+      <div className="mt-6 border-t border-slate-200 pt-4">
+        <p className="text-sm font-semibold text-slate-700">Or start without login</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Create a household instantly, then claim ownership later from Settings.
+        </p>
+        <form method="post" action="/start-household" className="mt-3">
+          <button
+            type="submit"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+          >
+            Start Household Without Login
+          </button>
+        </form>
+      </div>
 
       {configuredSiteUrl ? (
         <p className="mt-4 text-xs text-slate-400">Using NEXT_PUBLIC_SITE_URL={configuredSiteUrl}</p>

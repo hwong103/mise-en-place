@@ -6,7 +6,12 @@ import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/c
 
 const isAuthDisabled = /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 
-export default function AuthStatus() {
+type AuthStatusProps = {
+  hasHouseholdAccess?: boolean;
+  accessSource?: "guest" | "auth" | "bootstrap" | null;
+};
+
+export default function AuthStatus({ hasHouseholdAccess = false, accessSource = null }: AuthStatusProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(hasSupabasePublicEnv);
 
@@ -60,6 +65,30 @@ export default function AuthStatus() {
   }
 
   if (!user) {
+    if (hasHouseholdAccess && accessSource === "guest") {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="hidden text-xs text-slate-500 md:inline">Guest access</span>
+          <a
+            href="/login"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+          >
+            Login
+          </a>
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch("/api/session/clear", { method: "POST", credentials: "include" });
+              window.location.assign("/");
+            }}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-rose-200 hover:text-rose-700"
+          >
+            Leave
+          </button>
+        </div>
+      );
+    }
+
     return (
       <a
         href="/login"
@@ -81,6 +110,7 @@ export default function AuthStatus() {
             return;
           }
           await supabase.auth.signOut();
+          await fetch("/api/session/clear", { method: "POST", credentials: "include" });
           window.location.assign("/login");
         }}
         className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"

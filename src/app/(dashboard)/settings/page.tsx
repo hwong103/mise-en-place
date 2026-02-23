@@ -1,12 +1,41 @@
-import prisma from "@/lib/prisma";
-import { getCurrentHouseholdId } from "@/lib/household";
+import Link from "next/link";
 
-export default async function SettingsPage() {
-  const householdId = await getCurrentHouseholdId();
+import prisma from "@/lib/prisma";
+import { getCurrentAuthUser } from "@/lib/auth";
+import { getCurrentAccessContext } from "@/lib/household";
+import { getCurrentHouseholdShareLink } from "@/lib/household-access";
+
+import { claimCurrentHousehold, rotateHouseholdShareLink } from "./actions";
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const accessContext = await getCurrentAccessContext();
+  const authUser = await getCurrentAuthUser();
+  const resolvedSearchParams = (await searchParams) ?? {};
+
+  const claimed = Array.isArray(resolvedSearchParams.claimed)
+    ? resolvedSearchParams.claimed[0]
+    : resolvedSearchParams.claimed;
+  const rotated = Array.isArray(resolvedSearchParams.rotated)
+    ? resolvedSearchParams.rotated[0]
+    : resolvedSearchParams.rotated;
+  const claim = Array.isArray(resolvedSearchParams.claim)
+    ? resolvedSearchParams.claim[0]
+    : resolvedSearchParams.claim;
 
   const household = await prisma.household.findFirst({
-    where: { id: householdId },
+    where: { id: accessContext.householdId },
     include: {
+      claimedBy: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      },
       members: {
         include: {
           user: {
@@ -30,12 +59,42 @@ export default async function SettingsPage() {
     );
   }
 
+  const shareLink = accessContext.canManageLink
+    ? await getCurrentHouseholdShareLink(household.id)
+    : null;
+
+  const isUnclaimed = household.claimedByUserId === null;
+
   return (
     <div className="max-w-3xl space-y-8">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Settings</h1>
-        <p className="text-slate-500">Manage household preferences and members.</p>
+        <p className="text-slate-500">Manage household access and members.</p>
       </div>
+
+      {claimed === "1" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          Household ownership has been claimed successfully.
+        </div>
+      ) : null}
+
+      {rotated === "1" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          Household invite link rotated. Previous links no longer work.
+        </div>
+      ) : null}
+
+      {claim === "conflict" ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          This household was already claimed by another account.
+        </div>
+      ) : null}
+
+      {claim === "forbidden" ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          Only the current household manager can claim ownership.
+        </div>
+      ) : null}
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">Household</h2>
@@ -48,8 +107,85 @@ export default async function SettingsPage() {
             <dt className="font-semibold text-slate-500">Members</dt>
             <dd className="mt-1 text-slate-800">{household.members.length}</dd>
           </div>
+          <div>
+            <dt className="font-semibold text-slate-500">Claimed</dt>
+            <dd className="mt-1 text-slate-800">{isUnclaimed ? "No" : "Yes"}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-500">Claim owner</dt>
+            <dd className="mt-1 text-slate-800">
+              {household.claimedBy
+                ? household.claimedBy.name ?? household.claimedBy.email
+                : "Not claimed yet"}
+            </dd>
+          </div>
         </dl>
       </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-slate-900">Household Share Link</h2>
+
+        {accessContext.canManageLink && shareLink ? (
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="household-share-link">
+                Invite URL
+              </label>
+              <input
+                id="household-share-link"
+                readOnly
+                value={shareLink.url}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Anyone with this link can access and edit recipes, planner, and shopping list.
+              </p>
+            </div>
+
+            <form action={rotateHouseholdShareLink}>
+              <button
+                type="submit"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-rose-200 hover:text-rose-700"
+              >
+                Rotate Invite Link
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Only the household manager can view or rotate the invite link.
+          </div>
+        )}
+      </section>
+
+      {isUnclaimed && accessContext.canManageLink ? (
+        <section className="rounded-3xl border border-dashed border-emerald-200 bg-emerald-50/50 p-6 text-sm text-slate-700">
+          <h2 className="text-lg font-bold text-slate-900">Claim Household Ownership</h2>
+          <p className="mt-2 text-slate-600">
+            Claiming links this household to your Supabase login so you can manage access from any device.
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            {authUser ? (
+              <form action={claimCurrentHousehold}>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Claim This Household
+                </button>
+              </form>
+            ) : (
+              <Link
+                href="/login?next=/claim-household"
+                className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Login to Claim
+              </Link>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">Members</h2>
@@ -70,11 +206,6 @@ export default async function SettingsPage() {
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Invite/member management is intentionally stubbed in this phase.
-        Use Supabase Auth user creation plus database membership assignment for now.
       </section>
     </div>
   );

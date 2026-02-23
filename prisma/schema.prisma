@@ -11,9 +11,14 @@ datasource db {
 model Household {
   id        String   @id @default(cuid())
   name      String
+  shareTokenHash String?  @unique
+  shareTokenVersion Int   @default(1)
+  claimedByUserId   String?
+  claimedAt         DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  claimedBy         User?            @relation("ClaimedHouseholds", fields: [claimedByUserId], references: [id], onDelete: SetNull)
   members           HouseholdMember[]
   recipes           Recipe[]
   mealPlans         MealPlan[]
@@ -23,11 +28,13 @@ model Household {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  authProviderUserId String? @unique
   name      String?
   avatarUrl String?
   createdAt DateTime @default(now())
 
   households HouseholdMember[]
+  claimedHouseholds Household[] @relation("ClaimedHouseholds")
 }
 
 model HouseholdMember {

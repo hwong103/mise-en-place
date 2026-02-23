@@ -1,11 +1,16 @@
 import prisma from "@/lib/prisma";
-import { getOrCreateAppUserId, requireCurrentAuthUser } from "@/lib/auth";
+import { getCurrentAuthUser, getOrCreateAppUserId } from "@/lib/auth";
+import {
+  clearGuestSessionCookie,
+  readGuestSessionCookie,
+  setGuestSessionCookie,
+  validateGuestSession,
+} from "@/lib/household-access";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
-const isAuthDisabled = () =>
-  /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "") ||
-  /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+const isAuthDisabled = () => /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
 
 export const ensureDefaultHouseholdForUser = async (userId: string) => {
   const existingMembership = await prisma.householdMember.findFirst({
@@ -41,25 +46,129 @@ export const ensureDefaultHouseholdForUser = async (userId: string) => {
 
 type UnauthenticatedBehavior = "redirect" | "throw";
 
-export const getCurrentHouseholdId = async (
-  unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
-) => {
-  if (isAuthDisabled()) {
-    return getBootstrapHouseholdId();
+export type AccessActorType =
+  | "authenticated_manager"
+  | "authenticated_member"
+  | "guest_manager"
+  | "guest_member"
+  | "debug_manager";
+
+export type AccessSource = "auth" | "guest" | "bootstrap";
+
+export type AccessContext = {
+  householdId: string;
+  actorType: AccessActorType;
+  canManageLink: boolean;
+  source: AccessSource;
+  shareTokenVersion: number;
+};
+
+const resolveGuestAccessContext = async (): Promise<AccessContext | null> => {
+  const cookieStore = await cookies();
+  const guestSession = readGuestSessionCookie(cookieStore);
+  if (!guestSession) {
+    return null;
   }
 
-  let authUser;
-  try {
-    authUser = await requireCurrentAuthUser();
-  } catch {
-    if (unauthenticatedBehavior === "redirect") {
-      redirect("/login");
-    }
-    throw new Error("UNAUTHORIZED");
+  const validated = await validateGuestSession(guestSession);
+  if (!validated) {
+    clearGuestSessionCookie(cookieStore);
+    return null;
+  }
+
+  setGuestSessionCookie(cookieStore, guestSession);
+
+  return {
+    householdId: validated.householdId,
+    actorType: validated.guestRole === "manager" ? "guest_manager" : "guest_member",
+    canManageLink: validated.canManageLink,
+    source: "guest",
+    shareTokenVersion: validated.shareTokenVersion,
+  };
+};
+
+const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null> => {
+  const authUser = await getCurrentAuthUser();
+  if (!authUser) {
+    return null;
   }
 
   const appUserId = await getOrCreateAppUserId(authUser);
-  return ensureDefaultHouseholdForUser(appUserId);
+  const membership = await prisma.householdMember.findFirst({
+    where: { userId: appUserId },
+    select: {
+      householdId: true,
+      role: true,
+      household: {
+        select: {
+          shareTokenVersion: true,
+        },
+      },
+    },
+    orderBy: { joinedAt: "asc" },
+  });
+
+  if (membership) {
+    const canManageLink = membership.role === "OWNER" || membership.role === "ADMIN";
+    return {
+      householdId: membership.householdId,
+      actorType: canManageLink ? "authenticated_manager" : "authenticated_member",
+      canManageLink,
+      source: "auth",
+      shareTokenVersion: membership.household.shareTokenVersion,
+    };
+  }
+
+  const householdId = await ensureDefaultHouseholdForUser(appUserId);
+  const household = await prisma.household.findUnique({
+    where: { id: householdId },
+    select: { shareTokenVersion: true },
+  });
+
+  return {
+    householdId,
+    actorType: "authenticated_manager",
+    canManageLink: true,
+    source: "auth",
+    shareTokenVersion: household?.shareTokenVersion ?? 1,
+  };
+};
+
+export const getCurrentAccessContext = async (
+  unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
+): Promise<AccessContext> => {
+  if (isAuthDisabled()) {
+    return {
+      householdId: await getBootstrapHouseholdId(),
+      actorType: "debug_manager",
+      canManageLink: true,
+      source: "bootstrap",
+      shareTokenVersion: 0,
+    };
+  }
+
+  const guestContext = await resolveGuestAccessContext();
+  if (guestContext) {
+    return guestContext;
+  }
+
+  const authContext = await resolveAuthenticatedAccessContext();
+  if (authContext) {
+    return authContext;
+  }
+
+  if (unauthenticatedBehavior === "redirect") {
+    redirect("/login");
+  }
+
+  throw new Error("UNAUTHORIZED");
+};
+
+export const getCurrentHouseholdId = async (
+  unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
+) => {
+  const accessContext = await getCurrentAccessContext(unauthenticatedBehavior);
+  return accessContext.householdId;
 };
 
 // Kept only for local/dev bootstrap scripts; do not use this in request authorization paths.

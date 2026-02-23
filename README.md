@@ -17,12 +17,14 @@ Household recipe management with URL import, OCR import, weekly planning, and sh
   - Auto-generated from planned meals
   - Manual item additions and check-off state
 - Auth + tenant scoping:
-  - Supabase magic-link login
-  - Data scoped to the authenticated user household membership
+  - Anonymous household start + share-link access
+  - Optional Supabase magic-link login for ownership claim/management
+  - Data scoped to household access context (guest link or authenticated membership)
 - Settings (v1):
   - Household overview
   - Member list
-  - Invite/member management stub
+  - Share link view/rotate for manager
+  - Household ownership claim flow
 
 ## Tech Stack
 
@@ -75,10 +77,13 @@ Required runtime variables:
 Optional variables:
 
 - `DEFAULT_HOUSEHOLD_NAME` (default: `My Household`)
+- `HOUSEHOLD_SHARE_SIGNING_SECRET` (required in production for household share tokens and signed guest sessions)
+- `HOUSEHOLD_GUEST_SESSION_DAYS` (default: `90`; sliding guest session window)
 - `SUPABASE_SERVICE_ROLE_KEY` (reserved for future admin flows)
 - `OPENAI_API_KEY` and `NEXT_PUBLIC_OCR_PROVIDER` (reserved for future OCR provider expansion)
 - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (reserved for future managed image storage)
-- `DISABLE_AUTH` and `NEXT_PUBLIC_DISABLE_AUTH` (set to `true` only for debugging to bypass auth; in Preview you can set `NEXT_PUBLIC_DISABLE_AUTH=true` alone)
+- `DISABLE_AUTH` (set to `true` only for debugging to bypass server auth)
+- `NEXT_PUBLIC_DISABLE_AUTH` (client-only debug messaging toggle)
 - `INGEST_ENABLE_RENDER_FALLBACK` (default: `true`; set `false` to disable rendered-page fallback)
 - `INGEST_RENDER_WORKER_URL` (URL of the dedicated render worker endpoint)
 - `INGEST_RENDER_WORKER_TOKEN` (bearer token passed to the render worker)
@@ -122,7 +127,15 @@ npm start
 
 - URL import quality still depends on source website structure and anti-bot protections (render fallback improves, but does not eliminate, hard failures).
 - OCR quality depends on image clarity, lighting, and text layout.
-- Settings invite/member management is currently a documented stub.
+- Share-link access is intended for low-risk household planning data; anyone with an active link can edit household content.
+
+## Household Sharing Model
+
+- Start anonymously via `POST /start-household` from the home/login CTA.
+- Share via `GET /join/<token>` invite link.
+- Guests receive a signed household session cookie (sliding expiration).
+- Managers can rotate links from Settings; rotation invalidates prior links and guest sessions.
+- Ownership can be claimed later via Supabase login (`/claim-household` flow), which grants durable manager access across devices.
 
 ## Supabase Auth Redirect Setup
 

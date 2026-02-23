@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 const isAuthDisabled = /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+const normalizeNextPath = (value: string | null) => {
+  if (!value) {
+    return "/recipes";
+  }
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return "/recipes";
+  }
+  return value;
+};
 
 export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +37,7 @@ export default function AuthCallbackPage() {
 
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
+      const nextPath = normalizeNextPath(url.searchParams.get("next"));
       let exchangeErrorMessage: string | null = null;
 
       if (code) {
@@ -46,7 +56,7 @@ export default function AuthCallbackPage() {
 
       const retry = await supabase.auth.getSession();
       if (retry.data.session) {
-        window.location.replace("/recipes");
+        window.location.replace(nextPath);
         return;
       }
 

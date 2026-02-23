@@ -43,18 +43,40 @@ export async function requireCurrentAuthUser(): Promise<AuthUser> {
 }
 
 export async function getOrCreateAppUserId(authUser: AuthUser): Promise<string> {
-  const existing = await prisma.user.findUnique({
-    where: { email: authUser.email },
+  const byProviderUserId = await prisma.user.findUnique({
+    where: { authProviderUserId: authUser.id },
     select: { id: true },
   });
 
+  if (byProviderUserId) {
+    return byProviderUserId.id;
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: { email: authUser.email },
+    select: { id: true, authProviderUserId: true, name: true },
+  });
+
   if (existing) {
+    if (
+      !existing.authProviderUserId ||
+      (authUser.name !== null && authUser.name !== undefined && existing.name !== authUser.name)
+    ) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          authProviderUserId: existing.authProviderUserId ?? authUser.id,
+          ...(authUser.name !== null && authUser.name !== undefined ? { name: authUser.name } : {}),
+        },
+      });
+    }
     return existing.id;
   }
 
   const created = await prisma.user.create({
     data: {
       email: authUser.email,
+      authProviderUserId: authUser.id,
       name: authUser.name,
     },
     select: { id: true },
