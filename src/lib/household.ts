@@ -141,6 +141,11 @@ const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null
 export const getCurrentAccessContext = async (
   unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
 ): Promise<AccessContext> => {
+  const guestContext = await resolveGuestAccessContext();
+  if (guestContext) {
+    return guestContext;
+  }
+
   if (isAuthDisabled()) {
     return {
       householdId: await getBootstrapHouseholdId(),
@@ -149,11 +154,6 @@ export const getCurrentAccessContext = async (
       source: "bootstrap",
       shareTokenVersion: 0,
     };
-  }
-
-  const guestContext = await resolveGuestAccessContext();
-  if (guestContext) {
-    return guestContext;
   }
 
   const authContext = await resolveAuthenticatedAccessContext();
