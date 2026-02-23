@@ -22,20 +22,22 @@ export default async function PlannerPage() {
       where: {
         householdId,
         date: { in: days },
-        mealType: "DINNER",
       },
       include: {
         recipe: true,
       },
+      orderBy: [{ date: "asc" }, { mealType: "asc" }],
     }),
   ]);
 
   const hasRecipes = recipes.length > 0;
   const slots = mealPlans.map((plan) => ({
+    id: plan.id,
     dateKey: toDateKey(plan.date),
     recipeId: plan.recipeId,
     recipeTitle: plan.recipe?.title ?? null,
     recipeImageUrl: plan.recipe?.imageUrl ?? null,
+    mealType: plan.mealType,
   }));
 
   return (

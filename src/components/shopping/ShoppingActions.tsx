@@ -13,9 +13,11 @@ const shareFallback = async (text: string) => {
 
 type ShoppingActionsProps = {
   shareText: string;
+  onClearList: () => void;
+  clearing: boolean;
 };
 
-export default function ShoppingActions({ shareText }: ShoppingActionsProps) {
+export default function ShoppingActions({ shareText, onClearList, clearing }: ShoppingActionsProps) {
   const [status, setStatus] = useState<"idle" | "copied" | "shared" | "unavailable">("idle");
 
   const handlePrint = () => {
@@ -61,6 +63,14 @@ export default function ShoppingActions({ shareText }: ShoppingActionsProps) {
         className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-95"
       >
         {label} List
+      </button>
+      <button
+        type="button"
+        onClick={onClearList}
+        className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-60 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/40"
+        disabled={clearing}
+      >
+        {clearing ? "Clearing..." : "Clear List"}
       </button>
     </div>
   );

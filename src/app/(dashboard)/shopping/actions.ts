@@ -192,3 +192,22 @@ export async function suppressShoppingItem(input: {
 
   revalidatePath("/shopping");
 }
+
+export async function clearShoppingListWeek(input: { weekKey: string }) {
+  const weekKey = toOptionalString(input.weekKey);
+  if (!weekKey) {
+    return;
+  }
+
+  const householdId = await getCurrentHouseholdId();
+  const date = fromDateKey(weekKey);
+
+  await prisma.shoppingListItem.deleteMany({
+    where: {
+      householdId,
+      weekStart: date,
+    },
+  });
+
+  revalidatePath("/shopping");
+}

@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { Trash2 } from "lucide-react";
 import type { ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@prisma/client";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
 import {
   addManualShoppingItem,
+  clearShoppingListWeek,
   removeManualShoppingItem,
   suppressShoppingItem,
   toggleShoppingItem,
@@ -44,6 +46,7 @@ export default function ShoppingList({
   const [optimisticChecked, setOptimisticChecked] = useState<Record<string, boolean>>({});
   const [suppressedKeys, setSuppressedKeys] = useState<Record<string, boolean>>({});
   const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({});
+  const [isClearing, setIsClearing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const persistedLookup = useMemo(() => {
@@ -232,6 +235,22 @@ export default function ShoppingList({
     });
   };
 
+  const handleClearList = () => {
+    const confirmed = window.confirm("Clear all shopping items for this week?");
+    if (!confirmed) {
+      return;
+    }
+
+    setIsClearing(true);
+    startTransition(async () => {
+      try {
+        await clearShoppingListWeek({ weekKey });
+      } finally {
+        setIsClearing(false);
+      }
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -239,7 +258,7 @@ export default function ShoppingList({
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Shopping List</h1>
           <p className="text-slate-500 dark:text-slate-400">Confirm what you have and what you need.</p>
         </div>
-        <ShoppingActions shareText={shareText} />
+        <ShoppingActions shareText={shareText} onClearList={handleClearList} clearing={isClearing} />
       </div>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -350,10 +369,12 @@ export default function ShoppingList({
                                   id: item.id,
                                 })
                               }
-                              className="text-xs font-semibold text-rose-500 dark:text-rose-300"
+                              className="rounded-full p-1 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
                               disabled={isSaving || isPending}
+                              aria-label={`Remove ${item.line}`}
+                              title="Remove item"
                             >
-                              Remove
+                              <Trash2 className="h-4 w-4" strokeWidth={1.8} />
                             </button>
                           </div>
                         </div>

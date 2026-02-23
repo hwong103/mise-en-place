@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
-import RecipeForm from "@/components/recipes/RecipeForm";
+import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
 import SubmitButton from "@/components/forms/SubmitButton";
 import { getRecipeById } from "@/lib/recipes";
 import {
@@ -12,13 +12,12 @@ import {
   serializePrepGroupsToText,
 } from "@/lib/recipe-utils";
 
-import { deleteRecipe, updateRecipe, updateRecipeSection } from "../actions";
+import { deleteRecipe, updateRecipeSection } from "../actions";
 
 export const revalidate = 60;
 export const dynamicParams = true;
 
-const formatMinutes = (value?: number | null) =>
-  value ? `${value} min` : null;
+const formatMinutes = (value?: number | null) => (value ? `${value} min` : null);
 
 const getVideoEmbedUrl = (videoUrl?: string | null) => {
   if (!videoUrl) {
@@ -93,10 +92,8 @@ const isIngredientGroupTitle = (value: string) => {
 
 export default async function RecipeDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: { [key: string]: string | string[] | undefined };
 }) {
   const { id } = await params;
   const recipe = await getRecipeById(id);
@@ -140,25 +137,7 @@ export default async function RecipeDetailPage({
     return filtered;
   })();
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
-  const editParam = Array.isArray(searchParams?.edit)
-    ? searchParams?.edit[0]
-    : searchParams?.edit;
-  const isEditing = editParam === "1" || editParam === "true";
   const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
-  const initialValues = {
-    title: recipe.title,
-    description: recipe.description ?? undefined,
-    sourceUrl: recipe.sourceUrl ?? undefined,
-    imageUrl: recipe.imageUrl ?? undefined,
-    videoUrl: recipe.videoUrl ?? undefined,
-    servings: recipe.servings ?? undefined,
-    prepTime: recipe.prepTime ?? undefined,
-    cookTime: recipe.cookTime ?? undefined,
-    tags: recipe.tags ?? [],
-    ingredients,
-    instructions,
-    notes,
-  };
 
   return (
     <div className="space-y-10">
@@ -176,16 +155,7 @@ export default async function RecipeDetailPage({
         </div>
         <div className="flex flex-wrap gap-3">
           <AddToPlannerDialog recipeId={recipe.id} recipeTitle={recipe.title} />
-          <Link
-            href={
-              isEditing
-                ? `/recipes/${recipe.id}#edit-recipe`
-                : `/recipes/${recipe.id}?edit=1#edit-recipe`
-            }
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            Edit
-          </Link>
+          <RecipeFocusMode title={recipe.title} prepGroups={prepGroups} ingredients={ingredients} instructions={instructions} />
           <form action={deleteRecipe}>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <SubmitButton
@@ -240,6 +210,95 @@ export default async function RecipeDetailPage({
                 ))}
               </div>
             ) : null}
+
+            <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+              <input type="hidden" name="recipeId" value={recipe.id} />
+              <input type="hidden" name="section" value="overview" />
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Inline Edit</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Title
+                  <input
+                    name="title"
+                    defaultValue={recipe.title}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Tags
+                  <input
+                    name="tags"
+                    defaultValue={(recipe.tags ?? []).join(", ")}
+                    placeholder="Weeknight, Family"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Servings
+                  <input
+                    name="servings"
+                    type="number"
+                    min={1}
+                    defaultValue={recipe.servings ?? undefined}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Prep (min)
+                    <input
+                      name="prepTime"
+                      type="number"
+                      min={1}
+                      defaultValue={recipe.prepTime ?? undefined}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Cook (min)
+                    <input
+                      name="cookTime"
+                      type="number"
+                      min={1}
+                      defaultValue={recipe.cookTime ?? undefined}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                </div>
+                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 md:col-span-2">
+                  Description
+                  <textarea
+                    name="description"
+                    rows={2}
+                    defaultValue={recipe.description ?? ""}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <input
+                  name="sourceUrl"
+                  defaultValue={recipe.sourceUrl ?? ""}
+                  placeholder="Source URL"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <input
+                  name="videoUrl"
+                  defaultValue={recipe.videoUrl ?? ""}
+                  placeholder="Video URL"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <input
+                  name="imageUrl"
+                  defaultValue={recipe.imageUrl ?? ""}
+                  placeholder="Image URL"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </div>
+              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                Save Overview
+              </button>
+            </form>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -247,12 +306,7 @@ export default async function RecipeDetailPage({
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
-                  <a
-                    href={recipe.videoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm font-semibold text-emerald-600 dark:text-emerald-400"
-                  >
+                  <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                     Open Video
                   </a>
                 </div>
@@ -275,21 +329,16 @@ export default async function RecipeDetailPage({
                 </div>
               </section>
             ) : null}
+
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
-              </div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
               {ingredients.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                  No ingredients listed yet.
-                </p>
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No ingredients listed yet.</p>
               ) : ingredientGroups.length > 0 ? (
                 <div className="mt-4 space-y-5">
                   {ingredientGroups.map((group) => (
                     <div key={group.title}>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                        {group.title}
-                      </h3>
+                      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{group.title}</h3>
                       <ul className="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                         {group.items.map((item) => (
                           <li key={`${group.title}-${item}`} className="flex items-start gap-2">
@@ -311,40 +360,25 @@ export default async function RecipeDetailPage({
                   ))}
                 </ul>
               )}
-              <details className="mt-6">
-                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                  Edit Ingredients
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
-                  </svg>
-                </summary>
-                <form action={updateRecipeSection} className="mt-4 space-y-3">
-                  <input type="hidden" name="recipeId" value={recipe.id} />
-                  <input type="hidden" name="section" value="ingredients" />
-                  <textarea
-                    name="ingredients"
-                    rows={6}
-                    defaultValue={ingredients.join("\n")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
-                  >
-                    Save Ingredients
-                  </button>
-                </form>
-              </details>
+              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+                <input type="hidden" name="recipeId" value={recipe.id} />
+                <input type="hidden" name="section" value="ingredients" />
+                <textarea
+                  name="ingredients"
+                  rows={6}
+                  defaultValue={ingredients.join("\n")}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                  Save Ingredients
+                </button>
+              </form>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
-              </div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
               {instructions.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                  No instructions listed yet.
-                </p>
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No instructions listed yet.</p>
               ) : (
                 <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
                   {instructions.map((step, index) => (
@@ -357,30 +391,19 @@ export default async function RecipeDetailPage({
                   ))}
                 </ol>
               )}
-              <details className="mt-6">
-                <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                  Edit Instructions
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
-                  </svg>
-                </summary>
-                <form action={updateRecipeSection} className="mt-4 space-y-3">
-                  <input type="hidden" name="recipeId" value={recipe.id} />
-                  <input type="hidden" name="section" value="instructions" />
-                  <textarea
-                    name="instructions"
-                    rows={6}
-                    defaultValue={instructions.join("\n")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
-                  >
-                    Save Instructions
-                  </button>
-                </form>
-              </details>
+              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+                <input type="hidden" name="recipeId" value={recipe.id} />
+                <input type="hidden" name="section" value="instructions" />
+                <textarea
+                  name="instructions"
+                  rows={6}
+                  defaultValue={instructions.join("\n")}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                  Save Instructions
+                </button>
+              </form>
             </section>
           </div>
 
@@ -397,30 +420,19 @@ export default async function RecipeDetailPage({
                 ))}
               </ul>
             )}
-            <details className="mt-6">
-              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                Edit Notes
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
-                </svg>
-              </summary>
-              <form action={updateRecipeSection} className="mt-4 space-y-3">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="notes" />
-                <textarea
-                  name="notes"
-                  rows={4}
-                  defaultValue={notes.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
-                >
-                  Save Notes
-                </button>
-              </form>
-            </details>
+            <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+              <input type="hidden" name="recipeId" value={recipe.id} />
+              <input type="hidden" name="section" value="notes" />
+              <textarea
+                name="notes"
+                rows={4}
+                defaultValue={notes.join("\n")}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              />
+              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                Save Notes
+              </button>
+            </form>
           </section>
         </section>
 
@@ -428,32 +440,22 @@ export default async function RecipeDetailPage({
           {recipe.imageUrl ? (
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={recipe.imageUrl}
-                alt={recipe.title}
-                className="h-full w-full object-cover"
-              />
+              <img src={recipe.imageUrl} alt={recipe.title} className="h-full w-full object-cover" />
             </div>
           ) : null}
 
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise en Place</h2>
             {prepGroups.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                Add ingredients to generate prep groups.
-              </p>
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Add ingredients to generate prep groups.</p>
             ) : (
               <div className="mt-4 space-y-4">
                 {prepGroups.map((group) => (
                   <div key={group.title}>
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                      {group.title}
-                    </h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{group.title}</h3>
                     <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
                       {group.items.map((item) => (
-                        <li key={`${group.title}-${item}`}>
-                          {item}
-                        </li>
+                        <li key={`${group.title}-${item}`}>{item}</li>
                       ))}
                     </ul>
                   </div>
@@ -461,54 +463,23 @@ export default async function RecipeDetailPage({
               </div>
             )}
 
-            <details className="mt-6">
-              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                Edit Prep Groups
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16.862 3.487a2.25 2.25 0 113.182 3.182L7.125 19.588 3 21l1.412-4.125L16.862 3.487z" />
-                </svg>
-              </summary>
-              <form action={updateRecipeSection} className="mt-4 space-y-3">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="prepGroups" />
-                <textarea
-                  name="prepGroups"
-                  rows={8}
-                  defaultValue={prepGroupsText}
-                  placeholder="Prep\n- mince garlic\n- chop onions"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
-                >
-                  Save Prep Groups
-                </button>
-              </form>
-            </details>
+            <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+              <input type="hidden" name="recipeId" value={recipe.id} />
+              <input type="hidden" name="section" value="prepGroups" />
+              <textarea
+                name="prepGroups"
+                rows={8}
+                defaultValue={prepGroupsText}
+                placeholder="Prep\n- mince garlic\n- chop onions"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              />
+              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                Save Prep Groups
+              </button>
+            </form>
           </section>
         </aside>
       </div>
-
-      {isEditing ? (
-        <section
-          id="edit-recipe"
-          className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Edit Recipe Details</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Update the core recipe metadata, timings, and full ingredient list.
-            </p>
-          </div>
-          <RecipeForm
-            action={updateRecipe}
-            initialValues={initialValues}
-            recipeId={recipe.id}
-            submitLabel="Save Recipe"
-          />
-        </section>
-      ) : null}
     </div>
   );
 }

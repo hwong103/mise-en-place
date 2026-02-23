@@ -1001,6 +1001,33 @@ export async function updateRecipeSection(formData: FormData) {
     });
   }
 
+  if (section === "overview") {
+    const title = toOptionalString(formData.get("title")) ?? recipe.title;
+    const description = toOptionalString(formData.get("description"));
+    const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
+    const imageUrl = toOptionalUrl(formData.get("imageUrl"));
+    const videoUrl = toOptionalUrl(formData.get("videoUrl"));
+    const servings = toOptionalInt(formData.get("servings"));
+    const prepTime = toOptionalInt(formData.get("prepTime"));
+    const cookTime = toOptionalInt(formData.get("cookTime"));
+    const tags = parseTags(formData.get("tags")?.toString() ?? "");
+
+    await prisma.recipe.updateMany({
+      where: { id: recipeId, householdId },
+      data: {
+        title,
+        description: description ?? recipe.description,
+        sourceUrl: normalizeSourceUrl(sourceUrl) ?? sourceUrl ?? recipe.sourceUrl,
+        imageUrl: imageUrl ?? recipe.imageUrl,
+        videoUrl: normalizeVideoUrl(videoUrl) ?? videoUrl ?? recipe.videoUrl,
+        servings: servings ?? recipe.servings,
+        prepTime: prepTime ?? recipe.prepTime,
+        cookTime: cookTime ?? recipe.cookTime,
+        tags: tags.length > 0 ? tags : recipe.tags,
+      },
+    });
+  }
+
   revalidatePath(`/recipes/${recipeId}`);
   redirect(`/recipes/${recipeId}`);
 }
@@ -1215,24 +1242,31 @@ export async function addToMealPlan(formData: FormData) {
 
   const householdId = await getCurrentHouseholdId();
   const date = fromDateKey(dateKey);
+  const mealTypeOrder = ["DINNER", "LUNCH", "BREAKFAST", "SNACK"] as const;
+  const existingForDay = await prisma.mealPlan.findMany({
+    where: { householdId, date },
+    select: { mealType: true, recipeId: true },
+  });
 
-  await prisma.$transaction(async (tx) => {
-    await tx.mealPlan.deleteMany({
-      where: {
-        householdId,
-        date,
-      },
-    });
+  const alreadyAdded = existingForDay.some((plan) => plan.recipeId === recipeId);
+  if (alreadyAdded) {
+    redirect("/planner");
+  }
 
-    await tx.mealPlan.create({
-      data: {
-        householdId,
-        recipeId,
-        date,
-        mealType: "DINNER",
-        servings: 2,
-      },
-    });
+  const occupied = new Set(existingForDay.map((plan) => plan.mealType));
+  const nextMealType = mealTypeOrder.find((mealType) => !occupied.has(mealType));
+  if (!nextMealType) {
+    redirect("/planner");
+  }
+
+  await prisma.mealPlan.create({
+    data: {
+      householdId,
+      recipeId,
+      date,
+      mealType: nextMealType,
+      servings: 2,
+    },
   });
 
   revalidatePath("/planner");
