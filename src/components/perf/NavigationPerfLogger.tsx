@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 type PendingNavigation = {
   from: string;
@@ -18,11 +18,6 @@ type NavigationPerfPayload = {
 };
 
 const STORAGE_KEY = "mp_pending_navigation_perf";
-
-const buildPath = (pathname: string, searchParams: URLSearchParams) => {
-  const query = searchParams.toString();
-  return query ? `${pathname}?${query}` : pathname;
-};
 
 const readPendingNavigation = (): PendingNavigation | null => {
   try {
@@ -98,8 +93,7 @@ const isEligibleLinkClick = (event: MouseEvent) => {
 
 export default function NavigationPerfLogger() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const currentPathRef = useRef<string>(buildPath(pathname, searchParams));
+  const currentPathRef = useRef<string>(pathname);
 
   useEffect(() => {
     const clickListener = (event: MouseEvent) => {
@@ -151,7 +145,8 @@ export default function NavigationPerfLogger() {
   }, []);
 
   useEffect(() => {
-    const currentPath = buildPath(pathname, searchParams);
+    const currentPath =
+      typeof window === "undefined" ? pathname : `${pathname}${window.location.search}`;
     const pending = readPendingNavigation();
 
     if (pending && pending.to === currentPath) {
@@ -165,7 +160,7 @@ export default function NavigationPerfLogger() {
     }
 
     currentPathRef.current = currentPath;
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   return null;
 }
