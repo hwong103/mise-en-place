@@ -52,7 +52,7 @@ const createPrismaClient = () => {
 
       const normalizedQuery = normalizeQuery(event.query);
       const tableMatch = normalizedQuery.match(
-        /\b(?:from|into|update)\s+"?([a-z0-9_]+)"?/i
+        /\b(?:from|into|update)\s+"?(?:([a-z0-9_]+)"?\.)?"?([a-z0-9_]+)"?/i
       );
 
       console.info(
@@ -65,7 +65,8 @@ const createPrismaClient = () => {
           meta: {
             threshold_ms: thresholdMs,
             query_hash: hashValue(normalizedQuery),
-            table: tableMatch ? tableMatch[1] : null,
+            schema: tableMatch ? tableMatch[1] ?? null : null,
+            table: tableMatch ? tableMatch[2] : null,
             target: event.target,
           },
         })
