@@ -4,7 +4,10 @@ import { getCurrentHouseholdId } from "@/lib/household";
 import { getUpcomingRange, toDateKey } from "@/lib/date";
 import { buildShoppingList } from "@/lib/shopping";
 import { coerceStringArray } from "@/lib/recipe-utils";
-import { listShoppingItems } from "@/lib/shopping-list";
+import {
+  listShoppingItems,
+  listShoppingLocationPreferences,
+} from "@/lib/shopping-list";
 
 export const revalidate = 30;
 
@@ -15,7 +18,7 @@ export default async function ShoppingPage() {
   const { start, end } = getUpcomingRange();
   const householdId = await getCurrentHouseholdId();
 
-  const [mealPlans, persistedItems] = await Promise.all([
+  const [mealPlans, persistedItems, locationPreferences] = await Promise.all([
     prisma.mealPlan.findMany({
       where: {
         householdId,
@@ -27,6 +30,7 @@ export default async function ShoppingPage() {
       include: { recipe: true },
     }),
     listShoppingItems(start, householdId),
+    listShoppingLocationPreferences(householdId),
   ]);
 
   const ingredientEntries = mealPlans.flatMap((plan) => {
@@ -42,6 +46,7 @@ export default async function ShoppingPage() {
       weekLabel={`${formatDate(start)} - ${formatDate(end)}`}
       categories={categories}
       persistedItems={persistedItems}
+      locationPreferences={locationPreferences}
     />
   );
 }
