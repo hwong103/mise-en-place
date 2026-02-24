@@ -576,9 +576,18 @@ const extractNotesFromDescription = (value: string | undefined) => {
   };
 };
 
-const parseYield = (value: unknown) => {
+const parseYield = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.trunc(value);
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const parsed = parseYield(entry);
+      if (typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+    return undefined;
   }
   if (typeof value === "string") {
     const match = value.match(/\d+/);
@@ -1303,6 +1312,7 @@ export async function importRecipeFromUrl(formData: FormData) {
   let markdownRecipe: ReturnType<typeof extractRecipeFromMarkdown> | null = null;
   let directHtml = "";
   let renderedHtml = "";
+  let metadataFallback: Pick<RecipeIngestionCandidate, "tags" | "servings" | "prepTime" | "cookTime"> = {};
 
   const markdownStartedAt = Date.now();
   const markdownResult = await fetchMarkdownFromUrl(sourceUrl);
@@ -1366,6 +1376,21 @@ export async function importRecipeFromUrl(formData: FormData) {
 
       if (response.ok) {
         directHtml = await response.text();
+        const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
+        const metadataCandidate = buildCandidateFromHtml({
+          stage: "http_html",
+          sourceUrl,
+          html: directHtml,
+          latencyMs: mediaHtmlLatencyMs,
+        });
+        if (metadataCandidate) {
+          metadataFallback = {
+            tags: metadataCandidate.tags?.length ? metadataCandidate.tags : undefined,
+            servings: metadataCandidate.servings,
+            prepTime: metadataCandidate.prepTime,
+            cookTime: metadataCandidate.cookTime,
+          };
+        }
         attempts.push({
           stage: "http_html",
           success: true,
@@ -1373,7 +1398,7 @@ export async function importRecipeFromUrl(formData: FormData) {
           ingredients: [],
           instructions: [],
           notes: [],
-          latencyMs: Date.now() - mediaHtmlStartedAt,
+          latencyMs: mediaHtmlLatencyMs,
           errorCode: undefined,
         });
       } else {
@@ -1581,6 +1606,15 @@ export async function importRecipeFromUrl(formData: FormData) {
     getVideoKind(normalizedVideoUrl) === "youtube"
       ? normalizedVideoUrl
       : normalizedVideoUrl ?? undefined;
+  const finalTags =
+    selectedCandidate.tags?.length
+      ? selectedCandidate.tags
+      : markdownRecipe?.tags?.length
+        ? markdownRecipe.tags
+        : metadataFallback.tags ?? [];
+  const finalServings = selectedCandidate.servings ?? metadataFallback.servings ?? null;
+  const finalPrepTime = selectedCandidate.prepTime ?? metadataFallback.prepTime ?? null;
+  const finalCookTime = selectedCandidate.cookTime ?? metadataFallback.cookTime ?? null;
   const notes = Array.from(
     new Set([
       ...cleanedIngredients.notes,
@@ -1619,7 +1653,15 @@ export async function importRecipeFromUrl(formData: FormData) {
   if (existingRecipe) {
     const existing = await prisma.recipe.findFirst({
       where: { id: existingRecipe.id, householdId },
-      select: { id: true, imageUrl: true, videoUrl: true },
+      select: {
+        id: true,
+        imageUrl: true,
+        videoUrl: true,
+        servings: true,
+        prepTime: true,
+        cookTime: true,
+        tags: true,
+      },
     });
 
     if (existing) {
@@ -1630,13 +1672,36 @@ export async function importRecipeFromUrl(formData: FormData) {
         (existingKind !== "youtube" && nextKind === "youtube") ||
         (existingKind === null && nextKind !== null);
       const shouldUpdateImage = !existing.imageUrl && imageUrl;
+      const shouldUpdateServings =
+        (existing.servings === null || existing.servings === undefined) &&
+        typeof finalServings === "number";
+      const shouldUpdatePrepTime =
+        (existing.prepTime === null || existing.prepTime === undefined) &&
+        typeof finalPrepTime === "number";
+      const shouldUpdateCookTime =
+        (existing.cookTime === null || existing.cookTime === undefined) &&
+        typeof finalCookTime === "number";
+      const shouldUpdateTags =
+        (!Array.isArray(existing.tags) || existing.tags.length === 0) &&
+        finalTags.length > 0;
 
-      if (shouldUpdateVideo || shouldUpdateImage) {
+      if (
+        shouldUpdateVideo ||
+        shouldUpdateImage ||
+        shouldUpdateServings ||
+        shouldUpdatePrepTime ||
+        shouldUpdateCookTime ||
+        shouldUpdateTags
+      ) {
         await prisma.recipe.update({
           where: { id: existing.id },
           data: {
             imageUrl: shouldUpdateImage ? imageUrl : undefined,
             videoUrl: shouldUpdateVideo ? videoUrl : undefined,
+            servings: shouldUpdateServings ? finalServings : undefined,
+            prepTime: shouldUpdatePrepTime ? finalPrepTime : undefined,
+            cookTime: shouldUpdateCookTime ? finalCookTime : undefined,
+            tags: shouldUpdateTags ? finalTags : undefined,
           },
         });
       }
@@ -1655,13 +1720,10 @@ export async function importRecipeFromUrl(formData: FormData) {
       sourceUrl: normalizedSourceUrl,
       imageUrl,
       videoUrl,
-      servings: selectedCandidate.servings ?? null,
-      prepTime: selectedCandidate.prepTime ?? null,
-      cookTime: selectedCandidate.cookTime ?? null,
-      tags:
-        selectedCandidate.tags?.length
-          ? selectedCandidate.tags
-          : markdownRecipe?.tags ?? [],
+      servings: finalServings,
+      prepTime: finalPrepTime,
+      cookTime: finalCookTime,
+      tags: finalTags,
       ingredientCount: cleanedIngredients.lines.length,
       ingredients: cleanedIngredients.lines,
       instructions: cleanedInstructions.lines,
