@@ -22,4 +22,56 @@ describe("parseMarkdownRecipe", () => {
     expect(parsed.ingredients).toEqual([]);
     expect(parsed.instructions).toEqual([]);
   });
+
+  it("keeps collecting ingredients across subsection headings", () => {
+    const markdown = `# Beef Stroganoff\n\nIngredients\n### Beef\n- 500g beef strips\n- 1 onion\n### Sauce\n- 1 cup sour cream\n- 1 tbsp mustard\n### Serving\n- Pasta\n- Chives\n\nInstructions\n1. Sear beef.\n2. Make sauce.`;
+
+    const parsed = parseMarkdownRecipe(markdown);
+
+    expect(parsed.ingredients).toEqual([
+      "500g beef strips",
+      "1 onion",
+      "1 cup sour cream",
+      "1 tbsp mustard",
+      "Pasta",
+      "Chives",
+    ]);
+    expect(parsed.instructions).toEqual(["Sear beef.", "Make sauce."]);
+  });
+
+  it("ignores editorial headings and stops sections at peer-level headings", () => {
+    const markdown = `---
+title: Beef Stroganoff
+description: Creamy beef and mushroom gravy over noodles.
+---
+
+* [ Skip to primary navigation](#nav)
+
+## What is stroganoff sauce made of?
+This intro should not be captured as ingredients.
+
+## What to serve with beef stroganoff
+Dinner is on the table in 30 minutes.
+
+### Ingredients
+- 600 g beef
+#### Serving:
+- Egg noodles
+
+### Instructions
+1. Sear beef.
+
+### Recipe Notes:
+- Do not overcook the beef.
+
+### Nutrition Information:
+Serving: 243g`;
+
+    const parsed = parseMarkdownRecipe(markdown);
+
+    expect(parsed.description).toBe("Creamy beef and mushroom gravy over noodles.");
+    expect(parsed.ingredients).toEqual(["600 g beef", "Egg noodles"]);
+    expect(parsed.instructions).toEqual(["Sear beef."]);
+    expect(parsed.notes).toEqual(["Do not overcook the beef."]);
+  });
 });
