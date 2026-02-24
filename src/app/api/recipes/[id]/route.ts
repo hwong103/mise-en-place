@@ -19,6 +19,12 @@ export async function GET(
   const resolved = await params;
   const recipe = await prisma.recipe.findFirst({
     where: { id: resolved.id, householdId },
+    select: {
+      id: true,
+      title: true,
+      sourceUrl: true,
+      createdAt: true,
+    },
   });
 
   if (!recipe) {

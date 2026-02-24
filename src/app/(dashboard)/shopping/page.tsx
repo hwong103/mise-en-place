@@ -24,7 +24,14 @@ export default async function ShoppingPage() {
           lte: end,
         },
       },
-      include: { recipe: true },
+      include: {
+        recipe: {
+          select: {
+            title: true,
+            ingredients: true,
+          },
+        },
+      },
     }),
     listShoppingItems(start, householdId),
   ]);

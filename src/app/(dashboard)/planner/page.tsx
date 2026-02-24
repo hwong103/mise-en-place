@@ -24,7 +24,13 @@ export default async function PlannerPage() {
         date: { in: days },
       },
       include: {
-        recipe: true,
+        recipe: {
+          select: {
+            id: true,
+            title: true,
+            imageUrl: true,
+          },
+        },
       },
       orderBy: [{ date: "asc" }, { mealType: "asc" }],
     }),

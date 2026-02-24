@@ -22,7 +22,7 @@ export async function listRecipes(householdId?: string) {
         servings: true,
         prepTime: true,
         cookTime: true,
-        ingredientCount: true,
+        ingredients: true,
       },
     });
 
@@ -69,6 +69,25 @@ export async function getRecipeById(recipeId: string) {
     householdId = await getCurrentHouseholdId();
     const recipe = await prisma.recipe.findFirst({
       where: { id: recipeId, householdId },
+      select: {
+        id: true,
+        householdId: true,
+        title: true,
+        description: true,
+        imageUrl: true,
+        videoUrl: true,
+        sourceUrl: true,
+        servings: true,
+        prepTime: true,
+        cookTime: true,
+        ingredients: true,
+        instructions: true,
+        notes: true,
+        prepGroups: true,
+        tags: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     logServerPerf({

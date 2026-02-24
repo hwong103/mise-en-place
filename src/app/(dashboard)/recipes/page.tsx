@@ -1,5 +1,6 @@
 import RecipeLibraryClient from "@/components/recipes/RecipeLibraryClient";
 import { listRecipes } from "@/lib/recipes";
+import { coerceStringArray } from "@/lib/recipe-utils";
 
 import { createRecipe, importRecipeFromUrl } from "./actions";
 
@@ -25,7 +26,7 @@ export default async function RecipesPage({
     servings: recipe.servings,
     prepTime: recipe.prepTime,
     cookTime: recipe.cookTime,
-    ingredientCount: recipe.ingredientCount,
+    ingredientCount: coerceStringArray(recipe.ingredients).length,
   }));
 
   return (
