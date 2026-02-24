@@ -6,8 +6,8 @@ import { Suspense } from "react";
 import AuthStatus from "@/components/auth/AuthStatus";
 import GuestSessionHeartbeat from "@/components/auth/GuestSessionHeartbeat";
 import NavigationPerfLogger from "@/components/perf/NavigationPerfLogger";
+import HeaderAccessControls from "@/components/layout/HeaderAccessControls";
 import ThemeToggle from "@/components/theme/ThemeToggle";
-import { getCurrentAccessContext } from "@/lib/household";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -30,24 +30,11 @@ const navItems = [
   { href: "/shopping", label: "Shopping" },
 ];
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let hasHouseholdAccess = false;
-  let showSettings = false;
-  let accessSource: "guest" | "auth" | "bootstrap" | null = null;
-
-  try {
-    const accessContext = await getCurrentAccessContext("throw");
-    hasHouseholdAccess = true;
-    showSettings = accessContext.canManageLink;
-    accessSource = accessContext.source;
-  } catch {
-    // Anonymous visitors can still access public routes.
-  }
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
@@ -80,16 +67,9 @@ export default async function RootLayout({
 
               <div className="ml-auto flex items-center gap-3">
                 <ThemeToggle />
-                {showSettings ? (
-                  <Link
-                    href="/settings"
-                    prefetch={false}
-                    className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:border-emerald-200 hover:text-emerald-700 md:inline-flex dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-400/30 dark:hover:text-emerald-300"
-                  >
-                    Settings
-                  </Link>
-                ) : null}
-                <AuthStatus hasHouseholdAccess={hasHouseholdAccess} accessSource={accessSource} />
+                <Suspense fallback={<AuthStatus />}>
+                  <HeaderAccessControls />
+                </Suspense>
               </div>
             </div>
           </header>
