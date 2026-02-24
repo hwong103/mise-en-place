@@ -13,7 +13,6 @@ export default async function SettingsPage({
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const accessContext = await getCurrentAccessContext();
-  const authUser = await getCurrentAuthUser();
   const resolvedSearchParams = (await searchParams) ?? {};
 
   const claimed = Array.isArray(resolvedSearchParams.claimed)
@@ -64,6 +63,8 @@ export default async function SettingsPage({
     : null;
 
   const isUnclaimed = household.claimedByUserId === null;
+  const authUser =
+    isUnclaimed && accessContext.canManageLink ? await getCurrentAuthUser() : null;
 
   return (
     <div className="max-w-3xl space-y-8">

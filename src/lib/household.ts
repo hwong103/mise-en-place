@@ -9,6 +9,7 @@ import {
 import { logServerPerf } from "@/lib/server-perf";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
 const isServerAuthDisabled = () => /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
@@ -147,9 +148,7 @@ const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null
   };
 };
 
-export const getCurrentAccessContext = async (
-  unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
-): Promise<AccessContext> => {
+const resolveCurrentAccessContext = cache(async (): Promise<AccessContext | null> => {
   const startedAt = Date.now();
   try {
     const guestContext = await resolveGuestAccessContext();
@@ -196,12 +195,14 @@ export const getCurrentAccessContext = async (
       });
       return authContext;
     }
-
-    if (unauthenticatedBehavior === "redirect") {
-      redirect("/login");
-    }
-
-    throw new Error("UNAUTHORIZED");
+    logServerPerf({
+      phase: "household.resolve_access_context",
+      route: "/server/household/access-context",
+      startedAt,
+      success: false,
+      meta: { reason: "unauthorized" },
+    });
+    return null;
   } catch (error) {
     logServerPerf({
       phase: "household.resolve_access_context",
@@ -210,11 +211,23 @@ export const getCurrentAccessContext = async (
       success: false,
       meta: { error: error instanceof Error ? error.message : "unknown_error" },
     });
-    if (unauthenticatedBehavior === "redirect") {
-      redirect("/login");
-    }
     throw error;
   }
+});
+
+export const getCurrentAccessContext = async (
+  unauthenticatedBehavior: UnauthenticatedBehavior = "redirect"
+): Promise<AccessContext> => {
+  const context = await resolveCurrentAccessContext();
+  if (context) {
+    return context;
+  }
+
+  if (unauthenticatedBehavior === "redirect") {
+    redirect("/login");
+  }
+
+  throw new Error("UNAUTHORIZED");
 };
 
 export const getCurrentHouseholdId = async (

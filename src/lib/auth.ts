@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logServerPerf } from "@/lib/server-perf";
+import { cache } from "react";
 
 type AuthUser = {
   id: string;
@@ -35,7 +36,7 @@ const authUserFromClaims = (claims: Record<string, unknown>) => {
   };
 };
 
-export async function getCurrentAuthUser(): Promise<AuthUser | null> {
+const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
   const startedAt = Date.now();
   let authSource: "claims" | "get_user" | "none" = "none";
   try {
@@ -112,6 +113,10 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
     });
     return null;
   }
+});
+
+export async function getCurrentAuthUser(): Promise<AuthUser | null> {
+  return resolveCurrentAuthUser();
 }
 
 export async function requireCurrentAuthUser(): Promise<AuthUser> {
