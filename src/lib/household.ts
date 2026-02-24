@@ -12,11 +12,15 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
+const BOOTSTRAP_CACHE_TTL_MS = 5 * 60 * 1000;
 const isServerAuthDisabled = () => /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
 const isPreviewPublicAuthDisabled = () =>
   (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview" &&
   /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 const isAuthDisabled = () => isServerAuthDisabled() || isPreviewPublicAuthDisabled();
+
+let cachedBootstrapHouseholdId: string | null = null;
+let cachedBootstrapHouseholdIdAt = 0;
 
 export const ensureDefaultHouseholdForUser = async (userId: string) => {
   const existingMembership = await prisma.householdMember.findFirst({
@@ -326,11 +330,21 @@ export const getCurrentHouseholdId = async (
 
 // Kept only for local/dev bootstrap scripts; do not use this in request authorization paths.
 export const getBootstrapHouseholdId = async () => {
+  const now = Date.now();
+  if (
+    cachedBootstrapHouseholdId &&
+    now - cachedBootstrapHouseholdIdAt < BOOTSTRAP_CACHE_TTL_MS
+  ) {
+    return cachedBootstrapHouseholdId;
+  }
+
   const existing = await prisma.household.findFirst({
     orderBy: { createdAt: "asc" },
     select: { id: true },
   });
   if (existing) {
+    cachedBootstrapHouseholdId = existing.id;
+    cachedBootstrapHouseholdIdAt = now;
     return existing.id;
   }
 
@@ -339,5 +353,7 @@ export const getBootstrapHouseholdId = async () => {
     data: { name },
     select: { id: true },
   });
+  cachedBootstrapHouseholdId = created.id;
+  cachedBootstrapHouseholdIdAt = now;
   return created.id;
 };
