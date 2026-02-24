@@ -38,8 +38,8 @@ const authUserFromClaims = (claims: Record<string, unknown>) => {
 export async function getCurrentAuthUser(): Promise<AuthUser | null> {
   const startedAt = Date.now();
   let authSource: "claims" | "get_user" | "none" = "none";
-  const supabase = await createSupabaseServerClient();
   try {
+    const supabase = await createSupabaseServerClient();
     const claimsResult = await supabase.auth.getClaims();
     if (!claimsResult.error && claimsResult.data?.claims) {
       const claimsUser = authUserFromClaims(claimsResult.data.claims as Record<string, unknown>);
@@ -110,7 +110,7 @@ export async function getCurrentAuthUser(): Promise<AuthUser | null> {
         error: error instanceof Error ? error.message : "unknown_error",
       },
     });
-    throw error;
+    return null;
   }
 }
 

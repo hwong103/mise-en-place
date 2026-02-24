@@ -210,6 +210,9 @@ export const getCurrentAccessContext = async (
       success: false,
       meta: { error: error instanceof Error ? error.message : "unknown_error" },
     });
+    if (unauthenticatedBehavior === "redirect") {
+      redirect("/login");
+    }
     throw error;
   }
 };
