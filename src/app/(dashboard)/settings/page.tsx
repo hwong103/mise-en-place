@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma";
 import { getCurrentAuthUser } from "@/lib/auth";
 import { getCurrentAccessContext } from "@/lib/household";
 import { getCurrentHouseholdShareLink } from "@/lib/household-access";
+import { getServerNow } from "@/lib/server-clock";
+import { logServerPerf } from "@/lib/server-perf";
 
 import { claimCurrentHousehold, rotateHouseholdShareLink } from "./actions";
 
@@ -12,7 +14,11 @@ export default async function SettingsPage({
 }: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const startedAt = getServerNow();
+  const accessResolveStartedAt = getServerNow();
   const accessContext = await getCurrentAccessContext();
+  const accessResolveMs = getServerNow() - accessResolveStartedAt;
+  const householdId = accessContext.householdId;
   const resolvedSearchParams = (await searchParams) ?? {};
 
   const claimed = Array.isArray(resolvedSearchParams.claimed)
@@ -25,6 +31,7 @@ export default async function SettingsPage({
     ? resolvedSearchParams.claim[0]
     : resolvedSearchParams.claim;
 
+  const householdQueryStartedAt = getServerNow();
   const household = await prisma.household.findFirst({
     where: { id: accessContext.householdId },
     include: {
@@ -49,8 +56,21 @@ export default async function SettingsPage({
       },
     },
   });
+  const householdQueryMs = getServerNow() - householdQueryStartedAt;
 
   if (!household) {
+    logServerPerf({
+      phase: "settings.route_render",
+      route: "/settings",
+      startedAt,
+      success: false,
+      householdId,
+      meta: {
+        reason: "missing_household",
+        access_resolve_ms: accessResolveMs,
+        household_query_ms: householdQueryMs,
+      },
+    });
     return (
       <div className="max-w-2xl rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
         No household was found for your account.
@@ -58,13 +78,35 @@ export default async function SettingsPage({
     );
   }
 
+  const shareLinkStartedAt = getServerNow();
   const shareLink = accessContext.canManageLink
     ? await getCurrentHouseholdShareLink(household.id)
     : null;
+  const shareLinkMs = accessContext.canManageLink ? getServerNow() - shareLinkStartedAt : 0;
 
   const isUnclaimed = household.claimedByUserId === null;
+  const authUserStartedAt = getServerNow();
   const authUser =
     isUnclaimed && accessContext.canManageLink ? await getCurrentAuthUser() : null;
+  const authResolveMs =
+    isUnclaimed && accessContext.canManageLink ? getServerNow() - authUserStartedAt : 0;
+
+  logServerPerf({
+    phase: "settings.route_render",
+    route: "/settings",
+    startedAt,
+    success: true,
+    householdId,
+    meta: {
+      access_resolve_ms: accessResolveMs,
+      household_query_ms: householdQueryMs,
+      share_link_ms: shareLinkMs,
+      auth_resolve_ms: authResolveMs,
+      member_count: household.members.length,
+      can_manage_link: accessContext.canManageLink,
+      is_unclaimed: isUnclaimed,
+    },
+  });
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -97,7 +139,7 @@ export default async function SettingsPage({
         </div>
       ) : null}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">Household</h2>
         <dl className="mt-4 grid gap-4 text-sm md:grid-cols-2">
           <div>

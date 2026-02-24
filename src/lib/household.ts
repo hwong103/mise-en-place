@@ -70,20 +70,50 @@ export type AccessContext = {
 };
 
 const resolveGuestAccessContext = async (): Promise<AccessContext | null> => {
+  const startedAt = Date.now();
   const cookieStore = await cookies();
   try {
     const guestSession = readGuestSessionCookie(cookieStore);
     if (!guestSession) {
+      logServerPerf({
+        phase: "household.resolve_guest_context",
+        route: "/server/household/guest-context",
+        startedAt,
+        success: true,
+        meta: { has_guest_session: false },
+      });
       return null;
     }
 
+    const validateStartedAt = Date.now();
     const validated = await validateGuestSession(guestSession);
+    const validateMs = Date.now() - validateStartedAt;
     if (!validated) {
       clearGuestSessionCookie(cookieStore);
+      logServerPerf({
+        phase: "household.resolve_guest_context",
+        route: "/server/household/guest-context",
+        startedAt,
+        success: false,
+        meta: { has_guest_session: true, validate_ms: validateMs, reason: "invalid_session" },
+      });
       return null;
     }
 
     setGuestSessionCookie(cookieStore, guestSession);
+
+    logServerPerf({
+      phase: "household.resolve_guest_context",
+      route: "/server/household/guest-context",
+      startedAt,
+      householdId: validated.householdId,
+      success: true,
+      meta: {
+        has_guest_session: true,
+        validate_ms: validateMs,
+        role: validated.guestRole,
+      },
+    });
 
     return {
       householdId: validated.householdId,
@@ -97,17 +127,38 @@ const resolveGuestAccessContext = async (): Promise<AccessContext | null> => {
       error: error instanceof Error ? error.message : "unknown_error",
     });
     clearGuestSessionCookie(cookieStore);
+    logServerPerf({
+      phase: "household.resolve_guest_context",
+      route: "/server/household/guest-context",
+      startedAt,
+      success: false,
+      meta: { error: error instanceof Error ? error.message : "unknown_error" },
+    });
     return null;
   }
 };
 
 const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null> => {
+  const startedAt = Date.now();
+  const authResolveStartedAt = Date.now();
   const authUser = await getCurrentAuthUser();
+  const authResolveMs = Date.now() - authResolveStartedAt;
   if (!authUser) {
+    logServerPerf({
+      phase: "household.resolve_authenticated_context",
+      route: "/server/household/auth-context",
+      startedAt,
+      success: true,
+      meta: { has_auth_user: false, auth_resolve_ms: authResolveMs },
+    });
     return null;
   }
 
+  const appUserIdResolveStartedAt = Date.now();
   const appUserId = await getOrCreateAppUserId(authUser);
+  const appUserIdResolveMs = Date.now() - appUserIdResolveStartedAt;
+
+  const membershipReadStartedAt = Date.now();
   const membership = await prisma.householdMember.findFirst({
     where: { userId: appUserId },
     select: {
@@ -121,9 +172,24 @@ const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null
     },
     orderBy: { joinedAt: "asc" },
   });
+  const membershipReadMs = Date.now() - membershipReadStartedAt;
 
   if (membership) {
     const canManageLink = membership.role === "OWNER" || membership.role === "ADMIN";
+    logServerPerf({
+      phase: "household.resolve_authenticated_context",
+      route: "/server/household/auth-context",
+      startedAt,
+      householdId: membership.householdId,
+      success: true,
+      meta: {
+        has_auth_user: true,
+        auth_resolve_ms: authResolveMs,
+        app_user_id_resolve_ms: appUserIdResolveMs,
+        membership_read_ms: membershipReadMs,
+        membership_found: true,
+      },
+    });
     return {
       householdId: membership.householdId,
       actorType: canManageLink ? "authenticated_manager" : "authenticated_member",
@@ -133,10 +199,31 @@ const resolveAuthenticatedAccessContext = async (): Promise<AccessContext | null
     };
   }
 
+  const defaultHouseholdResolveStartedAt = Date.now();
   const householdId = await ensureDefaultHouseholdForUser(appUserId);
+  const defaultHouseholdResolveMs = Date.now() - defaultHouseholdResolveStartedAt;
+  const householdReadStartedAt = Date.now();
   const household = await prisma.household.findUnique({
     where: { id: householdId },
     select: { shareTokenVersion: true },
+  });
+  const householdReadMs = Date.now() - householdReadStartedAt;
+
+  logServerPerf({
+    phase: "household.resolve_authenticated_context",
+    route: "/server/household/auth-context",
+    startedAt,
+    householdId,
+    success: true,
+    meta: {
+      has_auth_user: true,
+      auth_resolve_ms: authResolveMs,
+      app_user_id_resolve_ms: appUserIdResolveMs,
+      membership_read_ms: membershipReadMs,
+      membership_found: false,
+      default_household_resolve_ms: defaultHouseholdResolveMs,
+      household_read_ms: householdReadMs,
+    },
   });
 
   return {

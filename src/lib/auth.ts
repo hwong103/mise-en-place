@@ -39,9 +39,13 @@ const authUserFromClaims = (claims: Record<string, unknown>) => {
 const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
   const startedAt = Date.now();
   let authSource: "claims" | "get_user" | "none" = "none";
+  let claimsReadMs = 0;
+  let userReadMs = 0;
   try {
     const supabase = await createSupabaseServerClient();
+    const claimsReadStartedAt = Date.now();
     const claimsResult = await supabase.auth.getClaims();
+    claimsReadMs = Date.now() - claimsReadStartedAt;
     if (!claimsResult.error && claimsResult.data?.claims) {
       const claimsUser = authUserFromClaims(claimsResult.data.claims as Record<string, unknown>);
       if (claimsUser) {
@@ -51,20 +55,27 @@ const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
           route: "/server/auth/current-user",
           startedAt,
           success: true,
-          meta: { source: authSource },
+          meta: { source: authSource, claims_read_ms: claimsReadMs, user_read_ms: userReadMs },
         });
         return claimsUser;
       }
     }
 
+    const userReadStartedAt = Date.now();
     const { data, error } = await supabase.auth.getUser();
+    userReadMs = Date.now() - userReadStartedAt;
     if (error || !data.user) {
       logServerPerf({
         phase: "auth.resolve_user",
         route: "/server/auth/current-user",
         startedAt,
         success: false,
-        meta: { source: authSource, reason: "missing_user" },
+        meta: {
+          source: authSource,
+          reason: "missing_user",
+          claims_read_ms: claimsReadMs,
+          user_read_ms: userReadMs,
+        },
       });
       return null;
     }
@@ -76,7 +87,12 @@ const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
         route: "/server/auth/current-user",
         startedAt,
         success: false,
-        meta: { source: authSource, reason: "missing_email" },
+        meta: {
+          source: authSource,
+          reason: "missing_email",
+          claims_read_ms: claimsReadMs,
+          user_read_ms: userReadMs,
+        },
       });
       return null;
     }
@@ -96,7 +112,7 @@ const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
       route: "/server/auth/current-user",
       startedAt,
       success: true,
-      meta: { source: authSource },
+      meta: { source: authSource, claims_read_ms: claimsReadMs, user_read_ms: userReadMs },
     });
 
     return authUser;
@@ -108,6 +124,8 @@ const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
       success: false,
       meta: {
         source: authSource,
+        claims_read_ms: claimsReadMs,
+        user_read_ms: userReadMs,
         error: error instanceof Error ? error.message : "unknown_error",
       },
     });

@@ -4,6 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import AuthStatus from "@/components/auth/AuthStatus";
 import GuestSessionHeartbeat from "@/components/auth/GuestSessionHeartbeat";
+import NavigationPerfLogger from "@/components/perf/NavigationPerfLogger";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { getCurrentAccessContext } from "@/lib/household";
 
@@ -50,6 +51,7 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <GuestSessionHeartbeat />
+        <NavigationPerfLogger />
         <div className="min-h-[100dvh] text-slate-900 dark:text-slate-100">
           <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/75 dark:border-emerald-200/10 dark:bg-slate-950/80 dark:supports-[backdrop-filter]:bg-slate-950/55">
             <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center px-4 md:px-8">

@@ -5,13 +5,15 @@ import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
 import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
 import SubmitButton from "@/components/forms/SubmitButton";
 import { getRecipeById } from "@/lib/recipes";
+import { getServerNow } from "@/lib/server-clock";
+import { logServerPerf } from "@/lib/server-perf";
 import {
   cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
 } from "@/lib/recipe-utils";
 
-import { deleteRecipe, updateRecipeSection } from "../actions";
+import { deleteRecipe, updateRecipeSection } from "../detail-actions";
 
 export const revalidate = 60;
 export const dynamicParams = true;
@@ -96,14 +98,37 @@ export default async function RecipeDetailPage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const startedAt = getServerNow();
+  const paramsResolveStartedAt = getServerNow();
   const { id } = await params;
+  const paramsResolveMs = getServerNow() - paramsResolveStartedAt;
+
+  const searchParamsResolveStartedAt = getServerNow();
   const resolvedSearchParams = (await searchParams) ?? {};
+  const searchParamsResolveMs = getServerNow() - searchParamsResolveStartedAt;
+
+  const recipeReadStartedAt = getServerNow();
   const recipe = await getRecipeById(id);
+  const recipeReadMs = getServerNow() - recipeReadStartedAt;
 
   if (!recipe) {
+    logServerPerf({
+      phase: "recipes.detail_route_render",
+      route: "/recipes/[id]",
+      startedAt,
+      success: false,
+      meta: {
+        recipe_id: id,
+        reason: "not_found",
+        params_resolve_ms: paramsResolveMs,
+        search_params_resolve_ms: searchParamsResolveMs,
+        recipe_read_ms: recipeReadMs,
+      },
+    });
     notFound();
   }
 
+  const transformStartedAt = getServerNow();
   const ingredients = coerceStringArray(recipe.ingredients)
     .map((line) => cleanIngredientLine(line).line)
     .filter(Boolean);
@@ -143,6 +168,24 @@ export default async function RecipeDetailPage({
     ? resolvedSearchParams.edit[0]
     : resolvedSearchParams.edit;
   const isEditing = editParam === "1" || editParam === "true";
+  const transformMs = getServerNow() - transformStartedAt;
+
+  logServerPerf({
+    phase: "recipes.detail_route_render",
+    route: "/recipes/[id]",
+    startedAt,
+    success: true,
+    householdId: recipe.householdId,
+    meta: {
+      recipe_id: id,
+      params_resolve_ms: paramsResolveMs,
+      search_params_resolve_ms: searchParamsResolveMs,
+      recipe_read_ms: recipeReadMs,
+      transform_ms: transformMs,
+      ingredient_count: ingredients.length,
+      instruction_count: instructions.length,
+    },
+  });
 
   return (
     <div className="space-y-6">
