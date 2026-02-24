@@ -36,6 +36,12 @@ describe("GET /api/recipes/[id]", () => {
 
     expect(prisma.recipe.findFirst).toHaveBeenCalledWith({
       where: { id: "abc", householdId: "household_1" },
+      select: {
+        id: true,
+        title: true,
+        sourceUrl: true,
+        createdAt: true,
+      },
     });
     expect(response.status).toBe(404);
   });
