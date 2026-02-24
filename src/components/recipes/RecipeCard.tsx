@@ -46,6 +46,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         <div className="absolute inset-x-0 top-0 p-5">
           <Link
             href={`/recipes/${recipe.id}`}
+            prefetch={false}
             className="inline-block rounded-xl bg-black/45 px-3 py-1 text-xl font-bold text-white drop-shadow-sm transition-colors"
           >
             {recipe.title}
@@ -86,6 +87,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
           />
           <Link
             href={`/recipes/${recipe.id}`}
+            prefetch={false}
             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             View Recipe
