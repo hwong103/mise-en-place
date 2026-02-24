@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type PrepGroup = {
   title: string;
@@ -17,7 +17,10 @@ type RecipeFocusModeProps = {
 type FocusMode = "mise" | "cook";
 
 type WakeLockSentinelLike = {
+  released?: boolean;
   release: () => Promise<void>;
+  addEventListener?: (type: "release", listener: () => void) => void;
+  removeEventListener?: (type: "release", listener: () => void) => void;
 };
 
 type NavigatorWithWakeLock = Navigator & {
@@ -33,6 +36,69 @@ export default function RecipeFocusMode({
   instructions,
 }: RecipeFocusModeProps) {
   const [mode, setMode] = useState<FocusMode | null>(null);
+  const [hasScrollableContent, setHasScrollableContent] = useState(false);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+  const misePrepRef = useRef<HTMLDivElement | null>(null);
+  const miseIngredientsRef = useRef<HTMLDivElement | null>(null);
+  const cookStepsRef = useRef<HTMLDivElement | null>(null);
+  const cookQuickRef = useRef<HTMLDivElement | null>(null);
+
+  const getActiveScrollContainers = useCallback(() => {
+    if (mode === "mise") {
+      return [misePrepRef.current, miseIngredientsRef.current].filter(
+        (node): node is HTMLDivElement => Boolean(node)
+      );
+    }
+
+    if (mode === "cook") {
+      return [cookStepsRef.current, cookQuickRef.current].filter(
+        (node): node is HTMLDivElement => Boolean(node)
+      );
+    }
+
+    return [];
+  }, [mode]);
+
+  const refreshScrollControls = useCallback(() => {
+    const containers = getActiveScrollContainers();
+    if (containers.length === 0) {
+      setHasScrollableContent(false);
+      setCanScrollUp(false);
+      setCanScrollDown(false);
+      return;
+    }
+
+    const scrollable = containers.filter(
+      (el) => el.scrollHeight - el.clientHeight > 2
+    );
+    setHasScrollableContent(scrollable.length > 0);
+    setCanScrollUp(scrollable.some((el) => el.scrollTop > 2));
+    setCanScrollDown(
+      scrollable.some((el) => el.scrollTop + el.clientHeight < el.scrollHeight - 2)
+    );
+  }, [getActiveScrollContainers]);
+
+  const scrollActiveContainers = useCallback(
+    (direction: "up" | "down") => {
+      const containers = getActiveScrollContainers().filter(
+        (el) => el.scrollHeight - el.clientHeight > 2
+      );
+      if (containers.length === 0) {
+        return;
+      }
+
+      containers.forEach((el) => {
+        const delta = Math.max(160, Math.floor(el.clientHeight * 0.7));
+        el.scrollBy({
+          top: direction === "down" ? delta : -delta,
+          behavior: "smooth",
+        });
+      });
+      window.setTimeout(refreshScrollControls, 260);
+    },
+    [getActiveScrollContainers, refreshScrollControls]
+  );
 
   useEffect(() => {
     if (!mode) {
@@ -46,26 +112,82 @@ export default function RecipeFocusMode({
 
     let sentinel: WakeLockSentinelLike | null = null;
     let mounted = true;
+    let requesting = false;
+    const onRelease = () => {
+      sentinel = null;
+      if (mounted && mode) {
+        void requestWakeLock();
+      }
+    };
 
-    nav.wakeLock
-      .request("screen")
-      .then((lock) => {
+    const requestWakeLock = async () => {
+      if (requesting || !mounted || document.visibilityState !== "visible") {
+        return;
+      }
+      if (sentinel && !sentinel.released) {
+        return;
+      }
+
+      requesting = true;
+      try {
+        const lock = await nav.wakeLock.request("screen");
         if (!mounted) {
+          void lock.release();
           return;
         }
         sentinel = lock;
-      })
-      .catch(() => {
+        lock.addEventListener?.("release", onRelease);
+      } catch {
         sentinel = null;
-      });
+      } finally {
+        requesting = false;
+      }
+    };
+
+    const onVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        void requestWakeLock();
+      }
+    };
+
+    void requestWakeLock();
+    document.addEventListener("visibilitychange", onVisibilityOrFocus);
+    window.addEventListener("focus", onVisibilityOrFocus);
 
     return () => {
       mounted = false;
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus);
+      window.removeEventListener("focus", onVisibilityOrFocus);
       if (sentinel) {
+        sentinel.removeEventListener?.("release", onRelease);
         void sentinel.release();
       }
     };
   }, [mode]);
+
+  useEffect(() => {
+    if (!mode) {
+      return;
+    }
+
+    const containers = getActiveScrollContainers();
+    if (containers.length === 0) {
+      refreshScrollControls();
+      return;
+    }
+
+    refreshScrollControls();
+    const onScroll = () => refreshScrollControls();
+    const onResize = () => refreshScrollControls();
+
+    containers.forEach((el) => el.addEventListener("scroll", onScroll, { passive: true }));
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      containers.forEach((el) => el.removeEventListener("scroll", onScroll));
+      window.removeEventListener("resize", onResize);
+    };
+  }, [mode, getActiveScrollContainers, refreshScrollControls]);
 
   return (
     <>
@@ -73,21 +195,21 @@ export default function RecipeFocusMode({
         <button
           type="button"
           onClick={() => setMode("mise")}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
         >
           Mise
         </button>
         <button
           type="button"
           onClick={() => setMode("cook")}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
         >
           Cook
         </button>
       </div>
 
       {mode ? (
-        <div className="fixed inset-0 z-50 bg-black/50 p-3 backdrop-blur-sm md:p-6">
+        <div className="fixed inset-0 z-50 p-3 md:p-6">
           <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
               <div>
@@ -102,8 +224,8 @@ export default function RecipeFocusMode({
                   onClick={() => setMode("mise")}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     mode === "mise"
-                      ? "bg-emerald-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      ? "bg-amber-500 text-slate-950"
+                      : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300"
                   }`}
                 >
                   Mise
@@ -113,8 +235,8 @@ export default function RecipeFocusMode({
                   onClick={() => setMode("cook")}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     mode === "cook"
-                      ? "bg-emerald-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      ? "bg-amber-500 text-slate-950"
+                      : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300"
                   }`}
                 >
                   Cook
@@ -131,7 +253,7 @@ export default function RecipeFocusMode({
 
             {mode === "mise" ? (
               <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.4fr_1fr]">
-                <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <section ref={misePrepRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Prep Groups
                   </h3>
@@ -153,7 +275,7 @@ export default function RecipeFocusMode({
                   )}
                 </section>
 
-                <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <section ref={miseIngredientsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Ingredients
                   </h3>
@@ -168,7 +290,7 @@ export default function RecipeFocusMode({
               </div>
             ) : (
               <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.6fr_1fr]">
-                <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <section ref={cookStepsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Steps
                   </h3>
@@ -184,7 +306,7 @@ export default function RecipeFocusMode({
                   </ol>
                 </section>
 
-                <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <section ref={cookQuickRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Quick Reference
                   </h3>
@@ -199,6 +321,28 @@ export default function RecipeFocusMode({
               </div>
             )}
           </div>
+          {hasScrollableContent ? (
+            <div className="pointer-events-none fixed bottom-8 right-8 z-[60] flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => scrollActiveContainers("up")}
+                disabled={!canScrollUp}
+                className="pointer-events-auto min-h-16 min-w-16 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-base font-bold text-amber-800 shadow-xl transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                aria-label="Scroll up"
+              >
+                Up
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollActiveContainers("down")}
+                disabled={!canScrollDown}
+                className="pointer-events-auto min-h-16 min-w-16 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-base font-bold text-amber-800 shadow-xl transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                aria-label="Scroll down"
+              >
+                Down
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </>

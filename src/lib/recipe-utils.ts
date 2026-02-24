@@ -62,7 +62,6 @@ const PREP_VERBS = [
   "marinate",
   "toast",
   "grind",
-  "heat",
 ];
 
 const PREP_ADVERBS = [
@@ -273,6 +272,27 @@ const extractIngredientKeywords = (line: string) => {
   return Array.from(new Set(tokens));
 };
 
+const INGREDIENT_PREP_HINTS: Array<{ title: string; pattern: RegExp }> = [
+  { title: "Slice", pattern: /\b(sliced?|thinly\s+cut)\b/i },
+  { title: "Chop", pattern: /\b(chopped?|roughly\s+chopped?)\b/i },
+  { title: "Dice", pattern: /\b(diced?)\b/i },
+  { title: "Mince", pattern: /\b(minced?)\b/i },
+  { title: "Grate", pattern: /\b(grated?)\b/i },
+  { title: "Shred", pattern: /\b(shredded?)\b/i },
+  { title: "Crush", pattern: /\b(crushed?)\b/i },
+  { title: "Peel", pattern: /\b(peeled?)\b/i },
+  { title: "Zest", pattern: /\b(zested?)\b/i },
+];
+
+const findIngredientPrepTitle = (line: string) => {
+  for (const hint of INGREDIENT_PREP_HINTS) {
+    if (hint.pattern.test(line)) {
+      return hint.title;
+    }
+  }
+  return null;
+};
+
 const findPrepPhrase = (instruction: string) => {
   const lower = instruction.toLowerCase();
   for (const verb of PREP_VERBS) {
@@ -291,6 +311,20 @@ const findPrepPhrase = (instruction: string) => {
 const titleCase = (value: string) =>
   value.replace(/\b\w/g, (char) => char.toUpperCase());
 
+const addToGroupMap = (groupMap: Map<string, string[]>, title: string, items: string[]) => {
+  const existing = groupMap.get(title);
+  if (!existing) {
+    groupMap.set(title, Array.from(new Set(items)));
+    return;
+  }
+
+  for (const item of items) {
+    if (!existing.includes(item)) {
+      existing.push(item);
+    }
+  }
+};
+
 export const buildPrepGroupsFromInstructions = (
   ingredients: string[],
   instructions: string[]
@@ -304,7 +338,18 @@ export const buildPrepGroupsFromInstructions = (
     keywords: extractIngredientKeywords(line),
   }));
   const assigned = new Set<string>();
-  const groups: PrepGroup[] = [];
+  const groupMap = new Map<string, string[]>();
+
+  // Prefer explicit prep hints from ingredient lines ("sliced", "diced", etc)
+  // so mise en place reflects actual prep work instead of cooking-stage verbs.
+  for (const ingredient of ingredients) {
+    const prepTitle = findIngredientPrepTitle(ingredient);
+    if (!prepTitle) {
+      continue;
+    }
+    addToGroupMap(groupMap, prepTitle, [ingredient]);
+    assigned.add(ingredient);
+  }
 
   instructions.forEach((instruction, index) => {
     const lower = instruction.toLowerCase();
@@ -324,15 +369,19 @@ export const buildPrepGroupsFromInstructions = (
     }
 
     const title = prepPhrase ? titleCase(prepPhrase) : `Step ${index + 1} Prep`;
-
-    groups.push({
+    addToGroupMap(
+      groupMap,
       title,
-      items: matches.map((match) => match.line),
-    });
+      matches.map((match) => match.line)
+    );
 
     matches.forEach((match) => assigned.add(match.line));
   });
 
+  const groups: PrepGroup[] = Array.from(groupMap.entries()).map(([title, items]) => ({
+    title,
+    items,
+  }));
   const remaining = ingredients.filter((line) => !assigned.has(line));
   if (groups.length === 0) {
     return [];

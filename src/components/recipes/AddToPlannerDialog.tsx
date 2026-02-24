@@ -29,7 +29,7 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
         onClick={() => setIsOpen(true)}
         className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
       >
-        Plan this Day
+        Add to Planner
       </button>
     );
   }
@@ -70,7 +70,7 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
               disabled={isPending}
               className="rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-50"
             >
-              {isPending ? "Saving..." : "Add to Plan"}
+              {isPending ? "Saving..." : "Add to Planner"}
             </button>
           </div>
         </form>

@@ -576,9 +576,18 @@ const extractNotesFromDescription = (value: string | undefined) => {
   };
 };
 
-const parseYield = (value: unknown) => {
+const parseYield = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.trunc(value);
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const parsed = parseYield(entry);
+      if (typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+    return undefined;
   }
   if (typeof value === "string") {
     const match = value.match(/\d+/);
@@ -860,9 +869,16 @@ const fetchMarkdownFromUrl = async (sourceUrl: string) => {
 const extractRecipeFromMarkdown = (markdown: string, fallbackTitle?: string) => {
   const parsed = parseMarkdownRecipe(markdown, fallbackTitle);
 
+  const frontmatterMatch = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/);
+  const frontmatter = frontmatterMatch?.[1] ?? "";
+  const frontmatterImage = frontmatter.match(/^\s*image\s*:\s*(.+)\s*$/im)?.[1];
+  const frontmatterVideo =
+    frontmatter.match(/^\s*(?:video|video_url|youtube)\s*:\s*(.+)\s*$/im)?.[1] ?? undefined;
   const imageMatch = markdown.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
-  const imageUrl = toOptionalUrlString(imageMatch?.[1] ?? "");
-  const videoUrl = normalizeVideoUrl(extractVideoFromHtml(markdown));
+  const imageUrl = toOptionalUrlString(frontmatterImage ?? imageMatch?.[1] ?? "");
+  const videoUrl =
+    normalizeVideoUrl(toOptionalUrlString(frontmatterVideo ?? "")) ??
+    normalizeVideoUrl(extractVideoFromHtml(markdown));
 
   return {
     title: parsed.title,
@@ -1296,6 +1312,7 @@ export async function importRecipeFromUrl(formData: FormData) {
   let markdownRecipe: ReturnType<typeof extractRecipeFromMarkdown> | null = null;
   let directHtml = "";
   let renderedHtml = "";
+  let metadataFallback: Pick<RecipeIngestionCandidate, "tags" | "servings" | "prepTime" | "cookTime"> = {};
 
   const markdownStartedAt = Date.now();
   const markdownResult = await fetchMarkdownFromUrl(sourceUrl);
@@ -1335,8 +1352,69 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
 
   let selected = selectBestRecipeIngestionCandidate(candidates);
+  const markdownHasBalancedSections =
+    selected.candidate?.stage === "markdown" &&
+    selected.candidate.ingredients.length >= 4 &&
+    selected.candidate.instructions.length >= 3;
   const markdownIsHighConfidence =
-    selected.candidate?.stage === "markdown" && selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE;
+    selected.candidate?.stage === "markdown" &&
+    selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE &&
+    markdownHasBalancedSections;
+
+  if (markdownIsHighConfidence && (!markdownRecipe?.imageUrl || !markdownRecipe?.videoUrl)) {
+    const mediaHtmlStartedAt = Date.now();
+    const mediaHtmlController = new AbortController();
+    const mediaHtmlTimeout = setTimeout(() => mediaHtmlController.abort(), 6000);
+    try {
+      const response = await fetch(sourceUrl, {
+        headers: {
+          "User-Agent": "MiseEnPlaceBot/2.0",
+        },
+        cache: "no-store",
+        signal: mediaHtmlController.signal,
+      });
+
+      if (response.ok) {
+        directHtml = await response.text();
+        const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
+        const metadataCandidate = buildCandidateFromHtml({
+          stage: "http_html",
+          sourceUrl,
+          html: directHtml,
+          latencyMs: mediaHtmlLatencyMs,
+        });
+        if (metadataCandidate) {
+          metadataFallback = {
+            tags: metadataCandidate.tags?.length ? metadataCandidate.tags : undefined,
+            servings: metadataCandidate.servings,
+            prepTime: metadataCandidate.prepTime,
+            cookTime: metadataCandidate.cookTime,
+          };
+        }
+        attempts.push({
+          stage: "http_html",
+          success: true,
+          title: undefined,
+          ingredients: [],
+          instructions: [],
+          notes: [],
+          latencyMs: mediaHtmlLatencyMs,
+          errorCode: undefined,
+        });
+      } else {
+        attempts.push(
+          createFailedAttempt("http_html", classifyFetchStatus(response.status), Date.now() - mediaHtmlStartedAt)
+        );
+      }
+    } catch (error) {
+      const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
+      const timeoutError =
+        error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
+      attempts.push(createFailedAttempt("http_html", timeoutError, mediaHtmlLatencyMs));
+    } finally {
+      clearTimeout(mediaHtmlTimeout);
+    }
+  }
 
   if (!markdownIsHighConfidence) {
     const htmlStartedAt = Date.now();
@@ -1430,6 +1508,21 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
 
   selected = selectBestRecipeIngestionCandidate(candidates);
+  const markdownNeedsRescue =
+    selected.candidate?.stage === "markdown" &&
+    (selected.candidate.ingredients.length < 4 || selected.candidate.instructions.length < 3);
+  if (markdownNeedsRescue) {
+    const balancedFallbackCandidates = candidates.filter(
+      (candidate) =>
+        candidate.stage !== "markdown" &&
+        candidate.ingredients.length >= 4 &&
+        candidate.instructions.length >= 3
+    );
+    if (balancedFallbackCandidates.length > 0) {
+      selected = selectBestRecipeIngestionCandidate(balancedFallbackCandidates);
+    }
+  }
+
   const selectedCandidate = selected.candidate;
   const failureReason = classifyIngestionFailure(attempts, selectedCandidate);
 
@@ -1456,7 +1549,7 @@ export async function importRecipeFromUrl(formData: FormData) {
     redirect(`/recipes?importError=${failureReason}`);
   }
 
-  const candidateHtml = selectedCandidate.html ?? renderedHtml ?? directHtml;
+  const candidateHtml = selectedCandidate.html || renderedHtml || directHtml;
   const title =
     selectedCandidate.title ||
     markdownTitle ||
@@ -1513,6 +1606,15 @@ export async function importRecipeFromUrl(formData: FormData) {
     getVideoKind(normalizedVideoUrl) === "youtube"
       ? normalizedVideoUrl
       : normalizedVideoUrl ?? undefined;
+  const finalTags =
+    selectedCandidate.tags?.length
+      ? selectedCandidate.tags
+      : markdownRecipe?.tags?.length
+        ? markdownRecipe.tags
+        : metadataFallback.tags ?? [];
+  const finalServings = selectedCandidate.servings ?? metadataFallback.servings ?? null;
+  const finalPrepTime = selectedCandidate.prepTime ?? metadataFallback.prepTime ?? null;
+  const finalCookTime = selectedCandidate.cookTime ?? metadataFallback.cookTime ?? null;
   const notes = Array.from(
     new Set([
       ...cleanedIngredients.notes,
@@ -1551,21 +1653,56 @@ export async function importRecipeFromUrl(formData: FormData) {
   if (existingRecipe) {
     const existing = await prisma.recipe.findFirst({
       where: { id: existingRecipe.id, householdId },
-      select: { id: true, videoUrl: true },
+      select: {
+        id: true,
+        imageUrl: true,
+        videoUrl: true,
+        servings: true,
+        prepTime: true,
+        cookTime: true,
+        tags: true,
+      },
     });
 
     if (existing) {
       const existingKind = getVideoKind(existing.videoUrl ?? undefined);
       const nextKind = getVideoKind(videoUrl ?? undefined);
-      const shouldUpdate =
+      const shouldUpdateVideo =
         (!existing.videoUrl && videoUrl) ||
         (existingKind !== "youtube" && nextKind === "youtube") ||
         (existingKind === null && nextKind !== null);
+      const shouldUpdateImage = !existing.imageUrl && imageUrl;
+      const shouldUpdateServings =
+        (existing.servings === null || existing.servings === undefined) &&
+        typeof finalServings === "number";
+      const shouldUpdatePrepTime =
+        (existing.prepTime === null || existing.prepTime === undefined) &&
+        typeof finalPrepTime === "number";
+      const shouldUpdateCookTime =
+        (existing.cookTime === null || existing.cookTime === undefined) &&
+        typeof finalCookTime === "number";
+      const shouldUpdateTags =
+        (!Array.isArray(existing.tags) || existing.tags.length === 0) &&
+        finalTags.length > 0;
 
-      if (shouldUpdate && videoUrl) {
+      if (
+        shouldUpdateVideo ||
+        shouldUpdateImage ||
+        shouldUpdateServings ||
+        shouldUpdatePrepTime ||
+        shouldUpdateCookTime ||
+        shouldUpdateTags
+      ) {
         await prisma.recipe.update({
           where: { id: existing.id },
-          data: { videoUrl },
+          data: {
+            imageUrl: shouldUpdateImage ? imageUrl : undefined,
+            videoUrl: shouldUpdateVideo ? videoUrl : undefined,
+            servings: shouldUpdateServings ? finalServings : undefined,
+            prepTime: shouldUpdatePrepTime ? finalPrepTime : undefined,
+            cookTime: shouldUpdateCookTime ? finalCookTime : undefined,
+            tags: shouldUpdateTags ? finalTags : undefined,
+          },
         });
       }
     }
@@ -1583,13 +1720,10 @@ export async function importRecipeFromUrl(formData: FormData) {
       sourceUrl: normalizedSourceUrl,
       imageUrl,
       videoUrl,
-      servings: selectedCandidate.servings ?? null,
-      prepTime: selectedCandidate.prepTime ?? null,
-      cookTime: selectedCandidate.cookTime ?? null,
-      tags:
-        selectedCandidate.tags?.length
-          ? selectedCandidate.tags
-          : markdownRecipe?.tags ?? [],
+      servings: finalServings,
+      prepTime: finalPrepTime,
+      cookTime: finalCookTime,
+      tags: finalTags,
       ingredientCount: cleanedIngredients.lines.length,
       ingredients: cleanedIngredients.lines,
       instructions: cleanedInstructions.lines,
