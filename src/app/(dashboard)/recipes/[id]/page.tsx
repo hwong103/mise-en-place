@@ -379,19 +379,21 @@ export default async function RecipeDetailPage({
                   ))}
                 </ul>
               )}
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="ingredients" />
-                <textarea
-                  name="ingredients"
-                  rows={6}
-                  defaultValue={ingredients.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-                <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                  Save Ingredients
-                </button>
-              </form>
+              {isEditing ? (
+                <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+                  <input type="hidden" name="recipeId" value={recipe.id} />
+                  <input type="hidden" name="section" value="ingredients" />
+                  <textarea
+                    name="ingredients"
+                    rows={6}
+                    defaultValue={ingredients.join("\n")}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                    Save Ingredients
+                  </button>
+                </form>
+              ) : null}
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">

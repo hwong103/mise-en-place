@@ -49,7 +49,9 @@ const markdownToLine = (value: string) =>
   );
 
 const isIngredientHeading = (value: string) =>
-  /^(ingredients?|for\s+the\s+.+|sauce|dressing|marinade|filling|topping)$/i.test(value);
+  /(^|\b)(ingredients?|for\s+the\s+.+|for\s+serving|to\s+serve|sauce|dressing|marinade|filling|topping)(\b|$)/i.test(
+    value
+  );
 
 const isInstructionHeading = (value: string) =>
   /^(instructions?|directions?|method|preparation|steps?)$/i.test(value);
@@ -103,6 +105,11 @@ export const parseMarkdownRecipe = (markdown: string, fallbackTitle?: string): M
       if (isNoteHeading(headingCandidate)) {
         section = "notes";
         reachedRecipeSection = true;
+        continue;
+      }
+
+      // Keep the active section for subsection headings like "Sauce" or "Serving".
+      if (reachedRecipeSection && section !== "none") {
         continue;
       }
 

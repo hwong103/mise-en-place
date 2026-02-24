@@ -22,4 +22,20 @@ describe("parseMarkdownRecipe", () => {
     expect(parsed.ingredients).toEqual([]);
     expect(parsed.instructions).toEqual([]);
   });
+
+  it("keeps collecting ingredients across subsection headings", () => {
+    const markdown = `# Beef Stroganoff\n\nIngredients\n### Beef\n- 500g beef strips\n- 1 onion\n### Sauce\n- 1 cup sour cream\n- 1 tbsp mustard\n### Serving\n- Pasta\n- Chives\n\nInstructions\n1. Sear beef.\n2. Make sauce.`;
+
+    const parsed = parseMarkdownRecipe(markdown);
+
+    expect(parsed.ingredients).toEqual([
+      "500g beef strips",
+      "1 onion",
+      "1 cup sour cream",
+      "1 tbsp mustard",
+      "Pasta",
+      "Chives",
+    ]);
+    expect(parsed.instructions).toEqual(["Sear beef.", "Make sauce."]);
+  });
 });
