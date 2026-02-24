@@ -74,14 +74,61 @@ describe("importRecipeFromUrl ingestion stages", () => {
       json: async () => ({
         success: true,
         title: "Fast Pasta",
-        content: `# Fast Pasta\n\nIngredients\n${Array.from({ length: 12 }, (_, i) => `- ${i + 1} cup flour`).join("\n")}\n\nInstructions\n${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
+        content: `---
+image: https://cdn.example.com/fast-pasta.jpg
+video: https://youtu.be/abc123xyz00
+---
+
+# Fast Pasta
+
+Ingredients
+${Array.from({ length: 12 }, (_, i) => `- ${i + 1} cup flour`).join("\n")}
+
+Instructions
+${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
       }),
     } as Response);
 
     const redirected = await withRedirect(() => importRecipeFromUrl(buildFormData("https://example.com/r")));
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(createArg?.data.imageUrl).toBe("https://cdn.example.com/fast-pasta.jpg");
+    expect(createArg?.data.videoUrl).toBe("https://youtu.be/abc123xyz00");
     expect(prisma.recipe.create).toHaveBeenCalled();
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
+  it("hydrates image and video from direct HTML when markdown is high confidence but media is missing", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "Media Rescue Pasta",
+          content: `# Media Rescue Pasta\n\nIngredients\n${Array.from({ length: 12 }, (_, i) => `- ${i + 1} cup flour`).join("\n")}\n\nInstructions\n${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => `
+          <html>
+            <head>
+              <meta property="og:image" content="https://cdn.example.com/media-rescue.jpg" />
+              <meta property="og:video" content="https://youtu.be/media1234567" />
+            </head>
+          </html>
+        `,
+      } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://example.com/media-rescue"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(createArg?.data.imageUrl).toBe("https://cdn.example.com/media-rescue.jpg");
+    expect(createArg?.data.videoUrl).toBe("https://youtu.be/media1234567");
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
 

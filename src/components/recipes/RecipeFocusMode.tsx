@@ -17,7 +17,10 @@ type RecipeFocusModeProps = {
 type FocusMode = "mise" | "cook";
 
 type WakeLockSentinelLike = {
+  released?: boolean;
   release: () => Promise<void>;
+  addEventListener?: (type: "release", listener: () => void) => void;
+  removeEventListener?: (type: "release", listener: () => void) => void;
 };
 
 type NavigatorWithWakeLock = Navigator & {
@@ -46,22 +49,54 @@ export default function RecipeFocusMode({
 
     let sentinel: WakeLockSentinelLike | null = null;
     let mounted = true;
+    let requesting = false;
+    const onRelease = () => {
+      sentinel = null;
+      if (mounted && mode) {
+        void requestWakeLock();
+      }
+    };
 
-    nav.wakeLock
-      .request("screen")
-      .then((lock) => {
+    const requestWakeLock = async () => {
+      if (requesting || !mounted || document.visibilityState !== "visible") {
+        return;
+      }
+      if (sentinel && !sentinel.released) {
+        return;
+      }
+
+      requesting = true;
+      try {
+        const lock = await nav.wakeLock.request("screen");
         if (!mounted) {
+          void lock.release();
           return;
         }
         sentinel = lock;
-      })
-      .catch(() => {
+        lock.addEventListener?.("release", onRelease);
+      } catch {
         sentinel = null;
-      });
+      } finally {
+        requesting = false;
+      }
+    };
+
+    const onVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        void requestWakeLock();
+      }
+    };
+
+    void requestWakeLock();
+    document.addEventListener("visibilitychange", onVisibilityOrFocus);
+    window.addEventListener("focus", onVisibilityOrFocus);
 
     return () => {
       mounted = false;
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus);
+      window.removeEventListener("focus", onVisibilityOrFocus);
       if (sentinel) {
+        sentinel.removeEventListener?.("release", onRelease);
         void sentinel.release();
       }
     };
@@ -87,7 +122,7 @@ export default function RecipeFocusMode({
       </div>
 
       {mode ? (
-        <div className="fixed inset-0 z-50 bg-black/50 p-3 backdrop-blur-sm md:p-6">
+        <div className="fixed inset-0 z-50 p-3 md:p-6">
           <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
               <div>

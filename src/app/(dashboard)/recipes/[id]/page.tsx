@@ -9,7 +9,6 @@ import {
   cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
-  serializePrepGroupsToText,
 } from "@/lib/recipe-utils";
 
 import { deleteRecipe, updateRecipeSection } from "../actions";
@@ -111,7 +110,6 @@ export default async function RecipeDetailPage({
   const instructions = coerceStringArray(recipe.instructions);
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
-  const prepGroupsText = serializePrepGroupsToText(prepGroups);
   const ingredientGroups = (() => {
     if (!prepGroups.length) {
       return [];
@@ -379,19 +377,21 @@ export default async function RecipeDetailPage({
                   ))}
                 </ul>
               )}
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="ingredients" />
-                <textarea
-                  name="ingredients"
-                  rows={6}
-                  defaultValue={ingredients.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-                <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                  Save Ingredients
-                </button>
-              </form>
+              {isEditing ? (
+                <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+                  <input type="hidden" name="recipeId" value={recipe.id} />
+                  <input type="hidden" name="section" value="ingredients" />
+                  <textarea
+                    name="ingredients"
+                    rows={6}
+                    defaultValue={ingredients.join("\n")}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                    Save Ingredients
+                  </button>
+                </form>
+              ) : null}
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -466,43 +466,6 @@ export default async function RecipeDetailPage({
               <img src={recipe.imageUrl} alt={recipe.title} className="h-full w-full object-cover" />
             </div>
           ) : null}
-
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise en Place</h2>
-            {prepGroups.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Add ingredients to generate prep groups.</p>
-            ) : (
-              <div className="mt-4 space-y-4">
-                {prepGroups.map((group) => (
-                  <div key={group.title}>
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{group.title}</h3>
-                    <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                      {group.items.map((item) => (
-                        <li key={`${group.title}-${item}`}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {isEditing ? (
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-              <input type="hidden" name="recipeId" value={recipe.id} />
-              <input type="hidden" name="section" value="prepGroups" />
-              <textarea
-                name="prepGroups"
-                rows={8}
-                defaultValue={prepGroupsText}
-                placeholder="Prep\n- mince garlic\n- chop onions"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                Save Prep Groups
-              </button>
-              </form>
-            ) : null}
-          </section>
         </aside>
       </div>
     </div>

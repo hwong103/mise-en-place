@@ -860,9 +860,16 @@ const fetchMarkdownFromUrl = async (sourceUrl: string) => {
 const extractRecipeFromMarkdown = (markdown: string, fallbackTitle?: string) => {
   const parsed = parseMarkdownRecipe(markdown, fallbackTitle);
 
+  const frontmatterMatch = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/);
+  const frontmatter = frontmatterMatch?.[1] ?? "";
+  const frontmatterImage = frontmatter.match(/^\s*image\s*:\s*(.+)\s*$/im)?.[1];
+  const frontmatterVideo =
+    frontmatter.match(/^\s*(?:video|video_url|youtube)\s*:\s*(.+)\s*$/im)?.[1] ?? undefined;
   const imageMatch = markdown.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
-  const imageUrl = toOptionalUrlString(imageMatch?.[1] ?? "");
-  const videoUrl = normalizeVideoUrl(extractVideoFromHtml(markdown));
+  const imageUrl = toOptionalUrlString(frontmatterImage ?? imageMatch?.[1] ?? "");
+  const videoUrl =
+    normalizeVideoUrl(toOptionalUrlString(frontmatterVideo ?? "")) ??
+    normalizeVideoUrl(extractVideoFromHtml(markdown));
 
   return {
     title: parsed.title,
@@ -1344,6 +1351,46 @@ export async function importRecipeFromUrl(formData: FormData) {
     selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE &&
     markdownHasBalancedSections;
 
+  if (markdownIsHighConfidence && (!markdownRecipe?.imageUrl || !markdownRecipe?.videoUrl)) {
+    const mediaHtmlStartedAt = Date.now();
+    const mediaHtmlController = new AbortController();
+    const mediaHtmlTimeout = setTimeout(() => mediaHtmlController.abort(), 6000);
+    try {
+      const response = await fetch(sourceUrl, {
+        headers: {
+          "User-Agent": "MiseEnPlaceBot/2.0",
+        },
+        cache: "no-store",
+        signal: mediaHtmlController.signal,
+      });
+
+      if (response.ok) {
+        directHtml = await response.text();
+        attempts.push({
+          stage: "http_html",
+          success: true,
+          title: undefined,
+          ingredients: [],
+          instructions: [],
+          notes: [],
+          latencyMs: Date.now() - mediaHtmlStartedAt,
+          errorCode: undefined,
+        });
+      } else {
+        attempts.push(
+          createFailedAttempt("http_html", classifyFetchStatus(response.status), Date.now() - mediaHtmlStartedAt)
+        );
+      }
+    } catch (error) {
+      const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
+      const timeoutError =
+        error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
+      attempts.push(createFailedAttempt("http_html", timeoutError, mediaHtmlLatencyMs));
+    } finally {
+      clearTimeout(mediaHtmlTimeout);
+    }
+  }
+
   if (!markdownIsHighConfidence) {
     const htmlStartedAt = Date.now();
     const htmlController = new AbortController();
@@ -1477,7 +1524,7 @@ export async function importRecipeFromUrl(formData: FormData) {
     redirect(`/recipes?importError=${failureReason}`);
   }
 
-  const candidateHtml = selectedCandidate.html ?? renderedHtml ?? directHtml;
+  const candidateHtml = selectedCandidate.html || renderedHtml || directHtml;
   const title =
     selectedCandidate.title ||
     markdownTitle ||
@@ -1572,21 +1619,25 @@ export async function importRecipeFromUrl(formData: FormData) {
   if (existingRecipe) {
     const existing = await prisma.recipe.findFirst({
       where: { id: existingRecipe.id, householdId },
-      select: { id: true, videoUrl: true },
+      select: { id: true, imageUrl: true, videoUrl: true },
     });
 
     if (existing) {
       const existingKind = getVideoKind(existing.videoUrl ?? undefined);
       const nextKind = getVideoKind(videoUrl ?? undefined);
-      const shouldUpdate =
+      const shouldUpdateVideo =
         (!existing.videoUrl && videoUrl) ||
         (existingKind !== "youtube" && nextKind === "youtube") ||
         (existingKind === null && nextKind !== null);
+      const shouldUpdateImage = !existing.imageUrl && imageUrl;
 
-      if (shouldUpdate && videoUrl) {
+      if (shouldUpdateVideo || shouldUpdateImage) {
         await prisma.recipe.update({
           where: { id: existing.id },
-          data: { videoUrl },
+          data: {
+            imageUrl: shouldUpdateImage ? imageUrl : undefined,
+            videoUrl: shouldUpdateVideo ? videoUrl : undefined,
+          },
         });
       }
     }
