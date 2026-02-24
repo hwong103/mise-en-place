@@ -1032,7 +1032,6 @@ const buildRecipePayload = (formData: FormData) => {
     prepTime,
     cookTime,
     tags,
-    ingredientCount: ingredients.length,
     ingredients,
     instructions,
     notes,
@@ -1053,6 +1052,7 @@ export async function createRecipe(formData: FormData) {
       householdId,
       ...payload,
     },
+    select: { id: true },
   });
 
   revalidatePath("/recipes");
@@ -1082,12 +1082,12 @@ export async function createRecipeFromOcr(formData: FormData) {
       prepTime: payload.prepTime,
       cookTime: payload.cookTime,
       tags: [],
-      ingredientCount: payload.ingredients.length,
       ingredients: payload.ingredients,
       instructions: payload.instructions,
       notes: payload.notes,
       prepGroups: payload.prepGroups,
     },
+    select: { id: true },
   });
 
   revalidatePath("/recipes");
@@ -1170,7 +1170,6 @@ export async function updateRecipeSection(formData: FormData) {
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
         data: {
-          ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
           prepGroups:
@@ -1590,12 +1589,12 @@ export async function importRecipeFromUrl(formData: FormData) {
         selectedCandidate.tags?.length
           ? selectedCandidate.tags
           : markdownRecipe?.tags ?? [],
-      ingredientCount: cleanedIngredients.lines.length,
       ingredients: cleanedIngredients.lines,
       instructions: cleanedInstructions.lines,
       notes,
       prepGroups,
     },
+    select: { id: true },
   });
 
   revalidatePath("/recipes");
