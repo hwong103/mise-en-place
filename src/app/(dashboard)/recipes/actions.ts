@@ -648,6 +648,13 @@ const isLikelyIngredientHeading = (value: string) => {
   if (!normalized) {
     return false;
   }
+  if (
+    /\b(video|life|dozer|step|steps|print|tag|author|prep|cook|total|yield|nutrition)\b/i.test(
+      normalized
+    )
+  ) {
+    return false;
+  }
   if (/\d/.test(normalized)) {
     return false;
   }
@@ -664,7 +671,7 @@ const isLikelyIngredientHeading = (value: string) => {
   const letters = normalized.replace(/[^A-Za-z]/g, "");
   const uppercase = letters.replace(/[^A-Z]/g, "").length;
   const upperRatio = letters.length > 0 ? uppercase / letters.length : 0;
-  if (upperRatio >= 0.8 && words.length >= 2 && letters.length >= 6) {
+  if (upperRatio >= 0.8 && words.length >= 2 && words.length <= 6 && letters.length >= 6) {
     return true;
   }
   if (

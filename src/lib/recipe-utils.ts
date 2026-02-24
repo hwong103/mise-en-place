@@ -204,9 +204,30 @@ const cleanLineBase = (line: string) => {
   return normalizeWhitespace(balanceParentheses(cleaned));
 };
 
+const looksLikeIngredientProse = (value: string) => {
+  const normalized = normalizeWhitespace(value);
+  if (!normalized) {
+    return false;
+  }
+  if (/\d/.test(normalized)) {
+    return false;
+  }
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length <= 10) {
+    return false;
+  }
+  return true;
+};
+
 export const cleanIngredientLine = (line: string) => {
   const notes = extractNotesFromLine(line);
   const cleaned = cleanLineBase(line).replace(NOTE_PATTERN, "").trim();
+  if (looksLikeIngredientProse(cleaned)) {
+    return {
+      line: "",
+      notes,
+    };
+  }
   return {
     line: normalizeWhitespace(cleaned),
     notes,

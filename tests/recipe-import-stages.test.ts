@@ -219,4 +219,54 @@ describe("importRecipeFromUrl ingestion stages", () => {
     expect(prisma.recipe.create).not.toHaveBeenCalled();
     expect(redirected).toBe("REDIRECT:/recipes?importError=no_recipe_data");
   });
+
+  it("keeps serving ingredients and drops long prose from markdown imports", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "Beef Stroganoff",
+          content: `# Beef Stroganoff
+
+Ingredients
+### Beef
+- 500 g beef strips
+- 1 onion
+### Sauce
+- 1 cup sour cream
+- 1 tbsp mustard
+### RECIPE VIDEO ABOVE
+This is a long editorial paragraph about the history of this dish and why the sauce is nostalgic for many families.
+### Serving
+- 250g pasta
+- Chopped chives
+
+Instructions
+1. Sear beef.
+2. Cook onions.
+3. Stir in sauce.
+4. Simmer gently.
+5. Boil pasta.
+6. Serve with chives.`,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => "<html></html>",
+      } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://example.com/stroganoff"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(createArg).toBeDefined();
+    expect(createArg?.data.ingredients).toContain("250g pasta");
+    expect(createArg?.data.ingredients).toContain("Chopped chives");
+    expect(createArg?.data.ingredients).not.toContain(
+      "This is a long editorial paragraph about the history of this dish and why the sauce is nostalgic for many families."
+    );
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
 });

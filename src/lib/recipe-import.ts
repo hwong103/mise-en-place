@@ -49,7 +49,7 @@ const markdownToLine = (value: string) =>
   );
 
 const isIngredientHeading = (value: string) =>
-  /(^|\b)(ingredients?|for\s+the\s+.+|for\s+serving|to\s+serve|sauce|dressing|marinade|filling|topping)(\b|$)/i.test(
+  /(^|\b)(ingredients?|for\s+the\s+.+|for\s+serving|to\s+serve|sauce|dressing|marinade|filling|topping|garnish)(\b|$)/i.test(
     value
   );
 
