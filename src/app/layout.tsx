@@ -40,7 +40,7 @@ export default async function RootLayout({
   try {
     const accessContext = await getCurrentAccessContext("throw");
     hasHouseholdAccess = true;
-    showSettings = accessContext.canManageLink;
+    showSettings = accessContext.source === "auth" || accessContext.canManageLink;
     accessSource = accessContext.source;
   } catch {
     // Anonymous visitors can still access public routes.

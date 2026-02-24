@@ -57,7 +57,8 @@ const isInstructionHeading = (value: string) =>
 const isNoteHeading = (value: string) => /^(notes?|tips?|cook'?s?\s+notes?)$/i.test(value);
 
 export const parseMarkdownRecipe = (markdown: string, fallbackTitle?: string): MarkdownRecipeDraft => {
-  const lines = markdown.split(/\r?\n/);
+  const stripped = markdown.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, "");
+  const lines = stripped.split(/\r?\n/);
   const ingredients: string[] = [];
   const instructions: string[] = [];
   const notes: string[] = [];

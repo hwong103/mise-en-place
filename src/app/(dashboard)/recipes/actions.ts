@@ -23,7 +23,6 @@ import {
 import { buildOcrRecipePayload } from "@/lib/ocr";
 import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
 import {
-  HIGH_CONFIDENCE_INGESTION_SCORE,
   MIN_INGESTION_SCORE,
   classifyIngestionFailure,
   selectBestRecipeIngestionCandidate,
@@ -1334,47 +1333,42 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
 
   let selected = selectBestRecipeIngestionCandidate(candidates);
-  const markdownIsHighConfidence =
-    selected.candidate?.stage === "markdown" && selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE;
-
-  if (!markdownIsHighConfidence) {
-    const htmlStartedAt = Date.now();
-    const htmlController = new AbortController();
-    const htmlTimeout = setTimeout(() => htmlController.abort(), 10000);
-    try {
-      const response = await fetch(sourceUrl, {
-        headers: {
-          "User-Agent": "MiseEnPlaceBot/2.0",
-        },
-        cache: "no-store",
-        signal: htmlController.signal,
+  const htmlStartedAt = Date.now();
+  const htmlController = new AbortController();
+  const htmlTimeout = setTimeout(() => htmlController.abort(), 10000);
+  try {
+    const response = await fetch(sourceUrl, {
+      headers: {
+        "User-Agent": "MiseEnPlaceBot/2.0",
+      },
+      cache: "no-store",
+      signal: htmlController.signal,
+    });
+    const htmlLatencyMs = Date.now() - htmlStartedAt;
+    if (!response.ok) {
+      attempts.push(createFailedAttempt("http_html", classifyFetchStatus(response.status), htmlLatencyMs));
+    } else {
+      directHtml = await response.text();
+      const htmlCandidate = buildCandidateFromHtml({
+        stage: "http_html",
+        sourceUrl,
+        html: directHtml,
+        latencyMs: htmlLatencyMs,
       });
-      const htmlLatencyMs = Date.now() - htmlStartedAt;
-      if (!response.ok) {
-        attempts.push(createFailedAttempt("http_html", classifyFetchStatus(response.status), htmlLatencyMs));
+      if (htmlCandidate?.success) {
+        attempts.push(htmlCandidate);
+        candidates.push(htmlCandidate);
       } else {
-        directHtml = await response.text();
-        const htmlCandidate = buildCandidateFromHtml({
-          stage: "http_html",
-          sourceUrl,
-          html: directHtml,
-          latencyMs: htmlLatencyMs,
-        });
-        if (htmlCandidate?.success) {
-          attempts.push(htmlCandidate);
-          candidates.push(htmlCandidate);
-        } else {
-          attempts.push(createFailedAttempt("http_html", "parse_failed", htmlLatencyMs));
-        }
+        attempts.push(createFailedAttempt("http_html", "parse_failed", htmlLatencyMs));
       }
-    } catch (error) {
-      const htmlLatencyMs = Date.now() - htmlStartedAt;
-      const timeoutError =
-        error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
-      attempts.push(createFailedAttempt("http_html", timeoutError, htmlLatencyMs));
-    } finally {
-      clearTimeout(htmlTimeout);
     }
+  } catch (error) {
+    const htmlLatencyMs = Date.now() - htmlStartedAt;
+    const timeoutError =
+      error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
+    attempts.push(createFailedAttempt("http_html", timeoutError, htmlLatencyMs));
+  } finally {
+    clearTimeout(htmlTimeout);
   }
 
   selected = selectBestRecipeIngestionCandidate(candidates);

@@ -152,6 +152,19 @@ export const getCurrentAccessContext = async (
 ): Promise<AccessContext> => {
   const startedAt = Date.now();
   try {
+    const authContext = await resolveAuthenticatedAccessContext();
+    if (authContext) {
+      logServerPerf({
+        phase: "household.resolve_access_context",
+        route: "/server/household/access-context",
+        startedAt,
+        householdId: authContext.householdId,
+        success: true,
+        meta: { source: authContext.source, actor: authContext.actorType },
+      });
+      return authContext;
+    }
+
     const guestContext = await resolveGuestAccessContext();
     if (guestContext) {
       logServerPerf({
@@ -182,19 +195,6 @@ export const getCurrentAccessContext = async (
         meta: { source: context.source, actor: context.actorType },
       });
       return context;
-    }
-
-    const authContext = await resolveAuthenticatedAccessContext();
-    if (authContext) {
-      logServerPerf({
-        phase: "household.resolve_access_context",
-        route: "/server/household/access-context",
-        startedAt,
-        householdId: authContext.householdId,
-        success: true,
-        meta: { source: authContext.source, actor: authContext.actorType },
-      });
-      return authContext;
     }
 
     if (unauthenticatedBehavior === "redirect") {

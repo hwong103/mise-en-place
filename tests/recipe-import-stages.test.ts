@@ -68,19 +68,25 @@ describe("importRecipeFromUrl ingestion stages", () => {
     global.fetch = vi.fn() as unknown as typeof fetch;
   });
 
-  it("short-circuits fallback when markdown stage is high confidence", async () => {
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        title: "Fast Pasta",
-        content: `# Fast Pasta\n\nIngredients\n${Array.from({ length: 12 }, (_, i) => `- ${i + 1} cup flour`).join("\n")}\n\nInstructions\n${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
-      }),
-    } as Response);
+  it("keeps markdown as selected content while still fetching HTML metadata", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "Fast Pasta",
+          content: `# Fast Pasta\n\nIngredients\n${Array.from({ length: 12 }, (_, i) => `- ${i + 1} cup flour`).join("\n")}\n\nInstructions\n${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          `<html><head><meta property="og:image" content="https://example.com/fast-pasta.jpg" /></head></html>`,
+      } as Response);
 
     const redirected = await withRedirect(() => importRecipeFromUrl(buildFormData("https://example.com/r")));
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(prisma.recipe.create).toHaveBeenCalled();
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });

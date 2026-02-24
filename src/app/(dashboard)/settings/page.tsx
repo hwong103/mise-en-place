@@ -1,11 +1,13 @@
 import Link from "next/link";
 
+import SubmitButton from "@/components/forms/SubmitButton";
+import HouseholdNameEditor from "@/components/settings/HouseholdNameEditor";
 import prisma from "@/lib/prisma";
 import { getCurrentAuthUser } from "@/lib/auth";
 import { getCurrentAccessContext } from "@/lib/household";
 import { getCurrentHouseholdShareLink } from "@/lib/household-access";
 
-import { claimCurrentHousehold, rotateHouseholdShareLink } from "./actions";
+import { claimCurrentHousehold, rotateHouseholdShareLink, updateHouseholdName } from "./actions";
 
 export default async function SettingsPage({
   searchParams,
@@ -25,6 +27,12 @@ export default async function SettingsPage({
   const claim = Array.isArray(resolvedSearchParams.claim)
     ? resolvedSearchParams.claim[0]
     : resolvedSearchParams.claim;
+  const renamed = Array.isArray(resolvedSearchParams.renamed)
+    ? resolvedSearchParams.renamed[0]
+    : resolvedSearchParams.renamed;
+  const rename = Array.isArray(resolvedSearchParams.rename)
+    ? resolvedSearchParams.rename[0]
+    : resolvedSearchParams.rename;
 
   const household = await prisma.household.findFirst({
     where: { id: accessContext.householdId },
@@ -96,12 +104,30 @@ export default async function SettingsPage({
         </div>
       ) : null}
 
+      {renamed === "1" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          Household name updated.
+        </div>
+      ) : null}
+
+      {rename === "invalid" ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          Household name must be between 1 and 80 characters.
+        </div>
+      ) : null}
+
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-slate-900">Household</h2>
         <dl className="mt-4 grid gap-4 text-sm md:grid-cols-2">
           <div>
             <dt className="font-semibold text-slate-500">Name</dt>
-            <dd className="mt-1 text-slate-800">{household.name}</dd>
+            <dd className="mt-1 text-slate-800">
+              <HouseholdNameEditor
+                initialName={household.name}
+                canEdit={accessContext.canManageLink}
+                action={updateHouseholdName}
+              />
+            </dd>
           </div>
           <div>
             <dt className="font-semibold text-slate-500">Members</dt>
@@ -168,12 +194,11 @@ export default async function SettingsPage({
           <div className="mt-4 flex flex-wrap gap-3">
             {authUser ? (
               <form action={claimCurrentHousehold}>
-                <button
-                  type="submit"
+                <SubmitButton
+                  label="Claim This Household"
+                  pendingLabel="Claiming Household..."
                   className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Claim This Household
-                </button>
+                />
               </form>
             ) : (
               <Link
