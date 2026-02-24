@@ -145,208 +145,91 @@ export default async function RecipeDetailPage({
   const isEditing = editParam === "1" || editParam === "true";
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-2">
-          <Link href="/recipes" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-            {"<- Back to Recipes"}
-          </Link>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-            {recipe.title}
-          </h1>
-          {recipe.description ? (
-            <p className="max-w-2xl text-slate-500 dark:text-slate-400">{recipe.description}</p>
-          ) : null}
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-sm dark:border-slate-800">
+        {recipe.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={recipe.imageUrl}
+            alt={recipe.title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/50 via-slate-900/55 to-slate-950/85" />
+        <div className="relative flex min-h-[260px] flex-col justify-between p-5 md:min-h-[320px] md:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <Link
+              href="/recipes"
+              className="rounded-xl border border-white/40 bg-slate-900/45 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm hover:bg-slate-900/65"
+            >
+              {"<- Back to Recipes"}
+            </Link>
+            <div className="flex flex-wrap justify-end gap-2">
+              <AddToPlannerDialog recipeId={recipe.id} recipeTitle={recipe.title} />
+              <RecipeFocusMode title={recipe.title} prepGroups={prepGroups} ingredients={ingredients} instructions={instructions} />
+              <Link
+                href={
+                  isEditing
+                    ? `/recipes/${recipe.id}`
+                    : `/recipes/${recipe.id}?edit=1`
+                }
+                className="rounded-xl border border-white/40 bg-slate-900/45 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm hover:bg-slate-900/65"
+              >
+                {isEditing ? "Done" : "Edit"}
+              </Link>
+              <form action={deleteRecipe}>
+                <input type="hidden" name="recipeId" value={recipe.id} />
+                <SubmitButton
+                  label="Delete"
+                  pendingLabel="Deleting..."
+                  className="rounded-xl border border-rose-200/80 bg-rose-500/15 px-4 py-2 text-sm font-semibold text-rose-100 backdrop-blur-sm transition-colors hover:bg-rose-500/25 disabled:opacity-70"
+                />
+              </form>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h1 className="max-w-3xl text-3xl font-extrabold tracking-tight text-white md:text-4xl">
+              {recipe.title}
+            </h1>
+            {recipe.description ? (
+              <p className="max-w-3xl text-slate-100/95 md:text-lg">{recipe.description}</p>
+            ) : null}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <AddToPlannerDialog recipeId={recipe.id} recipeTitle={recipe.title} />
-          <RecipeFocusMode title={recipe.title} prepGroups={prepGroups} ingredients={ingredients} instructions={instructions} />
-          <Link
-            href={
-              isEditing
-                ? `/recipes/${recipe.id}`
-                : `/recipes/${recipe.id}?edit=1`
-            }
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            {isEditing ? "Done" : "Edit"}
-          </Link>
-          <form action={deleteRecipe}>
-            <input type="hidden" name="recipeId" value={recipe.id} />
-            <SubmitButton
-              label="Delete"
-              pendingLabel="Deleting..."
-              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-70 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/40"
-            />
-          </form>
-        </div>
-      </div>
+      </section>
+
+      {recipe.videoUrl ? (
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:hidden dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
+            <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              Open Video
+            </a>
+          </div>
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
+            {embedUrl ? (
+              <div className="aspect-[16/9] w-full">
+                <iframe
+                  src={embedUrl}
+                  title={`Video for ${recipe.title}`}
+                  className="h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            ) : (
+              <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                Video preview not available.
+              </div>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <section className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex flex-wrap items-center gap-3">
-              {recipe.servings ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  {recipe.servings} servings
-                </span>
-              ) : null}
-              {formatMinutes(recipe.prepTime) ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  Prep {formatMinutes(recipe.prepTime)}
-                </span>
-              ) : null}
-              {formatMinutes(recipe.cookTime) ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  Cook {formatMinutes(recipe.cookTime)}
-                </span>
-              ) : null}
-              {recipe.sourceUrl ? (
-                <a
-                  href={recipe.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-                >
-                  {authorLabel ? `By ${authorLabel}` : "Source"}
-                </a>
-              ) : null}
-            </div>
-
-            {recipe.tags?.length ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {recipe.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            {isEditing ? (
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-              <input type="hidden" name="recipeId" value={recipe.id} />
-              <input type="hidden" name="section" value="overview" />
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Inline Edit</p>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Title
-                  <input
-                    name="title"
-                    defaultValue={recipe.title}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Tags
-                  <input
-                    name="tags"
-                    defaultValue={(recipe.tags ?? []).join(", ")}
-                    placeholder="Weeknight, Family"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Servings
-                  <input
-                    name="servings"
-                    type="number"
-                    min={1}
-                    defaultValue={recipe.servings ?? undefined}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Prep (min)
-                    <input
-                      name="prepTime"
-                      type="number"
-                      min={1}
-                      defaultValue={recipe.prepTime ?? undefined}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Cook (min)
-                    <input
-                      name="cookTime"
-                      type="number"
-                      min={1}
-                      defaultValue={recipe.cookTime ?? undefined}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                </div>
-                <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 md:col-span-2">
-                  Description
-                  <textarea
-                    name="description"
-                    rows={2}
-                    defaultValue={recipe.description ?? ""}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                </label>
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <input
-                  name="sourceUrl"
-                  defaultValue={recipe.sourceUrl ?? ""}
-                  placeholder="Source URL"
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-                <input
-                  name="videoUrl"
-                  defaultValue={recipe.videoUrl ?? ""}
-                  placeholder="Video URL"
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-                <input
-                  name="imageUrl"
-                  defaultValue={recipe.imageUrl ?? ""}
-                  placeholder="Image URL"
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-              </div>
-              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                Save Overview
-              </button>
-              </form>
-            ) : null}
-          </div>
-
           <div className="grid gap-6 md:grid-cols-2">
-            {recipe.videoUrl ? (
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2 dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
-                  <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                    Open Video
-                  </a>
-                </div>
-                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                  {embedUrl ? (
-                    <div className="aspect-[16/9] w-full">
-                      <iframe
-                        src={embedUrl}
-                        title={`Video for ${recipe.title}`}
-                        className="h-full w-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-                      Video preview not available.
-                    </div>
-                  )}
-                </div>
-              </section>
-            ) : null}
-
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
               {ingredients.length === 0 ? (
@@ -457,14 +340,169 @@ export default async function RecipeDetailPage({
               </form>
             ) : null}
           </section>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center gap-3">
+              {recipe.servings ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                  {recipe.servings} servings
+                </span>
+              ) : null}
+              {formatMinutes(recipe.prepTime) ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                  Prep {formatMinutes(recipe.prepTime)}
+                </span>
+              ) : null}
+              {formatMinutes(recipe.cookTime) ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                  Cook {formatMinutes(recipe.cookTime)}
+                </span>
+              ) : null}
+              {recipe.sourceUrl ? (
+                <a
+                  href={recipe.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
+                >
+                  {authorLabel ? `By ${authorLabel}` : "Source"}
+                </a>
+              ) : null}
+            </div>
+
+            {recipe.tags?.length ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {recipe.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {isEditing ? (
+              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+                <input type="hidden" name="recipeId" value={recipe.id} />
+                <input type="hidden" name="section" value="overview" />
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Inline Edit</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Title
+                    <input
+                      name="title"
+                      defaultValue={recipe.title}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Tags
+                    <input
+                      name="tags"
+                      defaultValue={(recipe.tags ?? []).join(", ")}
+                      placeholder="Weeknight, Family"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Servings
+                    <input
+                      name="servings"
+                      type="number"
+                      min={1}
+                      defaultValue={recipe.servings ?? undefined}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Prep (min)
+                      <input
+                        name="prepTime"
+                        type="number"
+                        min={1}
+                        defaultValue={recipe.prepTime ?? undefined}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Cook (min)
+                      <input
+                        name="cookTime"
+                        type="number"
+                        min={1}
+                        defaultValue={recipe.cookTime ?? undefined}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                  </div>
+                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 md:col-span-2">
+                    Description
+                    <textarea
+                      name="description"
+                      rows={2}
+                      defaultValue={recipe.description ?? ""}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <input
+                    name="sourceUrl"
+                    defaultValue={recipe.sourceUrl ?? ""}
+                    placeholder="Source URL"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <input
+                    name="videoUrl"
+                    defaultValue={recipe.videoUrl ?? ""}
+                    placeholder="Video URL"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <input
+                    name="imageUrl"
+                    defaultValue={recipe.imageUrl ?? ""}
+                    placeholder="Image URL"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </div>
+                <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                  Save Overview
+                </button>
+              </form>
+            ) : null}
+          </div>
         </section>
 
         <aside className="space-y-6">
-          {recipe.imageUrl ? (
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={recipe.imageUrl} alt={recipe.title} className="h-full w-full object-cover" />
-            </div>
+          {recipe.videoUrl ? (
+            <section className="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:block dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
+                <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  Open Video
+                </a>
+              </div>
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
+                {embedUrl ? (
+                  <div className="aspect-[16/9] w-full">
+                    <iframe
+                      src={embedUrl}
+                      title={`Video for ${recipe.title}`}
+                      className="h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                    Video preview not available.
+                  </div>
+                )}
+              </div>
+            </section>
           ) : null}
         </aside>
       </div>
