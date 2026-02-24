@@ -108,14 +108,14 @@ export default function RecipeFocusMode({
         <button
           type="button"
           onClick={() => setMode("mise")}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
         >
           Mise
         </button>
         <button
           type="button"
           onClick={() => setMode("cook")}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
         >
           Cook
         </button>
@@ -137,8 +137,8 @@ export default function RecipeFocusMode({
                   onClick={() => setMode("mise")}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     mode === "mise"
-                      ? "bg-emerald-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      ? "bg-amber-500 text-slate-950"
+                      : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300"
                   }`}
                 >
                   Mise
@@ -148,8 +148,8 @@ export default function RecipeFocusMode({
                   onClick={() => setMode("cook")}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     mode === "cook"
-                      ? "bg-emerald-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      ? "bg-amber-500 text-slate-950"
+                      : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300"
                   }`}
                 >
                   Cook
