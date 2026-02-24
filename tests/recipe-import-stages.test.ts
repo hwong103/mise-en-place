@@ -85,6 +85,40 @@ describe("importRecipeFromUrl ingestion stages", () => {
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
 
+  it("continues to HTML fallback when markdown lacks balanced ingredient/instruction coverage", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "No Ingredient Markdown",
+          content: `# No Ingredient Markdown\n\nInstructions\n${Array.from({ length: 18 }, (_, i) => `${i + 1}. Long cooking step with enough detail to score highly in quality checks.`).join("\n")}`,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => `
+          <html>
+            <script type="application/ld+json">
+              {"@context":"https://schema.org","@type":"Recipe","name":"HTML Rescue","recipeIngredient":["1 cup broth","1 onion","2 cloves garlic","2 cups water","1 tsp salt","1 tbsp olive oil"],"recipeInstructions":["Boil broth","Add onion","Stir in garlic","Simmer 10 minutes","Season to taste","Serve hot"]}
+            </script>
+          </html>
+        `,
+      } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://example.com/html-rescue"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    const ingredientCount = Array.isArray(createArg?.data.ingredients)
+      ? createArg.data.ingredients.length
+      : 0;
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(ingredientCount).toBeGreaterThan(0);
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
   it("falls back to direct HTML when markdown fails", async () => {
     vi.mocked(global.fetch)
       .mockResolvedValueOnce({ ok: false } as Response)

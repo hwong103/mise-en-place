@@ -1335,8 +1335,14 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
 
   let selected = selectBestRecipeIngestionCandidate(candidates);
+  const markdownHasBalancedSections =
+    selected.candidate?.stage === "markdown" &&
+    selected.candidate.ingredients.length >= 4 &&
+    selected.candidate.instructions.length >= 3;
   const markdownIsHighConfidence =
-    selected.candidate?.stage === "markdown" && selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE;
+    selected.candidate?.stage === "markdown" &&
+    selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE &&
+    markdownHasBalancedSections;
 
   if (!markdownIsHighConfidence) {
     const htmlStartedAt = Date.now();
@@ -1430,6 +1436,21 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
 
   selected = selectBestRecipeIngestionCandidate(candidates);
+  const markdownNeedsRescue =
+    selected.candidate?.stage === "markdown" &&
+    (selected.candidate.ingredients.length < 4 || selected.candidate.instructions.length < 3);
+  if (markdownNeedsRescue) {
+    const balancedFallbackCandidates = candidates.filter(
+      (candidate) =>
+        candidate.stage !== "markdown" &&
+        candidate.ingredients.length >= 4 &&
+        candidate.instructions.length >= 3
+    );
+    if (balancedFallbackCandidates.length > 0) {
+      selected = selectBestRecipeIngestionCandidate(balancedFallbackCandidates);
+    }
+  }
+
   const selectedCandidate = selected.candidate;
   const failureReason = classifyIngestionFailure(attempts, selectedCandidate);
 
