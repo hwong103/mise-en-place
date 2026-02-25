@@ -894,8 +894,9 @@ const extractRecipeFromHtml = (html: string, preParsedBlocks?: unknown[]) => {
     ? parseTags(normalizeText(recipe.keywords))
     : extractTextList(recipe.keywords);
   const servings = parseYield(recipe.recipeYield);
+  const totalTime = parseDurationMinutes(recipe.totalTime);
   const prepTime = parseDurationMinutes(recipe.prepTime);
-  const cookTime = parseDurationMinutes(recipe.cookTime);
+  const cookTime = parseDurationMinutes(recipe.cookTime) ?? totalTime;
   const videoUrl = extractVideoUrl(recipe.video ?? recipe.videoUrl);
 
   return {
@@ -952,6 +953,7 @@ const fetchMarkdownFromUrl = async (sourceUrl: string) => {
 
 const extractRecipeFromMarkdown = (markdown: string, fallbackTitle?: string) => {
   const parsed = parseMarkdownRecipe(markdown, fallbackTitle);
+  const embeddedRecipe = extractRecipeFromMarkdownJsonBlocks(markdown);
 
   const frontmatterMatch = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/);
   const frontmatter = frontmatterMatch?.[1] ?? "";
@@ -959,20 +961,103 @@ const extractRecipeFromMarkdown = (markdown: string, fallbackTitle?: string) => 
   const frontmatterVideo =
     frontmatter.match(/^\s*(?:video|video_url|youtube)\s*:\s*(.+)\s*$/im)?.[1] ?? undefined;
   const imageMatch = markdown.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
-  const imageUrl = toOptionalUrlString(frontmatterImage ?? imageMatch?.[1] ?? "");
+  const imageUrl = toOptionalUrlString(
+    frontmatterImage ?? imageMatch?.[1] ?? embeddedRecipe?.imageUrl ?? ""
+  );
   const videoUrl =
     normalizeVideoUrl(toOptionalUrlString(frontmatterVideo ?? "")) ??
+    normalizeVideoUrl(embeddedRecipe?.videoUrl) ??
     normalizeVideoUrl(extractVideoFromHtml(markdown));
+  const shouldPreferEmbeddedRecipe =
+    parsed.ingredients.length < 4 ||
+    parsed.instructions.length < 3 ||
+    (!parsed.tags.length && (embeddedRecipe?.tags?.length ?? 0) > 0);
+  const ingredients = shouldPreferEmbeddedRecipe
+    ? embeddedRecipe?.ingredients ?? parsed.ingredients
+    : parsed.ingredients;
+  const instructions = shouldPreferEmbeddedRecipe
+    ? embeddedRecipe?.instructions ?? parsed.instructions
+    : parsed.instructions;
+  const tags = parsed.tags.length > 0 ? parsed.tags : embeddedRecipe?.tags ?? [];
 
   return {
-    title: parsed.title,
-    description: parsed.description,
+    title: parsed.title || embeddedRecipe?.title,
+    description: parsed.description || embeddedRecipe?.description,
     imageUrl,
     videoUrl,
-    ingredients: parsed.ingredients,
-    instructions: parsed.instructions,
+    ingredients,
+    instructions,
     notes: parsed.notes,
-    tags: parsed.tags,
+    tags,
+    servings: embeddedRecipe?.servings,
+    prepTime: embeddedRecipe?.prepTime,
+    cookTime: embeddedRecipe?.cookTime,
+  };
+};
+
+const extractRecipeFromMarkdownJsonBlocks = (markdown: string) => {
+  const blocks: unknown[] = [];
+  const codeBlockRegex = /```(?:json|application\/ld\+json)?\s*([\s\S]*?)```/gi;
+  let match = codeBlockRegex.exec(markdown);
+  while (match) {
+    const raw = match[1]?.trim();
+    if (raw && raw.startsWith("{")) {
+      try {
+        blocks.push(JSON.parse(raw));
+      } catch {
+        // ignore malformed JSON blocks
+      }
+    }
+    match = codeBlockRegex.exec(markdown);
+  }
+
+  if (blocks.length === 0) {
+    return null;
+  }
+
+  const recipeNodes: Record<string, unknown>[] = [];
+  blocks.forEach((block) => collectRecipeNodes(block, recipeNodes));
+  const recipe = recipeNodes.find(
+    (node) =>
+      node.recipeIngredient ||
+      node.ingredients ||
+      node.recipeInstructions ||
+      node.name ||
+      node.headline
+  );
+  if (!recipe) {
+    return null;
+  }
+
+  const title =
+    (typeof recipe.name === "string" && normalizeText(recipe.name)) ||
+    (typeof recipe.headline === "string" && normalizeText(recipe.headline)) ||
+    undefined;
+  const description =
+    (typeof recipe.description === "string" && normalizeText(recipe.description)) || undefined;
+  const imageUrl = extractImageUrl(recipe.image);
+  const videoUrl = extractVideoUrl(recipe.video ?? recipe.videoUrl);
+  const ingredients = extractIngredientValue(recipe.recipeIngredient ?? recipe.ingredients);
+  const instructions = extractTextList(recipe.recipeInstructions);
+  const tags = typeof recipe.keywords === "string"
+    ? parseTags(normalizeText(recipe.keywords))
+    : extractTextList(recipe.keywords);
+  const servings = parseYield(recipe.recipeYield);
+  const totalTime = parseDurationMinutes(recipe.totalTime);
+  const prepTime = parseDurationMinutes(recipe.prepTime);
+  const cookTime = parseDurationMinutes(recipe.cookTime) ?? totalTime;
+
+  return {
+    title,
+    description,
+    imageUrl,
+    videoUrl,
+    ingredients,
+    instructions,
+    tags,
+    servings,
+    prepTime,
+    cookTime,
   };
 };
 
@@ -1430,6 +1515,9 @@ export async function importRecipeFromUrl(formData: FormData) {
       instructions: cleanCandidateLines(markdownRecipe.instructions),
       notes: cleanCandidateLines(markdownRecipe.notes),
       tags: markdownRecipe.tags,
+      servings: markdownRecipe.servings,
+      prepTime: markdownRecipe.prepTime,
+      cookTime: markdownRecipe.cookTime,
       latencyMs: markdownLatencyMs,
       errorCode: undefined,
     };

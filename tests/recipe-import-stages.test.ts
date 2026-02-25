@@ -18,6 +18,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
 }));
 
 vi.mock("@/lib/household", () => ({
@@ -147,6 +148,133 @@ ${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
     expect(createArg?.data.ingredients).toHaveLength(12);
     expect(createArg?.data.imageUrl).toBe("https://cdn.example.com/media-rescue.jpg");
     expect(createArg?.data.videoUrl).toBe("https://youtu.be/media1234567");
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
+  it("extracts recipe data from embedded markdown JSON blocks used by bonappetit", async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        title: "Slow-Roast Gochujang Chicken",
+        content: `---
+description: This isn’t the crisp-skinned, high-heat-roast chicken you’re probably familiar with.
+image: https://assets.bonappetit.com/photos/5d7296eec4af4d0008ad1263/16:9/w_1280,c_limit/Basically-Gojuchang-Chicken-Recipe-Wide.jpg
+title: Slow-Roast Gochujang Chicken
+---
+
+ArrowJump To RecipePrint
+
+\`\`\`json
+{
+  "@context":"http://schema.org",
+  "@type":"Recipe",
+  "name":"Slow-Roast Gochujang Chicken",
+  "keywords":["korean","chicken","weeknight meals"],
+  "recipeYield":"4 servings",
+  "recipeIngredient":[
+    "1 3½–4-lb. whole chicken",
+    "1 Tbsp. kosher salt",
+    "Freshly ground black pepper",
+    "5 Tbsp. gochujang",
+    "1/4 cup olive oil",
+    "2 heads of garlic"
+  ],
+  "recipeInstructions":[
+    {"@type":"HowToStep","text":"Preheat oven to 300° and season chicken."},
+    {"@type":"HowToStep","text":"Whisk gochujang with olive oil and aromatics."},
+    {"@type":"HowToStep","text":"Roast until chicken is tender and potatoes are soft."}
+  ]
+}
+\`\`\`
+`,
+      }),
+    } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://www.bonappetit.com/recipe/slow-roast-gochujang-chicken"))
+    );
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(createArg?.data.title).toBe("Slow-Roast Gochujang Chicken");
+    expect(createArg?.data.tags).toEqual(["korean", "chicken", "weeknight meals"]);
+    expect(createArg?.data.servings).toBe(4);
+    expect(createArg?.data.ingredients).toHaveLength(6);
+    expect(createArg?.data.instructions).toHaveLength(3);
+    expect(createArg?.data.imageUrl).toBe(
+      "https://assets.bonappetit.com/photos/5d7296eec4af4d0008ad1263/16:9/w_1280,c_limit/Basically-Gojuchang-Chicken-Recipe-Wide.jpg"
+    );
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
+  it("handles pressurecookrecipes markdown recipe cards and strips trailing metadata lines", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "Instant Pot HK Beef Curry",
+          content: `---
+description: Easy to Make Classic Instant Pot HK Beef Curry (咖喱牛腩) with simple ingredients.
+image: https://www.pressurecookrecipes.com/wp-content/uploads/2018/09/instant-pot-hk-beef-curry-fb.jpg
+title: Instant Pot HK Beef Curry
+---
+
+### Ingredients
+* ▢ 2 pounds beef finger meat
+* ▢ 1 large potato
+* ▢ 2 tablespoons chu hou sauce
+* ▢ 3 bay leaves
+* ▢ 1 tablespoon fish sauce
+* ▢ 3 tablespoons cold water
+
+### Instructions
+1. Brown beef in Instant Pot.
+2. Saute aromatics and deglaze.
+3. Pressure cook with potatoes.
+4. Add coconut milk and thicken sauce.
+5. Serve with rice.
+Course: Dinner, Lunch, Main
+Cuisine: Asian, Chinese, Hong Kong
+Keyword: beef curry, instant pot curry
+
+\`\`\`json
+{
+  "@context":"https://schema.org",
+  "@type":"Recipe",
+  "name":"Instant Pot HK Beef Curry",
+  "recipeYield":["4","4 - 6"],
+  "totalTime":"PT70M",
+  "keywords":"beef curry, instant pot curry",
+  "recipeIngredient":["2 pounds beef finger meat","1 large potato","2 tablespoons chu hou sauce","3 bay leaves","1 tablespoon fish sauce","3 tablespoons cold water"],
+  "recipeInstructions":[
+    {"@type":"HowToStep","text":"Brown beef in Instant Pot."},
+    {"@type":"HowToStep","text":"Saute aromatics and deglaze."},
+    {"@type":"HowToStep","text":"Pressure cook with potatoes."},
+    {"@type":"HowToStep","text":"Add coconut milk and thicken sauce."},
+    {"@type":"HowToStep","text":"Serve with rice."}
+  ]
+}
+\`\`\`
+`,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({ ok: false } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://www.pressurecookrecipes.com/instant-pot-hk-beef-curry/"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    const instructions = createArg?.data.instructions as string[];
+    expect(createArg?.data.title).toBe("Instant Pot HK Beef Curry");
+    expect(createArg?.data.tags).toEqual(["beef curry", "instant pot curry"]);
+    expect(createArg?.data.servings).toBe(4);
+    expect(createArg?.data.cookTime).toBe(70);
+    expect(instructions.some((line) => /^Course:/i.test(line))).toBe(false);
+    expect(instructions.some((line) => /^Cuisine:/i.test(line))).toBe(false);
+    expect(instructions.some((line) => /^Keyword:/i.test(line))).toBe(false);
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
 
