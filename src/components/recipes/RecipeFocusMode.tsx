@@ -301,8 +301,8 @@ export default function RecipeFocusMode({
                   onClick={() => setMode("mise")}
                   className={`rounded-[20px] border-[1.5px] px-[18px] py-[7px] text-[13px] font-semibold transition-colors ${
                     mode === "mise"
-                      ? "border-white/75 bg-white/10 text-white"
-                      : "border-white/45 bg-transparent text-white hover:border-white/75 hover:bg-white/10"
+                      ? "border-slate-300 bg-slate-100 text-slate-900 dark:border-white/75 dark:bg-white/10 dark:text-white"
+                      : "border-slate-300 bg-transparent text-slate-700 hover:border-slate-400 hover:bg-slate-100 dark:border-white/45 dark:text-white dark:hover:border-white/75 dark:hover:bg-white/10"
                   }`}
                   aria-pressed={mode === "mise"}
                 >
@@ -322,7 +322,7 @@ export default function RecipeFocusMode({
                 <button
                   type="button"
                   onClick={() => setMode(null)}
-                  className="rounded-[20px] border border-white/15 bg-transparent px-4 py-[7px] text-[13px] font-medium text-white/45 transition-colors hover:border-white/30 hover:text-white/80"
+                  className="rounded-[20px] border border-slate-300 bg-transparent px-4 py-[7px] text-[13px] font-medium text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 dark:border-white/15 dark:text-white/45 dark:hover:border-white/30 dark:hover:text-white/80"
                 >
                   Close
                 </button>
