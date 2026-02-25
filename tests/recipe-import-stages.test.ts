@@ -343,7 +343,10 @@ ${Array.from({ length: 5 }, (_, i) => `${i + 1}. Cook carefully.`).join("\n")}
 ## Recipe notes
 Do Ahead: Chicken can be seasoned 12 hours ahead.
 Back to topTriangle
+CookingSalmon Tacos With Pineapple-Chile SalsaBy Christina Chaey
 RecipesShockingly Easy No-Knead FocacciaBy Sarah Jampel
+recipesSoy-Marinated EggsBy Sohui Kim
+Cooking
 window.__PRELOADED_STATE__ = {"componentConfig":{"OneNav":{"settings":{"id":"header_menu"}}}}
 © 2026 Condé Nast. All rights reserved.
 `,

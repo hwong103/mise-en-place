@@ -580,7 +580,7 @@ const isLikelyJunkImportedNote = (value: string) => {
     return true;
   }
 
-  if (/^(back to top|more from\b|share|pin|email|subscribe)\b/i.test(normalized)) {
+  if (/^(back to top|more from\b|share|pin|email|subscribe)/i.test(normalized)) {
     return true;
   }
 
@@ -588,7 +588,14 @@ const isLikelyJunkImportedNote = (value: string) => {
     return true;
   }
 
-  if (/^(cooking|recipes?)\S+.+\bBy\s+[A-Z][a-z]+/.test(normalized)) {
+  if (/^(cooking|recipes?)$/i.test(normalized)) {
+    return true;
+  }
+
+  if (
+    /^(?:cooking|recipes?)[A-Z].*(?:By[A-Z]|By\s+[A-Z])/i.test(normalized) ||
+    /^(?:cooking|recipes?)\s+.+\s+By\s+[A-Z]/i.test(normalized)
+  ) {
     return true;
   }
 
