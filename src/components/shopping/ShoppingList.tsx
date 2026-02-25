@@ -27,6 +27,11 @@ const parseSuppressedMarkerLine = (line: string) =>
   isSuppressedMarkerLine(line) ? line.slice(SUPPRESS_PREFIX.length) : line;
 
 const normalizeLocationLabel = (value: string) => value.trim().replace(/\s+/g, " ");
+const buildLocationPanelId = (location: string) =>
+  `shopping-location-${location
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")}`;
 
 const mergeLocationOptions = (...groups: Array<readonly string[] | string[]>) => {
   const seen = new Set<string>();
@@ -70,16 +75,6 @@ type MergedItem = {
   location: string;
 };
 
-type MergedCategory = {
-  name: string;
-  items: MergedItem[];
-};
-
-type MergedLocation = {
-  name: string;
-  categories: MergedCategory[];
-};
-
 export default function ShoppingList({
   weekKey,
   weekLabel,
@@ -95,6 +90,7 @@ export default function ShoppingList({
   const [optimisticLocations, setOptimisticLocations] = useState<Record<string, string>>({});
   const [suppressedKeys, setSuppressedKeys] = useState<Record<string, boolean>>({});
   const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({});
+  const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -294,6 +290,28 @@ export default function ShoppingList({
 
     return [`Shopping List (${weekLabel})`, "", ...sections].join("\n\n");
   }, [mergedLocations, optimisticChecked, persistedLookup, weekLabel]);
+
+  useEffect(() => {
+    if (mergedLocations.length === 0) {
+      setActiveLocation(null);
+      return;
+    }
+
+    setActiveLocation((current) => {
+      if (current && mergedLocations.some((location) => location.name === current)) {
+        return current;
+      }
+      return mergedLocations[0].name;
+    });
+  }, [mergedLocations]);
+
+  const activeLocationGroup = useMemo(() => {
+    if (!activeLocation) {
+      return mergedLocations[0] ?? null;
+    }
+
+    return mergedLocations.find((location) => location.name === activeLocation) ?? mergedLocations[0] ?? null;
+  }, [activeLocation, mergedLocations]);
 
   const categoryOptions = useMemo(() => {
     const names = new Set<string>(categories.map((category) => category.name));
@@ -516,132 +534,173 @@ export default function ShoppingList({
           No ingredients yet. Add meals in the planner to generate your list.
         </div>
       ) : (
-        <div className="max-w-5xl space-y-10">
-          {mergedLocations.map((locationGroup) => (
-            <section key={locationGroup.name} className="space-y-5">
+        <div className="space-y-6">
+          <div
+            className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            role="tablist"
+            aria-label="Shopping locations"
+          >
+            {mergedLocations.map((locationGroup) => {
+              const itemCount = locationGroup.categories.reduce(
+                (total, category) => total + category.items.length,
+                0
+              );
+              const isActive = locationGroup.name === activeLocationGroup?.name;
+              return (
+                <button
+                  key={locationGroup.name}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={buildLocationPanelId(locationGroup.name)}
+                  onClick={() => setActiveLocation(locationGroup.name)}
+                  className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                    isActive
+                      ? "bg-emerald-600 text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {locationGroup.name}
+                  <span className={`ml-2 text-xs ${isActive ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
+                    {itemCount}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {activeLocationGroup ? (
+            <section
+              key={activeLocationGroup.name}
+              id={buildLocationPanelId(activeLocationGroup.name)}
+              role="tabpanel"
+              className="space-y-6"
+            >
               <h2 className="text-base font-extrabold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                {locationGroup.name}
+                {activeLocationGroup.name}
               </h2>
 
-              {locationGroup.categories.map((category) => (
-                <div key={`${locationGroup.name}-${category.name}`} className="space-y-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    {category.name}
-                  </h3>
-                  <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {category.items.map((item) => {
-                        const isChecked =
-                          optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
-                        const isSaving = pendingKeys[item.key] ?? false;
-                        const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                {activeLocationGroup.categories.map((category) => (
+                  <div key={`${activeLocationGroup.name}-${category.name}`} className="space-y-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      {category.name}
+                    </h3>
+                    <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                      <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {category.items.map((item) => {
+                          const isChecked =
+                            optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
+                          const isSaving = pendingKeys[item.key] ?? false;
+                          const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
 
-                        return (
-                          <li key={item.key} className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
-                            <div className="flex items-start justify-between gap-4">
-                              <label className="flex items-start gap-3">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() =>
-                                    handleToggle({
-                                      key: item.key,
-                                      line: item.line,
-                                      manual: item.manual,
-                                      category: category.name,
-                                      location: item.location,
-                                    })
-                                  }
-                                  className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900"
-                                />
-                                <div>
-                                  <div className={isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""}>
-                                    {item.line}
+                          return (
+                            <li key={item.key} className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                                <label className="flex items-start gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() =>
+                                      handleToggle({
+                                        key: item.key,
+                                        line: item.line,
+                                        manual: item.manual,
+                                        category: category.name,
+                                        location: item.location,
+                                      })
+                                    }
+                                    className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900"
+                                  />
+                                  <div>
+                                    <div className={isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""}>
+                                      {item.line}
+                                    </div>
+                                    {item.amountSummary ? (
+                                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                        Amount: {item.amountSummary}
+                                      </div>
+                                    ) : null}
+                                    {item.recipes.length > 0 ? (
+                                      <div className="mt-2 flex flex-wrap gap-1">
+                                        {item.recipes.map((recipe) => (
+                                          <span
+                                            key={`${item.key}-${recipe}`}
+                                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                          >
+                                            {recipe}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : null}
                                   </div>
-                                  {item.amountSummary ? (
-                                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                      Amount: {item.amountSummary}
-                                    </div>
-                                  ) : null}
-                                  {item.recipes.length > 0 ? (
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                      {item.recipes.map((recipe) => (
-                                        <span
-                                          key={`${item.key}-${recipe}`}
-                                          className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                        >
-                                          {recipe}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </label>
+                                </label>
 
-                              <div className="flex items-center gap-2">
-                                <select
-                                  value={item.location}
-                                  onChange={(event) =>
-                                    handleLocationChange({
-                                      key: item.key,
-                                      line: item.line,
-                                      manual: item.manual,
-                                      category: category.name,
-                                      location: event.target.value,
-                                    })
-                                  }
-                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                                  disabled={isSaving || isPending}
-                                  aria-label={`Location for ${item.line}`}
-                                >
-                                  {itemLocationOptions.map((location) => (
-                                    <option key={location} value={location}>
-                                      {location}
-                                    </option>
-                                  ))}
-                                </select>
-                                {item.amountSummary ? (
-                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                    {item.amountSummary}
-                                  </span>
-                                ) : item.count > 1 ? (
-                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                                    x{item.count}
-                                  </span>
-                                ) : null}
-                                {isSaving ? (
-                                  <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleSuppress({
-                                      key: item.key,
-                                      line: item.line,
-                                      manual: item.manual,
-                                      category: category.name,
-                                      location: item.location,
-                                      id: item.id,
-                                    })
-                                  }
-                                  className="rounded-full p-1 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
-                                  disabled={isSaving || isPending}
-                                  aria-label={`Remove ${item.line}`}
-                                  title="Remove item"
-                                >
-                                  <Trash2 className="h-4 w-4" strokeWidth={1.8} />
-                                </button>
+                                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                                  <select
+                                    value={item.location}
+                                    onChange={(event) =>
+                                      handleLocationChange({
+                                        key: item.key,
+                                        line: item.line,
+                                        manual: item.manual,
+                                        category: category.name,
+                                        location: event.target.value,
+                                      })
+                                    }
+                                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                    disabled={isSaving || isPending}
+                                    aria-label={`Location for ${item.line}`}
+                                  >
+                                    {itemLocationOptions.map((location) => (
+                                      <option key={location} value={location}>
+                                        {location}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {item.amountSummary ? (
+                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                      {item.amountSummary}
+                                    </span>
+                                  ) : item.count > 1 ? (
+                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                      x{item.count}
+                                    </span>
+                                  ) : null}
+                                  {isSaving ? (
+                                    <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleSuppress({
+                                        key: item.key,
+                                        line: item.line,
+                                        manual: item.manual,
+                                        category: category.name,
+                                        location: item.location,
+                                        id: item.id,
+                                      })
+                                    }
+                                    className="rounded-full p-1 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
+                                    disabled={isSaving || isPending}
+                                    aria-label={`Remove ${item.line}`}
+                                    title="Remove item"
+                                  >
+                                    <Trash2 className="h-4 w-4" strokeWidth={1.8} />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </section>
-          ))}
+          ) : null}
         </div>
       )}
     </div>
