@@ -191,8 +191,8 @@ Recipe Notes:
 
     const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
     expect(createArg?.data.notes).toEqual([
-      "Garam Masala is easy to find.",
-      "Use pure chilli powder.",
+      "1. Garam Masala is easy to find.",
+      "2. Use pure chilli powder.",
     ]);
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
