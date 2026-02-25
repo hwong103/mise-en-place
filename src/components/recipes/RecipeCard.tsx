@@ -30,7 +30,11 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
   const ingredientCount = recipe.ingredientCount;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-emerald-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-400">
+    <Link
+      href={`/recipes/${recipe.id}`}
+      prefetch={false}
+      className="group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-emerald-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-400"
+    >
       <div className="relative h-44 w-full">
         {recipe.imageUrl ? (
           <>
@@ -42,13 +46,9 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
           <div className="h-full w-full bg-slate-100 dark:bg-slate-800" />
         )}
         <div className="absolute inset-x-0 top-0 p-5">
-          <Link
-            href={`/recipes/${recipe.id}`}
-            prefetch={false}
-            className="inline-block rounded-xl bg-black/45 px-3 py-1 text-xl font-bold text-white drop-shadow-sm transition-colors"
-          >
+          <span className="inline-block rounded-xl bg-black/45 px-3 py-1 text-xl font-bold text-white drop-shadow-sm transition-colors group-hover:bg-black/55">
             {recipe.title}
-          </Link>
+          </span>
         </div>
       </div>
 
@@ -78,15 +78,11 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         ) : null}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Link
-            href={`/recipes/${recipe.id}`}
-            prefetch={false}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
+          <span className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors group-hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:group-hover:bg-slate-800">
             View Recipe
-          </Link>
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
