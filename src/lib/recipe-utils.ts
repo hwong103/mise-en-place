@@ -233,6 +233,8 @@ export const cleanIngredientLines = (lines: string[]) => {
 export const cleanInstructionLines = (lines: string[]) => {
   const cleanedLines: string[] = [];
   const notes: string[] = [];
+  const metadataLinePattern =
+    /^(?:course|cuisine|keyword|keywords|servings?|yield|author|calories|prep(?:\s+time)?|cook(?:\s+time)?|total(?:\s+time)?|equipment)\b[:\s-]*/i;
 
   for (const line of lines) {
     const trimmed = cleanLineBase(line);
@@ -241,6 +243,9 @@ export const cleanInstructionLines = (lines: string[]) => {
     }
     if (/^\s*notes?\b[:\s-]*/i.test(trimmed)) {
       notes.push(stripNoteText(trimmed));
+      continue;
+    }
+    if (metadataLinePattern.test(trimmed)) {
       continue;
     }
     cleanedLines.push(trimmed);
