@@ -63,26 +63,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-bold text-slate-900">Login</h1>
-      <p className="mt-2 text-sm text-slate-500">
+    <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Login</h1>
+      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
         Use a magic link to sign in with Supabase Auth.
       </p>
 
       {isAuthDisabled ? (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300">
           Auth is disabled for debugging. You can go directly to the app routes.
         </div>
       ) : null}
 
       {!hasSupabasePublicEnv ? (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300">
           Missing `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
         </div>
       ) : null}
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-        <label className="block text-sm font-semibold text-slate-700" htmlFor="email">
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="email">
           Email
         </label>
         <input
@@ -91,7 +91,7 @@ export default function LoginPage() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           placeholder="you@example.com"
         />
 
@@ -104,28 +104,28 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="mt-6 border-t border-slate-200 pt-4">
+      <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
         {isAuthDisabled ? (
           <>
-            <p className="text-sm font-semibold text-slate-700">Continue without login</p>
-            <p className="mt-1 text-xs text-slate-500">Auth is disabled in this environment.</p>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Continue without login</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Auth is disabled in this environment.</p>
             <Link
               href="/recipes"
-              className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+              className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
             >
               Continue to Recipes
             </Link>
           </>
         ) : (
           <>
-            <p className="text-sm font-semibold text-slate-700">Or start without login</p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Or start without login</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Create a household instantly, then claim ownership later from Settings.
             </p>
             <form method="post" action="/start-household" className="mt-3">
               <button
                 type="submit"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
               >
                 Start Household Without Login
               </button>
@@ -135,11 +135,11 @@ export default function LoginPage() {
       </div>
 
       {configuredSiteUrl ? (
-        <p className="mt-4 text-xs text-slate-400">Using NEXT_PUBLIC_SITE_URL={configuredSiteUrl}</p>
+        <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">Using NEXT_PUBLIC_SITE_URL={configuredSiteUrl}</p>
       ) : null}
 
-      {message ? <p className="mt-4 text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
+      {message ? <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-300">{message}</p> : null}
+      {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
     </div>
   );
 }

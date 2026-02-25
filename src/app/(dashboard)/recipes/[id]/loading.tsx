@@ -1,7 +1,7 @@
 export default function RecipeDetailLoading() {
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 p-6 md:p-8">
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 p-6 md:p-8 dark:border-slate-800">
         <div className="space-y-4">
           <div className="h-9 w-40 rounded-xl bg-white/20" />
           <div className="h-10 w-2/3 rounded-xl bg-white/25" />
@@ -13,30 +13,30 @@ export default function RecipeDetailLoading() {
         <section className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             {Array.from({ length: 2 }).map((_, index) => (
-              <div key={index} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="h-6 w-36 rounded-full bg-slate-200" />
+              <div key={index} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="h-6 w-36 rounded-full bg-slate-200 dark:bg-slate-800" />
                 <div className="mt-4 space-y-3">
                   {Array.from({ length: 6 }).map((__, rowIndex) => (
-                    <div key={rowIndex} className="h-4 rounded-full bg-slate-100" />
+                    <div key={rowIndex} className="h-4 rounded-full bg-slate-100 dark:bg-slate-900" />
                   ))}
                 </div>
               </div>
             ))}
           </div>
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="h-6 w-24 rounded-full bg-slate-200" />
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="h-6 w-24 rounded-full bg-slate-200 dark:bg-slate-800" />
             <div className="mt-4 space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="h-4 rounded-full bg-slate-100" />
+                <div key={index} className="h-4 rounded-full bg-slate-100 dark:bg-slate-900" />
               ))}
             </div>
           </div>
         </section>
 
         <aside className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="h-6 w-24 rounded-full bg-slate-200" />
-            <div className="mt-4 h-40 rounded-2xl bg-slate-100" />
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="h-6 w-24 rounded-full bg-slate-200 dark:bg-slate-800" />
+            <div className="mt-4 h-40 rounded-2xl bg-slate-100 dark:bg-slate-950/60" />
           </div>
         </aside>
       </div>

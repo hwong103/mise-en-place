@@ -74,10 +74,10 @@ export default function AuthCallbackPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-bold text-slate-900">Signing you in...</h1>
-      <p className="mt-2 text-sm text-slate-500">Completing your secure login.</p>
-      {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
+    <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Signing you in...</h1>
+      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Completing your secure login.</p>
+      {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
     </div>
   );
 }
