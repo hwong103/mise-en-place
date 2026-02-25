@@ -279,7 +279,7 @@ export default function RecipeFocusMode({
       </div>
 
       {mode ? (
-        <div className="fixed inset-0 z-50 p-3 md:p-6">
+        <div className="fixed inset-0 z-[80] bg-slate-950/60 p-3 backdrop-blur-sm md:p-6">
           <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
               <div>
