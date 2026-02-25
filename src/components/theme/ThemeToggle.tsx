@@ -13,6 +13,7 @@ const getSystemTheme = (): Theme =>
 const applyTheme = (theme: Theme) => {
   const isDark = theme === "dark";
   document.documentElement.classList.toggle("dark", isDark);
+  document.documentElement.classList.toggle("light", !isDark);
   document.documentElement.style.colorScheme = isDark ? "dark" : "light";
 };
 
