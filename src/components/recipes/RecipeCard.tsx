@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState, type SyntheticEvent } from "react";
 
 const formatMinutes = (value?: number | null) => {
   if (!value) {
@@ -15,12 +16,82 @@ export type RecipeSummary = {
   title: string;
   description?: string | null;
   imageUrl?: string | null;
+  sourceUrl?: string | null;
   tags?: string[];
   servings?: number | null;
   prepTime?: number | null;
   cookTime?: number | null;
   ingredientCount: number;
 };
+
+const getSourceDomain = (sourceUrl?: string | null): string | null => {
+  if (!sourceUrl) {
+    return null;
+  }
+
+  try {
+    const hostname = new URL(sourceUrl).hostname.replace(/^www\./, "");
+    const parts = hostname.split(".").filter(Boolean);
+    return parts.length >= 2 ? parts[parts.length - 2] : hostname;
+  } catch {
+    return null;
+  }
+};
+
+function FaviconImage({ faviconUrl, domain }: { faviconUrl: string; domain: string }) {
+  const [failed, setFailed] = useState(false);
+
+  const handleLoad = (e: SyntheticEvent<HTMLImageElement>) => {
+    // Google returns a 16x16 grey globe for unknown domains. Treat it as a fallback case.
+    if (e.currentTarget.naturalWidth <= 16) {
+      setFailed(true);
+    }
+  };
+
+  if (failed) {
+    return (
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/25 text-[9px] font-bold uppercase text-white">
+        {domain.charAt(0)}
+      </span>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={faviconUrl}
+      alt=""
+      width={16}
+      height={16}
+      className="h-4 w-4 shrink-0 rounded-full object-cover"
+      onLoad={handleLoad}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function AuthorBadge({ sourceUrl }: { sourceUrl: string }) {
+  const domain = getSourceDomain(sourceUrl);
+  if (!domain) {
+    return null;
+  }
+
+  const hostname = (() => {
+    try {
+      return new URL(sourceUrl).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
+
+  return (
+    <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-2.5 py-1 backdrop-blur-md transition-colors group-hover:bg-white/[0.22]">
+      <FaviconImage faviconUrl={faviconUrl} domain={domain} />
+      <span className="text-[11px] font-semibold leading-none text-white/90">{domain}</span>
+    </div>
+  );
+}
 
 type RecipeCardProps = {
   recipe: RecipeSummary;
@@ -41,6 +112,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/20 to-transparent" />
+            {recipe.sourceUrl ? <AuthorBadge sourceUrl={recipe.sourceUrl} /> : null}
           </>
         ) : (
           <div className="h-full w-full bg-slate-100 dark:bg-slate-800" />
@@ -54,21 +126,21 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
 
       <div className="flex flex-1 flex-col p-6">
         <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
-        {recipe.servings ? (
-          <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800 dark:text-slate-300">
-            {recipe.servings} servings
-          </span>
-        ) : null}
-        {formatMinutes(recipe.prepTime) ? (
-          <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800 dark:text-slate-300">
-            Prep {formatMinutes(recipe.prepTime)}
-          </span>
-        ) : null}
-        {formatMinutes(recipe.cookTime) ? (
-          <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800 dark:text-slate-300">
-            Cook {formatMinutes(recipe.cookTime)}
-          </span>
-        ) : null}
+          {recipe.servings ? (
+            <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800 dark:text-slate-300">
+              {recipe.servings} servings
+            </span>
+          ) : null}
+          {formatMinutes(recipe.prepTime) ? (
+            <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800 dark:text-slate-300">
+              Prep {formatMinutes(recipe.prepTime)}
+            </span>
+          ) : null}
+          {formatMinutes(recipe.cookTime) ? (
+            <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800 dark:text-slate-300">
+              Cook {formatMinutes(recipe.cookTime)}
+            </span>
+          ) : null}
         </div>
 
         {ingredientCount > 0 ? (
