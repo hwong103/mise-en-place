@@ -33,6 +33,7 @@ const buildLocationPanelId = (location: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")}`;
+const toDisplayCategoryName = (category: string) => (category === "Pantry" ? "Dry Goods" : category);
 
 const mergeLocationOptions = (...groups: Array<readonly string[] | string[]>) => {
   const seen = new Set<string>();
@@ -149,18 +150,17 @@ export default function ShoppingList({
     const addItemToLocationMap = (
       map: Map<string, Map<string, MergedItem[]>>,
       location: string,
-      category: string,
-      item: Omit<MergedItem, "category" | "location">
+      displayCategory: string,
+      item: Omit<MergedItem, "location">
     ) => {
       const locationName = normalizeShoppingLocation(location);
       const categoryMap = map.get(locationName) ?? new Map<string, MergedItem[]>();
-      const categoryItems = categoryMap.get(category) ?? [];
+      const categoryItems = categoryMap.get(displayCategory) ?? [];
       categoryItems.push({
         ...item,
-        category,
         location: locationName,
       });
-      categoryMap.set(category, categoryItems);
+      categoryMap.set(displayCategory, categoryItems);
       map.set(locationName, categoryMap);
     };
 
@@ -181,7 +181,7 @@ export default function ShoppingList({
           locationPreferences[preferenceKey] ??
           DEFAULT_SHOPPING_LOCATION;
 
-        addItemToLocationMap(locationMap, location, category.name, {
+        addItemToLocationMap(locationMap, location, toDisplayCategoryName(category.name), {
           line: item.line,
           count: item.count,
           amountSummary: item.amountSummary,
@@ -189,6 +189,7 @@ export default function ShoppingList({
           manual: false,
           id: persisted?.id,
           recipes: item.recipes,
+          category: category.name,
         });
       });
     });
@@ -202,7 +203,7 @@ export default function ShoppingList({
         }
 
         const location = optimisticLocations[key] ?? item.location ?? DEFAULT_SHOPPING_LOCATION;
-        addItemToLocationMap(locationMap, location, item.category, {
+        addItemToLocationMap(locationMap, location, toDisplayCategoryName(item.category), {
           line: item.line,
           count: 1,
           amountSummary: undefined,
@@ -210,6 +211,7 @@ export default function ShoppingList({
           manual: true,
           id: item.id,
           recipes: [],
+          category: item.category,
         });
       });
 
@@ -553,9 +555,12 @@ export default function ShoppingList({
                 {activeLocationGroup.name}
               </h2>
 
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <div className="columns-1 gap-6 sm:columns-2">
                 {activeLocationGroup.categories.map((category) => (
-                  <div key={`${activeLocationGroup.name}-${category.name}`} className="space-y-4">
+                  <div
+                    key={`${activeLocationGroup.name}-${category.name}`}
+                    className="mb-6 break-inside-avoid space-y-4"
+                  >
                     <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       {category.name}
                     </h3>
@@ -579,7 +584,7 @@ export default function ShoppingList({
                                         key: item.key,
                                         line: item.line,
                                         manual: item.manual,
-                                        category: category.name,
+                                        category: item.category,
                                         location: item.location,
                                       })
                                     }
@@ -617,7 +622,7 @@ export default function ShoppingList({
                                         key: item.key,
                                         line: item.line,
                                         manual: item.manual,
-                                        category: category.name,
+                                        category: item.category,
                                         location: event.target.value,
                                       })
                                     }
@@ -650,7 +655,7 @@ export default function ShoppingList({
                                         key: item.key,
                                         line: item.line,
                                         manual: item.manual,
-                                        category: category.name,
+                                        category: item.category,
                                         location: item.location,
                                         id: item.id,
                                       })

@@ -1,6 +1,12 @@
 import { INGREDIENT_TAXONOMY } from "@/lib/ingredient-taxonomy";
 
-export type IngredientCategory = "Produce" | "Dairy" | "Meat" | "Pantry" | "Other";
+export type IngredientCategory =
+  | "Produce"
+  | "Dairy"
+  | "Meat"
+  | "Dry Goods"
+  | "Canned & Jarred"
+  | "Other";
 
 export type IngredientClassification = {
   category: IngredientCategory;
@@ -272,7 +278,7 @@ const classifyMatchedEntry = (
 ): IngredientClassification => {
   if (storageOverride && entry.category === "Produce") {
     return {
-      category: "Pantry",
+      category: "Canned & Jarred",
       canonical: entry.canonical,
       matchedBy: "override",
     };

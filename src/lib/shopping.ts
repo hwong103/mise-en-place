@@ -17,7 +17,14 @@ export type ShoppingCategory = {
   items: ShoppingItem[];
 };
 
-const CATEGORY_ORDER: IngredientCategory[] = ["Produce", "Dairy", "Meat", "Pantry", "Other"];
+const CATEGORY_ORDER: IngredientCategory[] = [
+  "Produce",
+  "Dairy",
+  "Meat",
+  "Dry Goods",
+  "Canned & Jarred",
+  "Other",
+];
 
 const titleCase = (value: string) =>
   value

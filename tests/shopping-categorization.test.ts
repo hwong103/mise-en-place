@@ -20,14 +20,19 @@ describe("shopping ingredient categorization", () => {
   it("applies storage-first overrides for packaged produce", () => {
     const lines = ["canned tomatoes", "dried mushrooms", "frozen peas", "jarred peppers"];
     for (const line of lines) {
-      expect(classifyIngredient(line).category).toBe("Pantry");
+      expect(classifyIngredient(line).category).toBe("Canned & Jarred");
     }
   });
 
-  it("handles disambiguation for pantry sauces and milk alternatives", () => {
-    const pantryLines = ["fish sauce", "soy sauce", "coconut milk", "almond milk", "red wine vinegar"];
-    for (const line of pantryLines) {
-      expect(classifyIngredient(line).category).toBe("Pantry");
+  it("handles disambiguation between dry goods and canned or jarred staples", () => {
+    const dryGoodsLines = ["red wine vinegar", "dijon mustard", "soy sauce", "fish sauce", "almond milk"];
+    for (const line of dryGoodsLines) {
+      expect(classifyIngredient(line).category).toBe("Dry Goods");
+    }
+
+    const cannedJarredLines = ["beef stock", "canned tomatoes", "coconut milk"];
+    for (const line of cannedJarredLines) {
+      expect(classifyIngredient(line).category).toBe("Canned & Jarred");
     }
 
     const meatLines = ["chicken breast", "ground beef", "salmon fillet"];
