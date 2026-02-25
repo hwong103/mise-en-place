@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { addToMealPlan } from "@/app/(dashboard)/recipes/actions";
+import { toDateKey } from "@/lib/date";
 
 type AddToPlannerDialogProps = {
   recipeId: string;
@@ -21,8 +22,17 @@ export default function AddToPlannerDialog({
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
-  const today = new Date().toISOString().split("T")[0];
-  const dateValue = defaultDate ?? today;
+  const today = toDateKey(new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(defaultDate ?? today);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date();
+    day.setDate(day.getDate() + i);
+    return {
+      key: toDateKey(day),
+      label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : day.toLocaleDateString("en-AU", { weekday: "short" }),
+      sublabel: day.toLocaleDateString("en-AU", { day: "numeric", month: "short" }),
+    };
+  });
 
   async function clientAction(formData: FormData) {
     setIsPending(true);
@@ -47,7 +57,7 @@ export default function AddToPlannerDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add to Planner</h3>
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
           Schedule <span className="font-semibold text-emerald-600 dark:text-emerald-400">{recipeTitle}</span> for a day.
@@ -55,16 +65,32 @@ export default function AddToPlannerDialog({
 
         <form action={clientAction} className="space-y-4">
           <input type="hidden" name="recipeId" value={recipeId} />
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Date</label>
-            <input
-              type="date"
-              name="date"
-              defaultValue={dateValue}
-              required
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            />
+          <input type="hidden" name="date" value={selectedDate} />
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+            {days.map((day) => {
+              const isSelected = selectedDate === day.key;
+              return (
+                <button
+                  key={day.key}
+                  type="button"
+                  onClick={() => setSelectedDate(day.key)}
+                  className={`flex flex-col items-center rounded-2xl border px-2 py-3 text-center transition-colors ${
+                    isSelected
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-300"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-emerald-500/50"
+                  }`}
+                >
+                  <span className="text-xs font-semibold">{day.label}</span>
+                  <span
+                    className={`mt-0.5 text-[11px] ${
+                      isSelected ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
+                    }`}
+                  >
+                    {day.sublabel}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
