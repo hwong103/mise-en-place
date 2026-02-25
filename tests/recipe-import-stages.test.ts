@@ -150,6 +150,53 @@ ${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
 
+  it("normalizes imported note blobs and deduplicates html note echoes", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "Butter Chicken",
+          content: `# Butter Chicken
+
+Ingredients
+${Array.from({ length: 12 }, (_, i) => `- ${i + 1} cup flour`).join("\n")}
+
+Instructions
+${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}
+
+Recipe Notes:
+1\\. Garam Masala is easy to find. 2\\. Use pure chilli powder.`,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => `
+          <html>
+            <head>
+              <meta property="og:image" content="https://cdn.example.com/butter.jpg" />
+              <meta property="og:video" content="https://youtu.be/butter123456" />
+            </head>
+            <body>
+              <h3>Recipe Notes:</h3>
+              <p>1. Garam Masala is easy to find.</p>
+            </body>
+          </html>
+        `,
+      } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://example.com/butter"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(createArg?.data.notes).toEqual([
+      "Garam Masala is easy to find.",
+      "Use pure chilli powder.",
+    ]);
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
   it("backfills missing metadata on existing recipes without overwriting existing media", async () => {
     vi.mocked(prisma.recipe.findMany).mockResolvedValue([
       { id: "recipe_existing", sourceUrl: "https://example.com/reimport" } as never,

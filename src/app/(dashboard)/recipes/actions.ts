@@ -547,6 +547,62 @@ const cleanDescription = (value: string | undefined) => {
   return cleaned.length > 0 ? cleaned : undefined;
 };
 
+const RECIPE_NOTE_HEADING_PATTERN = /^(recipe\s+)?notes?:?\s*$/i;
+
+const splitInlineNumberedNotes = (value: string) => {
+  const normalized = normalizeText(value).replace(/\\([.)])/g, "$1");
+  if (!normalized) {
+    return [] as string[];
+  }
+
+  const markerPattern = /(^|\s)(\d+)[.)]\s+/g;
+  const markerIndices: number[] = [];
+  let markerMatch = markerPattern.exec(normalized);
+  while (markerMatch) {
+    markerIndices.push(markerMatch.index + markerMatch[1].length);
+    markerMatch = markerPattern.exec(normalized);
+  }
+
+  if (markerIndices.length < 2) {
+    return [normalized];
+  }
+
+  markerIndices.push(normalized.length);
+  return markerIndices
+    .slice(0, -1)
+    .map((start, index) =>
+      normalizeText(normalized.slice(start, markerIndices[index + 1]).replace(/^\d+[.)]\s*/, ""))
+    )
+    .filter(Boolean);
+};
+
+const normalizeImportedNotes = (notes: string[]) => {
+  const expanded = notes.flatMap((note) => splitInlineNumberedNotes(note));
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+
+  for (const note of expanded) {
+    const cleaned = normalizeText(note)
+      .replace(/\\([.)])/g, "$1")
+      .replace(/^[-*]\s*/, "")
+      .replace(/^\d+[.)]\s*/, "")
+      .trim();
+    if (!cleaned || RECIPE_NOTE_HEADING_PATTERN.test(cleaned) || /^note\s*\d+$/i.test(cleaned)) {
+      continue;
+    }
+
+    const dedupeKey = cleaned.toLowerCase();
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    deduped.push(cleaned);
+  }
+
+  return deduped;
+};
+
 const extractNotesFromDescription = (value: string | undefined) => {
   if (!value) {
     return { description: undefined, notes: [] as string[] };
@@ -1615,16 +1671,18 @@ export async function importRecipeFromUrl(formData: FormData) {
   const finalServings = selectedCandidate.servings ?? metadataFallback.servings ?? null;
   const finalPrepTime = selectedCandidate.prepTime ?? metadataFallback.prepTime ?? null;
   const finalCookTime = selectedCandidate.cookTime ?? metadataFallback.cookTime ?? null;
-  const notes = Array.from(
-    new Set([
+  const notes = normalizeImportedNotes(
+    Array.from(
+      new Set([
       ...cleanedIngredients.notes,
       ...cleanedInstructions.notes,
       ...(markdownRecipe?.notes ?? []),
       ...selectedCandidate.notes,
       ...htmlNotes,
       ...descriptionNotes,
-    ])
-  ).filter((note) => !/^note\s*\d+$/i.test(note));
+      ])
+    )
+  );
 
   logRecipeIngestionDiagnostics({
     sourceUrl,
