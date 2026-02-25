@@ -7,6 +7,7 @@ import {
   buildSuppressedMarkerLine,
   normalizeShoppingLine,
 } from "@/lib/shopping-list";
+import { normalizeShoppingLocation } from "@/lib/shopping-location";
 import { fromDateKey } from "@/lib/date";
 
 const toOptionalString = (value: string | null | undefined) => {
@@ -23,10 +24,12 @@ export async function toggleShoppingItem(input: {
   category: string;
   manual: boolean;
   checked: boolean;
+  location?: string;
 }) {
   const weekKey = toOptionalString(input.weekKey);
   const line = toOptionalString(input.line);
   const category = toOptionalString(input.category) ?? "Other";
+  const location = normalizeShoppingLocation(toOptionalString(input.location));
 
   if (!weekKey || !line) {
     return;
@@ -49,6 +52,7 @@ export async function toggleShoppingItem(input: {
     update: {
       line,
       checked: input.checked,
+      location,
     },
     create: {
       householdId,
@@ -56,6 +60,7 @@ export async function toggleShoppingItem(input: {
       line,
       lineNormalized,
       category,
+      location,
       manual: input.manual,
       checked: input.checked,
     },
@@ -68,10 +73,12 @@ export async function addManualShoppingItem(input: {
   weekKey: string;
   line: string;
   category: string;
+  location?: string;
 }) {
   const weekKey = toOptionalString(input.weekKey);
   const rawLine = toOptionalString(input.line);
   const category = toOptionalString(input.category) ?? "Other";
+  const location = normalizeShoppingLocation(toOptionalString(input.location));
 
   if (!weekKey || !rawLine) {
     return;
@@ -99,6 +106,7 @@ export async function addManualShoppingItem(input: {
     update: {
       line,
       checked: false,
+      location,
     },
     create: {
       householdId,
@@ -106,6 +114,7 @@ export async function addManualShoppingItem(input: {
       line,
       lineNormalized,
       category,
+      location,
       manual: true,
       checked: false,
     },
@@ -134,10 +143,12 @@ export async function suppressShoppingItem(input: {
   line: string;
   category: string;
   manual: boolean;
+  location?: string;
 }) {
   const weekKey = toOptionalString(input.weekKey);
   const line = toOptionalString(input.line);
   const category = toOptionalString(input.category) ?? "Other";
+  const location = normalizeShoppingLocation(toOptionalString(input.location));
 
   if (!weekKey || !line) {
     return;
@@ -178,6 +189,7 @@ export async function suppressShoppingItem(input: {
     update: {
       line: markerLine,
       checked: true,
+      location,
     },
     create: {
       householdId,
@@ -185,8 +197,58 @@ export async function suppressShoppingItem(input: {
       line: markerLine,
       lineNormalized: markerNormalized,
       category,
+      location,
       manual: true,
       checked: true,
+    },
+  });
+
+  revalidatePath("/shopping");
+}
+
+export async function updateShoppingItemLocation(input: {
+  weekKey: string;
+  line: string;
+  category: string;
+  manual: boolean;
+  location: string;
+}) {
+  const weekKey = toOptionalString(input.weekKey);
+  const line = toOptionalString(input.line);
+  const category = toOptionalString(input.category) ?? "Other";
+  const location = normalizeShoppingLocation(toOptionalString(input.location));
+
+  if (!weekKey || !line) {
+    return;
+  }
+
+  const householdId = await getCurrentHouseholdId();
+  const lineNormalized = normalizeShoppingLine(line);
+  const date = fromDateKey(weekKey);
+
+  await prisma.shoppingListItem.upsert({
+    where: {
+      householdId_weekStart_lineNormalized_category_manual: {
+        householdId,
+        weekStart: date,
+        lineNormalized,
+        category,
+        manual: input.manual,
+      },
+    },
+    update: {
+      line,
+      location,
+    },
+    create: {
+      householdId,
+      weekStart: date,
+      line,
+      lineNormalized,
+      category,
+      location,
+      manual: input.manual,
+      checked: false,
     },
   });
 

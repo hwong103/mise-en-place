@@ -97,6 +97,7 @@ model ShoppingListItem {
   line           String
   lineNormalized String
   category       String
+  location       String   @default("Woolies")
   manual         Boolean  @default(false)
   checked        Boolean  @default(false)
   createdAt      DateTime @default(now())
