@@ -209,7 +209,7 @@ export default function RecipeFocusMode({
       </div>
 
       {mode ? (
-        <div className="fixed inset-0 z-50 p-3 md:p-6">
+        <div data-testid="recipe-focus-overlay" className="fixed inset-0 z-50 overflow-y-auto p-3 md:p-6">
           <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
               <div>
@@ -252,8 +252,11 @@ export default function RecipeFocusMode({
             </div>
 
             {mode === "mise" ? (
-              <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.4fr_1fr]">
-                <section ref={misePrepRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+              <div
+                data-testid="recipe-focus-scroll-region"
+                className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1 md:grid-cols-[1.4fr_1fr] md:overflow-hidden md:pr-0"
+              >
+                <section ref={misePrepRef} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:min-h-0 md:overflow-auto dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Prep Groups
                   </h3>
@@ -275,7 +278,7 @@ export default function RecipeFocusMode({
                   )}
                 </section>
 
-                <section ref={miseIngredientsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <section ref={miseIngredientsRef} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:min-h-0 md:overflow-auto dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Ingredients
                   </h3>
@@ -289,8 +292,11 @@ export default function RecipeFocusMode({
                 </section>
               </div>
             ) : (
-              <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.6fr_1fr]">
-                <section ref={cookStepsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+              <div
+                data-testid="recipe-focus-scroll-region"
+                className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1 md:grid-cols-[1.6fr_1fr] md:overflow-hidden md:pr-0"
+              >
+                <section ref={cookStepsRef} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:min-h-0 md:overflow-auto dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Steps
                   </h3>
@@ -306,7 +312,7 @@ export default function RecipeFocusMode({
                   </ol>
                 </section>
 
-                <section ref={cookQuickRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <section ref={cookQuickRef} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:min-h-0 md:overflow-auto dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Quick Reference
                   </h3>

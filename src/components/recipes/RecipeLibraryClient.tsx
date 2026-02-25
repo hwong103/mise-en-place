@@ -94,8 +94,8 @@ export default function RecipeLibraryClient({
       ) : null}
 
       {isAddOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl md:p-6 dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:items-center">
+          <div className="my-6 w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:my-0 md:p-6 dark:bg-slate-900">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Add a Recipe</h2>

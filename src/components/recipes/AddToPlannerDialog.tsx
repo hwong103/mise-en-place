@@ -35,8 +35,8 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:items-center">
+      <div className="my-6 w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl sm:my-0 dark:bg-slate-900">
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add to Planner</h3>
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
           Schedule <span className="font-semibold text-emerald-600 dark:text-emerald-400">{recipeTitle}</span> for a day.
