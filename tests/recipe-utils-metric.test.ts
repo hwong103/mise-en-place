@@ -10,10 +10,11 @@ describe("convertIngredientMeasurementToMetric", () => {
     expect(convertIngredientMeasurementToMetric("1 lb ground beef")).toBe("454 g ground beef");
   });
 
-  it("converts cups and spoons to milliliters", () => {
-    expect(convertIngredientMeasurementToMetric("2 cups stock")).toBe("480 ml stock");
-    expect(convertIngredientMeasurementToMetric("1 tbsp olive oil")).toBe("15 ml olive oil");
-    expect(convertIngredientMeasurementToMetric("1 tsp salt")).toBe("5 ml salt");
+  it("does not convert non-weight units", () => {
+    expect(convertIngredientMeasurementToMetric("2/3 cups stock")).toBe("2/3 cups stock");
+    expect(convertIngredientMeasurementToMetric("2 cups stock")).toBe("2 cups stock");
+    expect(convertIngredientMeasurementToMetric("1 tbsp olive oil")).toBe("1 tbsp olive oil");
+    expect(convertIngredientMeasurementToMetric("1 tsp salt")).toBe("1 tsp salt");
   });
 
   it("converts measurements when they appear mid-sentence", () => {

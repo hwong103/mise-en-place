@@ -168,7 +168,7 @@ const MEASUREMENT_FRACTION_MAP: Record<string, number> = {
 };
 
 const MEASUREMENT_PATTERN =
-  /([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞])(?:\s*(?:-|–|—|to)\s*([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞]))?\s*[- ]?\s*(fl\.?\s*oz\.?|pounds?|lbs?\.?|lb\.?|ounces?|oz\.?|cups?|tablespoons?|tbsp\.?|teaspoons?|tsp\.?)\b\.?/gi;
+  /([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞])(?:\s*(?:-|–|—|to)\s*([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞]))?\s*[- ]?\s*(pounds?|lbs?\.?|lb\.?|ounces?|oz\.?)\b\.?/gi;
 
 const parseMeasurementAmount = (raw: string): number | null => {
   const trimmed = raw.trim();
@@ -261,22 +261,6 @@ const convertToMetricAmount = (amount: number, normalizedUnit: string) => {
     return { amount: Math.round(amount * 28.349523125), unit: "g" };
   }
 
-  if (normalizedUnit === "cup") {
-    return { amount: Math.round(amount * 240), unit: "ml" };
-  }
-
-  if (normalizedUnit === "tbsp" || normalizedUnit === "tablespoon") {
-    return { amount: Math.round(amount * 15), unit: "ml" };
-  }
-
-  if (normalizedUnit === "tsp" || normalizedUnit === "teaspoon") {
-    return { amount: Math.round(amount * 5), unit: "ml" };
-  }
-
-  if (normalizedUnit === "floz") {
-    return { amount: Math.round(amount * 29.5735295625), unit: "ml" };
-  }
-
   return null;
 };
 
@@ -292,26 +276,6 @@ const getMeasurementUnitBase = (normalizedUnit: string) => {
   }
   if (normalizedUnit === "oz" || normalizedUnit === "ounce" || normalizedUnit === "ounces") {
     return "oz";
-  }
-  if (normalizedUnit === "cup" || normalizedUnit === "cups") {
-    return "cup";
-  }
-  if (
-    normalizedUnit === "tbsp" ||
-    normalizedUnit === "tablespoon" ||
-    normalizedUnit === "tablespoons"
-  ) {
-    return "tbsp";
-  }
-  if (
-    normalizedUnit === "tsp" ||
-    normalizedUnit === "teaspoon" ||
-    normalizedUnit === "teaspoons"
-  ) {
-    return "tsp";
-  }
-  if (normalizedUnit === "floz") {
-    return "floz";
   }
   return null;
 };
