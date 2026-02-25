@@ -1,9 +1,13 @@
 import ShoppingList from "@/components/shopping/ShoppingList";
 import prisma from "@/lib/prisma";
-import { getCurrentHouseholdId } from "@/lib/household";
+import { getCurrentAccessContext } from "@/lib/household";
 import { getUpcomingRange, toDateKey } from "@/lib/date";
 import { buildShoppingList } from "@/lib/shopping";
 import { coerceStringArray } from "@/lib/recipe-utils";
+import {
+  buildHouseholdJoinUrl,
+  getCurrentHouseholdShareLink,
+} from "@/lib/household-access";
 import {
   listShoppingItems,
   listShoppingLocationPreferences,
@@ -11,14 +15,12 @@ import {
 
 export const revalidate = 30;
 
-const formatDate = (date: Date) =>
-  date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
 export default async function ShoppingPage() {
   const { start, end } = getUpcomingRange();
-  const householdId = await getCurrentHouseholdId();
+  const accessContext = await getCurrentAccessContext();
+  const householdId = accessContext.householdId;
 
-  const [mealPlans, persistedItems, locationPreferences] = await Promise.all([
+  const [mealPlans, persistedItems, locationPreferences, shareInviteUrl] = await Promise.all([
     prisma.mealPlan.findMany({
       where: {
         householdId,
@@ -31,6 +33,11 @@ export default async function ShoppingPage() {
     }),
     listShoppingItems(start, householdId),
     listShoppingLocationPreferences(householdId),
+    accessContext.canManageLink
+      ? getCurrentHouseholdShareLink(householdId).then((shareLink) =>
+          buildHouseholdJoinUrl(shareLink.token, "/shopping")
+        )
+      : Promise.resolve(null),
   ]);
 
   const ingredientEntries = mealPlans.flatMap((plan) => {
@@ -43,10 +50,10 @@ export default async function ShoppingPage() {
   return (
     <ShoppingList
       weekKey={toDateKey(start)}
-      weekLabel={`${formatDate(start)} - ${formatDate(end)}`}
       categories={categories}
       persistedItems={persistedItems}
       locationPreferences={locationPreferences}
+      shareInviteUrl={shareInviteUrl}
     />
   );
 }

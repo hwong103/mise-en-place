@@ -44,4 +44,48 @@ describe("GET /join/[token]", () => {
       role: "member",
     });
   });
+
+  it("redirects to requested in-app path when next query is provided", async () => {
+    vi.mocked(resolveHouseholdFromShareToken).mockResolvedValue({
+      householdId: "household_1",
+      shareTokenVersion: 2,
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/join/abc?next=%2Fshopping"),
+      {
+        params: Promise.resolve({ token: "abc" }),
+      }
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toContain("/shopping");
+    expect(setGuestSessionCookie).toHaveBeenCalledWith(expect.anything(), {
+      householdId: "household_1",
+      shareTokenVersion: 2,
+      role: "member",
+    });
+  });
+
+  it("ignores unsafe next query values", async () => {
+    vi.mocked(resolveHouseholdFromShareToken).mockResolvedValue({
+      householdId: "household_1",
+      shareTokenVersion: 2,
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/join/abc?next=https://example.com"),
+      {
+        params: Promise.resolve({ token: "abc" }),
+      }
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toContain("/recipes");
+    expect(setGuestSessionCookie).toHaveBeenCalledWith(expect.anything(), {
+      householdId: "household_1",
+      shareTokenVersion: 2,
+      role: "member",
+    });
+  });
 });

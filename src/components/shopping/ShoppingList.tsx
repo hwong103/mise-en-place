@@ -57,10 +57,10 @@ const mergeLocationOptions = (...groups: Array<readonly string[] | string[]>) =>
 
 type ShoppingListProps = {
   weekKey: string;
-  weekLabel: string;
   categories: ShoppingCategory[];
   persistedItems: ShoppingListItem[];
   locationPreferences: Record<string, string>;
+  shareInviteUrl: string | null;
 };
 
 type MergedItem = {
@@ -77,10 +77,10 @@ type MergedItem = {
 
 export default function ShoppingList({
   weekKey,
-  weekLabel,
   categories,
   persistedItems,
   locationPreferences,
+  shareInviteUrl,
 }: ShoppingListProps) {
   const [manualLine, setManualLine] = useState("");
   const [manualCategory, setManualCategory] = useState("Other");
@@ -249,47 +249,6 @@ export default function ShoppingList({
     suppressedAutoKeySet,
     suppressedKeys,
   ]);
-
-  const shareText = useMemo(() => {
-    if (mergedLocations.length === 0) {
-      return "No items in the shopping list yet.";
-    }
-
-    const sections = mergedLocations
-      .map((locationGroup) => {
-        const categorySections = locationGroup.categories
-          .map((category) => {
-            const items = category.items
-              .filter((item) => {
-                const checked = optimisticChecked[item.key] ?? persistedLookup.get(item.key)?.checked ?? false;
-                return !checked;
-              })
-              .map((item) => {
-                const line = item.count > 1 ? `- ${item.line} (x${item.count})` : `- ${item.line}`;
-                const amountSummary = item.amountSummary;
-                if (!amountSummary) {
-                  return line;
-                }
-                return `${line} [${amountSummary}]`;
-              })
-              .join("\n");
-            if (!items) {
-              return null;
-            }
-            return `${category.name}\n${items}`;
-          })
-          .filter(Boolean);
-
-        if (categorySections.length === 0) {
-          return null;
-        }
-
-        return `${locationGroup.name}\n\n${categorySections.join("\n\n")}`;
-      })
-      .filter(Boolean);
-
-    return [`Shopping List (${weekLabel})`, "", ...sections].join("\n\n");
-  }, [mergedLocations, optimisticChecked, persistedLookup, weekLabel]);
 
   useEffect(() => {
     if (mergedLocations.length === 0) {
@@ -468,7 +427,11 @@ export default function ShoppingList({
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Shopping List</h1>
           <p className="text-slate-500 dark:text-slate-400">Confirm what you have and what you need.</p>
         </div>
-        <ShoppingActions shareText={shareText} onClearList={handleClearList} clearing={isClearing} />
+        <ShoppingActions
+          shareInviteUrl={shareInviteUrl}
+          onClearList={handleClearList}
+          clearing={isClearing}
+        />
       </div>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">

@@ -36,6 +36,18 @@ const SHARE_TOKEN_NAMESPACE = "household-share-token";
 const DEV_SIGNING_SECRET = "dev-household-share-secret";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+const normalizeJoinNextPath = (value?: string | null) => {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (!normalized.startsWith("/") || normalized.startsWith("//")) {
+    return null;
+  }
+
+  return normalized;
+};
 
 const readGuestSessionDays = () => {
   const parsed = Number.parseInt(process.env.HOUSEHOLD_GUEST_SESSION_DAYS ?? "", 10);
@@ -392,10 +404,18 @@ export const claimHousehold = async (householdId: string, userId: string) => {
   });
 };
 
-export const buildHouseholdJoinPath = (token: string) => `/join/${token}`;
+export const buildHouseholdJoinPath = (token: string, nextPath?: string | null) => {
+  const path = `/join/${token}`;
+  const normalizedNextPath = normalizeJoinNextPath(nextPath);
+  if (!normalizedNextPath) {
+    return path;
+  }
 
-export const buildHouseholdJoinUrl = (token: string) => {
-  const path = buildHouseholdJoinPath(token);
+  return `${path}?next=${encodeURIComponent(normalizedNextPath)}`;
+};
+
+export const buildHouseholdJoinUrl = (token: string, nextPath?: string | null) => {
+  const path = buildHouseholdJoinPath(token, nextPath);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (!siteUrl) {
     return path;

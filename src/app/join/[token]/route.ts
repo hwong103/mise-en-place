@@ -6,6 +6,21 @@ import {
   setGuestSessionCookie,
 } from "@/lib/household-access";
 
+const DEFAULT_JOIN_REDIRECT = "/recipes";
+
+const resolveJoinRedirectPath = (value: string | null) => {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return DEFAULT_JOIN_REDIRECT;
+  }
+
+  if (!normalized.startsWith("/") || normalized.startsWith("//")) {
+    return DEFAULT_JOIN_REDIRECT;
+  }
+
+  return normalized;
+};
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -22,7 +37,8 @@ export async function GET(
     return invalidResponse;
   }
 
-  const response = NextResponse.redirect(new URL("/recipes", request.url), 302);
+  const redirectPath = resolveJoinRedirectPath(request.nextUrl.searchParams.get("next"));
+  const response = NextResponse.redirect(new URL(redirectPath, request.url), 302);
   setGuestSessionCookie(response.cookies, {
     householdId: result.householdId,
     shareTokenVersion: result.shareTokenVersion,
