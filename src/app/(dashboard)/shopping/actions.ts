@@ -255,7 +255,14 @@ export async function updateShoppingItemLocation(input: {
   revalidatePath("/shopping");
 }
 
-export async function clearShoppingListWeek(input: { weekKey: string }) {
+export async function clearShoppingListWeek(input: {
+  weekKey: string;
+  autoItems?: Array<{
+    line?: string | null;
+    category?: string | null;
+    location?: string | null;
+  }>;
+}) {
   const weekKey = toOptionalString(input.weekKey);
   if (!weekKey) {
     return;
@@ -264,11 +271,74 @@ export async function clearShoppingListWeek(input: { weekKey: string }) {
   const householdId = await getCurrentHouseholdId();
   const date = fromDateKey(weekKey);
 
-  await prisma.shoppingListItem.deleteMany({
-    where: {
+  const rawAutoItems = Array.isArray(input.autoItems) ? input.autoItems : [];
+  const suppressedRows: Array<{
+    householdId: string;
+    weekStart: Date;
+    line: string;
+    lineNormalized: string;
+    category: string;
+    location: string;
+    manual: boolean;
+    checked: boolean;
+  }> = [];
+  const seenSuppressedKeys = new Set<string>();
+
+  rawAutoItems.forEach((item) => {
+    if (!item || typeof item !== "object") {
+      return;
+    }
+
+    const candidate = item as {
+      line?: string | null;
+      category?: string | null;
+      location?: string | null;
+    };
+    const line = toOptionalString(candidate.line);
+    const category = toOptionalString(candidate.category) ?? "Other";
+    if (!line) {
+      return;
+    }
+
+    const markerLine = buildSuppressedMarkerLine(line);
+    const markerNormalized = normalizeShoppingLine(markerLine);
+    const dedupeKey = `${markerNormalized}::${category.toLowerCase()}`;
+    if (seenSuppressedKeys.has(dedupeKey)) {
+      return;
+    }
+
+    seenSuppressedKeys.add(dedupeKey);
+    suppressedRows.push({
       householdId,
       weekStart: date,
-    },
+      line: markerLine,
+      lineNormalized: markerNormalized,
+      category,
+      location: normalizeShoppingLocation(toOptionalString(candidate.location)),
+      manual: true,
+      checked: true,
+    });
+  });
+
+  await prisma.$transaction(async (tx: {
+    shoppingListItem: {
+      deleteMany: (args: { where: { householdId: string; weekStart: Date } }) => Promise<unknown>;
+      createMany: (args: { data: typeof suppressedRows; skipDuplicates: boolean }) => Promise<unknown>;
+    };
+  }) => {
+    await tx.shoppingListItem.deleteMany({
+      where: {
+        householdId,
+        weekStart: date,
+      },
+    });
+
+    if (suppressedRows.length > 0) {
+      await tx.shoppingListItem.createMany({
+        data: suppressedRows,
+        skipDuplicates: true,
+      });
+    }
   });
 
   revalidatePath("/shopping");
