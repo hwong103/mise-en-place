@@ -26,6 +26,7 @@ export default async function RecipesPage({
     prepTime: recipe.prepTime,
     cookTime: recipe.cookTime,
     ingredientCount: recipe.ingredientCount,
+    sourceUrl: recipe.sourceUrl ?? null,
   }));
 
   return (

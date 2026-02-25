@@ -26,6 +26,7 @@ export async function listRecipes(householdId?: string) {
             prepTime: true,
             cookTime: true,
             ingredientCount: true,
+            sourceUrl: true,
           },
         });
 
