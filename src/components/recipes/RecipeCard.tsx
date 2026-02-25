@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
 
 const formatMinutes = (value?: number | null) => {
   if (!value) {
@@ -29,7 +28,6 @@ type RecipeCardProps = {
 
 export default function RecipeCard({ recipe }: RecipeCardProps) {
   const ingredientCount = recipe.ingredientCount;
-  const defaultPlanDate = new Date().toISOString().split("T")[0];
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-emerald-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-400">
@@ -80,11 +78,6 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         ) : null}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <AddToPlannerDialog
-            recipeId={recipe.id}
-            recipeTitle={recipe.title}
-            defaultDate={defaultPlanDate}
-          />
           <Link
             href={`/recipes/${recipe.id}`}
             prefetch={false}
