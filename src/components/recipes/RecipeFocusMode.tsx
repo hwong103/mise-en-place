@@ -343,53 +343,53 @@ export default function RecipeFocusMode({
               </div>
             ) : (
               <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(0,1fr)_300px]">
-                <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#d8e6de] bg-white">
-                  <div className="h-[3px] w-full bg-[#e6f4ed]">
+                <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#d8e6de] bg-white dark:border-slate-700 dark:bg-slate-950">
+                  <div className="h-[3px] w-full bg-[#e6f4ed] dark:bg-emerald-400/20">
                     <div
-                      className="h-full bg-[#1a6b4a] transition-[width] duration-300 ease-in-out"
+                      className="h-full bg-[#1a6b4a] transition-[width] duration-300 ease-in-out dark:bg-emerald-400"
                       style={{ width: `${progressPercent}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between border-b border-[#d8e6de] px-7 py-[12px] pb-[10px]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b8c7d]">
+                  <div className="flex items-center justify-between border-b border-[#d8e6de] px-7 py-[12px] pb-[10px] dark:border-slate-700">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b8c7d] dark:text-slate-400">
                       Steps
                     </p>
-                    <p className="text-sm text-[#0e1f1a] [font-family:var(--font-lora)]">
+                    <p className="text-sm text-[#0e1f1a] [font-family:var(--font-lora)] dark:text-slate-200">
                       Step{" "}
-                      <span className="font-semibold text-[#0e1f1a]">
+                      <span className="font-semibold text-[#0e1f1a] dark:text-slate-100">
                         {stepCount > 0 ? activeStepIndex + 1 : 0}
                       </span>{" "}
-                      of <span className="text-[#6b8c7d]">{stepCount}</span>
+                      of <span className="text-[#6b8c7d] dark:text-slate-400">{stepCount}</span>
                     </p>
                   </div>
 
                   <div className="relative flex min-h-0 flex-1 overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                     <button
                       type="button"
-                      className="group absolute inset-x-0 top-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] disabled:pointer-events-none disabled:cursor-default"
+                      className="group absolute inset-x-0 top-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10 disabled:pointer-events-none disabled:cursor-default"
                       onClick={() => navigateStep(-1)}
                       disabled={!canGoPrev}
                       aria-label="Previous step"
                     >
                       <span className="pointer-events-none absolute right-5 top-5 hidden items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
-                        <span className="text-xs font-medium text-[#6b8c7d]">Previous</span>
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d]">
+                        <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Previous</span>
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
                           <ChevronUp className="h-4 w-4" />
                         </span>
                       </span>
                     </button>
                     <button
                       type="button"
-                      className="group absolute inset-x-0 bottom-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] disabled:pointer-events-none disabled:cursor-default"
+                      className="group absolute inset-x-0 bottom-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10 disabled:pointer-events-none disabled:cursor-default"
                       onClick={() => navigateStep(1)}
                       disabled={!canGoNext}
                       aria-label="Next step"
                     >
                       <span className="pointer-events-none absolute bottom-5 right-5 hidden items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d]">
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
                           <ChevronDown className="h-4 w-4" />
                         </span>
-                        <span className="text-xs font-medium text-[#6b8c7d]">Next</span>
+                        <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Next</span>
                       </span>
                     </button>
 
@@ -397,10 +397,10 @@ export default function RecipeFocusMode({
                       <div
                         className={`mx-auto max-w-3xl text-center transition-all duration-[250ms] ease-out ${stepMotionClass}`}
                       >
-                        <div className="mx-auto mb-5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1a6b4a] text-[15px] font-semibold text-white">
+                        <div className="mx-auto mb-5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#1a6b4a] text-[15px] font-semibold text-white dark:bg-emerald-500 dark:text-slate-950">
                           {stepCount > 0 ? renderedStepIndex + 1 : 0}
                         </div>
-                        <p className="text-[21px] leading-[1.65] text-[#0e1f1a] [font-family:var(--font-lora)]">
+                        <p className="text-[21px] leading-[1.65] text-[#0e1f1a] [font-family:var(--font-lora)] dark:text-slate-100">
                           {stepText}
                         </p>
                       </div>
