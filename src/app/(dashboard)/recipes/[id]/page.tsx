@@ -354,36 +354,9 @@ export default async function RecipeDetailPage({
             </section>
           </div>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Notes</h2>
-            {notes.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No notes saved yet.</p>
-            ) : (
-              <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                {notes.map((note) => (
-                  <li key={note} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                    {note}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {isEditing ? (
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-              <input type="hidden" name="recipeId" value={recipe.id} />
-              <input type="hidden" name="section" value="notes" />
-              <textarea
-                name="notes"
-                rows={4}
-                defaultValue={notes.join("\n")}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                Save Notes
-              </button>
-              </form>
-            ) : null}
-          </section>
+        </section>
 
+        <aside className="space-y-6">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-wrap items-center gap-3">
               {recipe.servings ? (
@@ -517,9 +490,37 @@ export default async function RecipeDetailPage({
               </form>
             ) : null}
           </div>
-        </section>
 
-        <aside className="space-y-6">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Notes</h2>
+            {notes.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No notes saved yet.</p>
+            ) : (
+              <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                {notes.map((note) => (
+                  <li key={note} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                    {note}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {isEditing ? (
+              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
+              <input type="hidden" name="recipeId" value={recipe.id} />
+              <input type="hidden" name="section" value="notes" />
+              <textarea
+                name="notes"
+                rows={4}
+                defaultValue={notes.join("\n")}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              />
+              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
+                Save Notes
+              </button>
+              </form>
+            ) : null}
+          </section>
+
           {recipe.videoUrl ? (
             <section className="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:block dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-wrap items-center justify-between gap-3">
