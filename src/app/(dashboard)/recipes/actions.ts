@@ -1812,7 +1812,11 @@ export async function importRecipeFromUrl(formData: FormData) {
     lines: cleanedIngredientsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
     notes: cleanedIngredientsSource.notes,
   };
-  const cleanedInstructions = cleanInstructionLines(selectedCandidate.instructions);
+  const cleanedInstructionsSource = cleanInstructionLines(selectedCandidate.instructions);
+  const cleanedInstructions = {
+    lines: cleanedInstructionsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
+    notes: cleanedInstructionsSource.notes,
+  };
   const htmlNotes = candidateHtml ? extractNotesFromHtml(candidateHtml) : [];
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
     cleanedIngredients.lines,

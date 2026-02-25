@@ -167,8 +167,8 @@ const MEASUREMENT_FRACTION_MAP: Record<string, number> = {
   "\u215E": 0.875,
 };
 
-const LEADING_MEASUREMENT_PATTERN =
-  /^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞])(?:\s*(?:-|–|—|to)\s*([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞]))?\s*[- ]?\s*(fl\.?\s*oz\.?|pounds?|lbs?\.?|lb\.?|ounces?|oz\.?|cups?|tablespoons?|tbsp\.?|teaspoons?|tsp\.?)\b\.?/i;
+const MEASUREMENT_PATTERN =
+  /([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞])(?:\s*(?:-|–|—|to)\s*([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞]))?\s*[- ]?\s*(fl\.?\s*oz\.?|pounds?|lbs?\.?|lb\.?|ounces?|oz\.?|cups?|tablespoons?|tbsp\.?|teaspoons?|tsp\.?)\b\.?/gi;
 
 const parseMeasurementAmount = (raw: string): number | null => {
   const trimmed = raw.trim();
@@ -218,6 +218,29 @@ const parseMeasurementAmount = (raw: string): number | null => {
 
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseMergedFractionAsMixed = (raw: string, maxValue: number) => {
+  const normalized = raw.trim();
+  const fractionMatch = normalized.match(/^(\d+)\/(\d+)$/);
+  if (!fractionMatch) {
+    return null;
+  }
+
+  const numeratorDigits = fractionMatch[1];
+  const denominator = Number(fractionMatch[2]);
+  if (numeratorDigits.length < 2 || !Number.isFinite(denominator) || denominator <= 0) {
+    return null;
+  }
+
+  const whole = Number(numeratorDigits.slice(0, -1));
+  const numerator = Number(numeratorDigits.slice(-1));
+  if (!Number.isFinite(whole) || !Number.isFinite(numerator) || numerator >= denominator) {
+    return null;
+  }
+
+  const candidate = whole + numerator / denominator;
+  return candidate <= maxValue ? candidate : null;
 };
 
 const formatAmount = (value: number, decimals: number) => {
@@ -294,41 +317,58 @@ const getMeasurementUnitBase = (normalizedUnit: string) => {
 };
 
 export const convertIngredientMeasurementToMetric = (line: string) => {
-  const match = line.match(LEADING_MEASUREMENT_PATTERN);
-  if (!match) {
-    return line;
-  }
+  return line.replace(
+    MEASUREMENT_PATTERN,
+    (match, rawFirst: string, rawSecond: string | undefined, rawUnit: string, offset: number, input: string) => {
+      const previousChar = offset > 0 ? input[offset - 1] : "";
+      if (previousChar && /[A-Za-z0-9/]/.test(previousChar)) {
+        return match;
+      }
 
-  const firstAmount = parseMeasurementAmount(match[1]);
-  if (firstAmount === null) {
-    return line;
-  }
+      let firstAmount = parseMeasurementAmount(rawFirst);
+      if (firstAmount === null) {
+        return match;
+      }
 
-  const secondAmount = match[2] ? parseMeasurementAmount(match[2]) : null;
-  const normalizedUnit = normalizeMeasurementUnit(match[3]);
-  const unitBase = getMeasurementUnitBase(normalizedUnit);
-  if (!unitBase) {
-    return line;
-  }
+      let secondAmount = rawSecond ? parseMeasurementAmount(rawSecond) : null;
+      if (secondAmount !== null && firstAmount > secondAmount) {
+        const fallbackMixed = parseMergedFractionAsMixed(rawFirst, secondAmount);
+        if (fallbackMixed !== null) {
+          firstAmount = fallbackMixed;
+        }
+      }
 
-  const firstConverted = convertToMetricAmount(firstAmount, unitBase);
-  if (!firstConverted) {
-    return line;
-  }
+      const normalizedUnit = normalizeMeasurementUnit(rawUnit);
+      const unitBase = getMeasurementUnitBase(normalizedUnit);
+      if (!unitBase) {
+        return match;
+      }
 
-  const formattedFirst = formatAmount(firstConverted.amount, firstConverted.unit === "kg" ? 1 : 0);
-  let metricText = `${formattedFirst} ${firstConverted.unit}`;
-  if (secondAmount !== null) {
-    const secondConverted = convertToMetricAmount(secondAmount, unitBase);
-    if (!secondConverted || secondConverted.unit !== firstConverted.unit) {
-      return line;
+      const firstConverted = convertToMetricAmount(firstAmount, unitBase);
+      if (!firstConverted) {
+        return match;
+      }
+
+      const formattedFirst = formatAmount(
+        firstConverted.amount,
+        firstConverted.unit === "kg" ? 1 : 0
+      );
+      if (secondAmount === null) {
+        return `${formattedFirst} ${firstConverted.unit}`;
+      }
+
+      const secondConverted = convertToMetricAmount(secondAmount, unitBase);
+      if (!secondConverted || secondConverted.unit !== firstConverted.unit) {
+        return match;
+      }
+
+      const formattedSecond = formatAmount(
+        secondConverted.amount,
+        secondConverted.unit === "kg" ? 1 : 0
+      );
+      return `${formattedFirst}-${formattedSecond} ${firstConverted.unit}`;
     }
-    const formattedSecond = formatAmount(secondConverted.amount, secondConverted.unit === "kg" ? 1 : 0);
-    metricText = `${formattedFirst}-${formattedSecond} ${firstConverted.unit}`;
-  }
-
-  const remainder = line.slice(match[0].length).trimStart();
-  return remainder ? `${metricText} ${remainder}` : metricText;
+  );
 };
 
 const stripNoteText = (value: string) => value.replace(/^note[:\s-]*/i, "Note ").trim();
