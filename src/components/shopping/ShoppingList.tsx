@@ -555,11 +555,11 @@ export default function ShoppingList({
                 {activeLocationGroup.name}
               </h2>
 
-              <div className="columns-1 gap-6 sm:columns-2">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {activeLocationGroup.categories.map((category) => (
                   <div
                     key={`${activeLocationGroup.name}-${category.name}`}
-                    className="mb-6 break-inside-avoid space-y-4"
+                    className="space-y-4"
                   >
                     <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       {category.name}
