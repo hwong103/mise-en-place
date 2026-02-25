@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@prisma/client";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
@@ -82,6 +83,7 @@ export default function ShoppingList({
   locationPreferences,
   shareInviteUrl,
 }: ShoppingListProps) {
+  const router = useRouter();
   const [manualLine, setManualLine] = useState("");
   const [manualCategory, setManualCategory] = useState("Other");
   const [manualLocation, setManualLocation] = useState(DEFAULT_SHOPPING_LOCATION);
@@ -410,10 +412,18 @@ export default function ShoppingList({
       return;
     }
 
+    const autoItems = categories.flatMap((category) =>
+      category.items.map((item) => ({
+        line: item.line,
+        category: category.name,
+      }))
+    );
+
     setIsClearing(true);
     startTransition(async () => {
       try {
-        await clearShoppingListWeek({ weekKey });
+        await clearShoppingListWeek({ weekKey, autoItems });
+        router.refresh();
       } finally {
         setIsClearing(false);
       }
