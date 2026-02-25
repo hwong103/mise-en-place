@@ -7,9 +7,17 @@ type AddToPlannerDialogProps = {
   recipeId: string;
   recipeTitle: string;
   defaultDate?: string;
+  triggerLabel?: string;
+  triggerClassName?: string;
 };
 
-export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate }: AddToPlannerDialogProps) {
+export default function AddToPlannerDialog({
+  recipeId,
+  recipeTitle,
+  defaultDate,
+  triggerLabel = "Add to Planner",
+  triggerClassName,
+}: AddToPlannerDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
@@ -27,9 +35,12 @@ export default function AddToPlannerDialog({ recipeId, recipeTitle, defaultDate 
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+        className={
+          triggerClassName ??
+          "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+        }
       >
-        Add to Planner
+        {triggerLabel}
       </button>
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { type TouchEvent, useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Play } from "lucide-react";
 
 type PrepGroup = {
   title: string;
@@ -13,6 +13,10 @@ type RecipeFocusModeProps = {
   prepGroups: PrepGroup[];
   ingredients: string[];
   instructions: string[];
+  triggerWrapperClassName?: string;
+  miseButtonClassName?: string;
+  cookButtonClassName?: string;
+  showCookPlayIcon?: boolean;
 };
 
 type FocusMode = "mise" | "cook";
@@ -35,6 +39,10 @@ export default function RecipeFocusMode({
   prepGroups,
   ingredients,
   instructions,
+  triggerWrapperClassName,
+  miseButtonClassName,
+  cookButtonClassName,
+  showCookPlayIcon = false,
 }: RecipeFocusModeProps) {
   const [mode, setMode] = useState<FocusMode | null>(null);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -244,20 +252,29 @@ export default function RecipeFocusMode({
 
   return (
     <>
-      <div className="flex flex-wrap gap-3">
+      <div className={triggerWrapperClassName ?? "flex flex-wrap gap-3"}>
         <button
           type="button"
           onClick={() => setMode("mise")}
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
+          className={
+            miseButtonClassName ??
+            "rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
+          }
         >
           Mise
         </button>
         <button
           type="button"
           onClick={() => setMode("cook")}
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
+          className={
+            cookButtonClassName ??
+            "rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
+          }
         >
-          Cook
+          <span className="inline-flex items-center gap-1.5">
+            {showCookPlayIcon ? <Play className="h-[11px] w-[11px] fill-current" /> : null}
+            <span>Cook</span>
+          </span>
         </button>
       </div>
 
