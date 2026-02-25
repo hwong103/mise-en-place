@@ -299,29 +299,30 @@ export default function RecipeFocusMode({
                 <button
                   type="button"
                   onClick={() => setMode("mise")}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  className={`rounded-[20px] border-[1.5px] px-[18px] py-[7px] text-[13px] font-semibold transition-colors ${
                     mode === "mise"
-                      ? "bg-amber-500 text-slate-950"
-                      : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300"
+                      ? "border-white/75 bg-white/10 text-white"
+                      : "border-white/45 bg-transparent text-white hover:border-white/75 hover:bg-white/10"
                   }`}
+                  aria-pressed={mode === "mise"}
                 >
                   Mise
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("cook")}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    mode === "cook"
-                      ? "bg-amber-500 text-slate-950"
-                      : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300"
-                  }`}
+                  className="rounded-[20px] border-0 bg-[#C67B2A] px-[18px] py-[7px] text-[13px] font-semibold text-white shadow-[0_1px_6px_rgba(198,123,42,0.40)] transition-colors hover:bg-[#B56E24]"
+                  aria-pressed={mode === "cook"}
                 >
-                  Cook
+                  <span className="inline-flex items-center gap-1.5">
+                    <Play className="h-[10px] w-[10px] fill-current" />
+                    <span>Cook</span>
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode(null)}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  className="rounded-[20px] border border-white/15 bg-transparent px-4 py-[7px] text-[13px] font-medium text-white/45 transition-colors hover:border-white/30 hover:text-white/80"
                 >
                   Close
                 </button>
