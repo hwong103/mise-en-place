@@ -155,6 +155,182 @@ const decodeHtmlEntities = (value: string) => {
 const normalizeWhitespace = (value: string) =>
   value.replace(MULTI_SPACE_PATTERN, " ").trim();
 
+const MEASUREMENT_FRACTION_MAP: Record<string, number> = {
+  "\u00BC": 0.25,
+  "\u00BD": 0.5,
+  "\u00BE": 0.75,
+  "\u2153": 1 / 3,
+  "\u2154": 2 / 3,
+  "\u215B": 0.125,
+  "\u215C": 0.375,
+  "\u215D": 0.625,
+  "\u215E": 0.875,
+};
+
+const LEADING_MEASUREMENT_PATTERN =
+  /^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞])(?:\s*(?:-|–|—|to)\s*([0-9]+(?:\.[0-9]+)?|[0-9]+\s+[0-9]+\/[0-9]+|[0-9]+\/[0-9]+|[0-9]+[¼½¾⅓⅔⅛⅜⅝⅞]|[¼½¾⅓⅔⅛⅜⅝⅞]))?\s*[- ]?\s*(fl\.?\s*oz\.?|pounds?|lbs?\.?|lb\.?|ounces?|oz\.?|cups?|tablespoons?|tbsp\.?|teaspoons?|tsp\.?)\b\.?/i;
+
+const parseMeasurementAmount = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (MEASUREMENT_FRACTION_MAP[trimmed] !== undefined) {
+    return MEASUREMENT_FRACTION_MAP[trimmed];
+  }
+
+  const mixedFractionMatch = trimmed.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixedFractionMatch) {
+    const whole = Number(mixedFractionMatch[1]);
+    const numerator = Number(mixedFractionMatch[2]);
+    const denominator = Number(mixedFractionMatch[3]);
+    if (denominator !== 0) {
+      return whole + numerator / denominator;
+    }
+  }
+
+  const compactMixedFractionMatch = trimmed.match(/^(\d+)([¼½¾⅓⅔⅛⅜⅝⅞])$/);
+  if (compactMixedFractionMatch) {
+    const whole = Number(compactMixedFractionMatch[1]);
+    const fraction = MEASUREMENT_FRACTION_MAP[compactMixedFractionMatch[2]];
+    return Number.isFinite(whole) && fraction !== undefined ? whole + fraction : null;
+  }
+
+  const compactAsciiMixedFractionMatch = trimmed.match(/^(\d+)(\d)\/(\d+)$/);
+  if (compactAsciiMixedFractionMatch) {
+    const whole = Number(compactAsciiMixedFractionMatch[1]);
+    const numerator = Number(compactAsciiMixedFractionMatch[2]);
+    const denominator = Number(compactAsciiMixedFractionMatch[3]);
+    if (denominator !== 0 && numerator < denominator) {
+      return whole + numerator / denominator;
+    }
+  }
+
+  const fractionMatch = trimmed.match(/^(\d+)\/(\d+)$/);
+  if (fractionMatch) {
+    const numerator = Number(fractionMatch[1]);
+    const denominator = Number(fractionMatch[2]);
+    if (denominator !== 0) {
+      return numerator / denominator;
+    }
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatAmount = (value: number, decimals: number) => {
+  const rounded = Number(value.toFixed(decimals));
+  return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
+};
+
+const convertToMetricAmount = (amount: number, normalizedUnit: string) => {
+  if (normalizedUnit === "lb" || normalizedUnit === "pound") {
+    const kilograms = amount * 0.45359237;
+    if (kilograms < 1) {
+      return { amount: Math.round(kilograms * 1000), unit: "g" };
+    }
+    return { amount: Number(kilograms.toFixed(1)), unit: "kg" };
+  }
+
+  if (normalizedUnit === "oz" || normalizedUnit === "ounce") {
+    return { amount: Math.round(amount * 28.349523125), unit: "g" };
+  }
+
+  if (normalizedUnit === "cup") {
+    return { amount: Math.round(amount * 240), unit: "ml" };
+  }
+
+  if (normalizedUnit === "tbsp" || normalizedUnit === "tablespoon") {
+    return { amount: Math.round(amount * 15), unit: "ml" };
+  }
+
+  if (normalizedUnit === "tsp" || normalizedUnit === "teaspoon") {
+    return { amount: Math.round(amount * 5), unit: "ml" };
+  }
+
+  if (normalizedUnit === "floz") {
+    return { amount: Math.round(amount * 29.5735295625), unit: "ml" };
+  }
+
+  return null;
+};
+
+const normalizeMeasurementUnit = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, "");
+
+const getMeasurementUnitBase = (normalizedUnit: string) => {
+  if (normalizedUnit === "lb" || normalizedUnit === "lbs" || normalizedUnit === "pound" || normalizedUnit === "pounds") {
+    return "lb";
+  }
+  if (normalizedUnit === "oz" || normalizedUnit === "ounce" || normalizedUnit === "ounces") {
+    return "oz";
+  }
+  if (normalizedUnit === "cup" || normalizedUnit === "cups") {
+    return "cup";
+  }
+  if (
+    normalizedUnit === "tbsp" ||
+    normalizedUnit === "tablespoon" ||
+    normalizedUnit === "tablespoons"
+  ) {
+    return "tbsp";
+  }
+  if (
+    normalizedUnit === "tsp" ||
+    normalizedUnit === "teaspoon" ||
+    normalizedUnit === "teaspoons"
+  ) {
+    return "tsp";
+  }
+  if (normalizedUnit === "floz") {
+    return "floz";
+  }
+  return null;
+};
+
+export const convertIngredientMeasurementToMetric = (line: string) => {
+  const match = line.match(LEADING_MEASUREMENT_PATTERN);
+  if (!match) {
+    return line;
+  }
+
+  const firstAmount = parseMeasurementAmount(match[1]);
+  if (firstAmount === null) {
+    return line;
+  }
+
+  const secondAmount = match[2] ? parseMeasurementAmount(match[2]) : null;
+  const normalizedUnit = normalizeMeasurementUnit(match[3]);
+  const unitBase = getMeasurementUnitBase(normalizedUnit);
+  if (!unitBase) {
+    return line;
+  }
+
+  const firstConverted = convertToMetricAmount(firstAmount, unitBase);
+  if (!firstConverted) {
+    return line;
+  }
+
+  const formattedFirst = formatAmount(firstConverted.amount, firstConverted.unit === "kg" ? 1 : 0);
+  let metricText = `${formattedFirst} ${firstConverted.unit}`;
+  if (secondAmount !== null) {
+    const secondConverted = convertToMetricAmount(secondAmount, unitBase);
+    if (!secondConverted || secondConverted.unit !== firstConverted.unit) {
+      return line;
+    }
+    const formattedSecond = formatAmount(secondConverted.amount, secondConverted.unit === "kg" ? 1 : 0);
+    metricText = `${formattedFirst}-${formattedSecond} ${firstConverted.unit}`;
+  }
+
+  const remainder = line.slice(match[0].length).trimStart();
+  return remainder ? `${metricText} ${remainder}` : metricText;
+};
+
 const stripNoteText = (value: string) => value.replace(/^note[:\s-]*/i, "Note ").trim();
 
 const extractNotesFromLine = (line: string) => {

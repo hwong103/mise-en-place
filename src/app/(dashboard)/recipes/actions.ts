@@ -15,6 +15,7 @@ import {
   cleanInstructionLines,
   cleanTextLines,
   coerceStringArray,
+  convertIngredientMeasurementToMetric,
   parseLines,
   parsePrepGroupsFromText,
   parseTags,
@@ -1804,18 +1805,26 @@ export async function importRecipeFromUrl(formData: FormData) {
       groupedIngredients.groups.length > 0 &&
       groupedIngredients.ingredients.length > 0
   );
-  const cleanedIngredients = hasGroupedIngredients
+  const cleanedIngredientsSource = hasGroupedIngredients
     ? { lines: groupedIngredients!.ingredients, notes: groupedIngredients!.notes }
     : cleanIngredientLines(selectedCandidate.ingredients);
+  const cleanedIngredients = {
+    lines: cleanedIngredientsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
+    notes: cleanedIngredientsSource.notes,
+  };
   const cleanedInstructions = cleanInstructionLines(selectedCandidate.instructions);
   const htmlNotes = candidateHtml ? extractNotesFromHtml(candidateHtml) : [];
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
     cleanedIngredients.lines,
     cleanedInstructions.lines
   );
+  const metricGroupedPrepGroups = groupedIngredients?.groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
+  }));
   const prepGroups =
     hasGroupedIngredients
-      ? groupedIngredients!.groups
+      ? metricGroupedPrepGroups!
       : instructionPrepGroups.length > 0
         ? instructionPrepGroups
         : buildPrepGroups(cleanedIngredients.lines);
