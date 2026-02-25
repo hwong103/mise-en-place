@@ -30,7 +30,8 @@ export default function AddToPlannerDialog({
     return {
       key: toDateKey(day),
       label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : day.toLocaleDateString("en-AU", { weekday: "short" }),
-      sublabel: day.toLocaleDateString("en-AU", { day: "numeric", month: "short" }),
+      day: day.toLocaleDateString("en-AU", { day: "numeric" }),
+      month: day.toLocaleDateString("en-AU", { month: "short" }),
     };
   });
 
@@ -57,7 +58,7 @@ export default function AddToPlannerDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add to Planner</h3>
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
           Schedule <span className="font-semibold text-emerald-600 dark:text-emerald-400">{recipeTitle}</span> for a day.
@@ -74,19 +75,26 @@ export default function AddToPlannerDialog({
                   key={day.key}
                   type="button"
                   onClick={() => setSelectedDate(day.key)}
-                  className={`flex flex-col items-center rounded-2xl border px-2 py-3 text-center transition-colors ${
+                  className={`flex flex-col items-center rounded-2xl border py-3 transition-colors sm:py-4 ${
                     isSelected
                       ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-300"
                       : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-emerald-500/50"
                   }`}
                 >
-                  <span className="text-xs font-semibold">{day.label}</span>
+                  <span className="whitespace-nowrap text-xs font-bold leading-tight">{day.label}</span>
                   <span
-                    className={`mt-0.5 text-[11px] ${
-                      isSelected ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
+                    className={`mt-1 text-base font-semibold leading-none ${
+                      isSelected ? "text-emerald-600 dark:text-emerald-400" : "text-slate-800 dark:text-slate-100"
                     }`}
                   >
-                    {day.sublabel}
+                    {day.day}
+                  </span>
+                  <span
+                    className={`mt-0.5 whitespace-nowrap text-[11px] leading-tight ${
+                      isSelected ? "text-emerald-500 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
+                    }`}
+                  >
+                    {day.month}
                   </span>
                 </button>
               );
