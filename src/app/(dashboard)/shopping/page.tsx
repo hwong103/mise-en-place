@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import ShoppingList from "@/components/shopping/ShoppingList";
 import prisma from "@/lib/prisma";
 import { getCurrentAccessContext } from "@/lib/household";
@@ -17,28 +18,44 @@ export const revalidate = 30;
 
 export default async function ShoppingPage() {
   const { start, end } = getUpcomingRange();
+  const weekKey = toDateKey(start);
   const accessContext = await getCurrentAccessContext();
   const householdId = accessContext.householdId;
 
-  const [mealPlans, persistedItems, locationPreferences, shareInviteUrl] = await Promise.all([
-    prisma.mealPlan.findMany({
-      where: {
-        householdId,
-        date: {
-          gte: start,
-          lte: end,
-        },
-      },
-      include: { recipe: true },
-    }),
-    listShoppingItems(start, householdId),
-    listShoppingLocationPreferences(householdId),
-    accessContext.canManageLink
-      ? getCurrentHouseholdShareLink(householdId).then((shareLink) =>
-          buildHouseholdJoinUrl(shareLink.token, "/shopping")
-        )
-      : Promise.resolve(null),
-  ]);
+  const { mealPlans, persistedItems, locationPreferences } = await unstable_cache(
+    async () => {
+      const [mealPlansResult, persistedItemsResult, locationPreferencesResult] = await Promise.all([
+        prisma.mealPlan.findMany({
+          where: {
+            householdId,
+            date: {
+              gte: start,
+              lte: end,
+            },
+          },
+          include: { recipe: true },
+        }),
+        listShoppingItems(start, householdId),
+        listShoppingLocationPreferences(householdId),
+      ]);
+      return {
+        mealPlans: mealPlansResult,
+        persistedItems: persistedItemsResult,
+        locationPreferences: locationPreferencesResult,
+      };
+    },
+    ["shopping-data", householdId, weekKey],
+    {
+      revalidate: 30,
+      tags: [`shopping-${householdId}`],
+    }
+  )();
+
+  const shareInviteUrl = accessContext.canManageLink
+    ? await getCurrentHouseholdShareLink(householdId).then((shareLink) =>
+        buildHouseholdJoinUrl(shareLink.token, "/shopping")
+      )
+    : null;
 
   const ingredientEntries = mealPlans.flatMap((plan) => {
     const recipeTitle = plan.recipe?.title ?? null;
@@ -49,7 +66,7 @@ export default async function ShoppingPage() {
   const categories = buildShoppingList(ingredientEntries);
   return (
     <ShoppingList
-      weekKey={toDateKey(start)}
+      weekKey={weekKey}
       categories={categories}
       persistedItems={persistedItems}
       locationPreferences={locationPreferences}

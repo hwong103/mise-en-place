@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import {
@@ -66,7 +66,7 @@ export async function toggleShoppingItem(input: {
     },
   });
 
-  revalidatePath("/shopping");
+  revalidateTag(`shopping-${householdId}`, "max");
 }
 
 export async function addManualShoppingItem(input: {
@@ -120,7 +120,7 @@ export async function addManualShoppingItem(input: {
     },
   });
 
-  revalidatePath("/shopping");
+  revalidateTag(`shopping-${householdId}`, "max");
 }
 
 export async function removeManualShoppingItem(input: { id: string }) {
@@ -135,7 +135,7 @@ export async function removeManualShoppingItem(input: { id: string }) {
     where: { id, householdId, manual: true },
   });
 
-  revalidatePath("/shopping");
+  revalidateTag(`shopping-${householdId}`, "max");
 }
 
 export async function suppressShoppingItem(input: {
@@ -169,7 +169,7 @@ export async function suppressShoppingItem(input: {
       },
     });
 
-    revalidatePath("/shopping");
+    revalidateTag(`shopping-${householdId}`, "max");
     return;
   }
 
@@ -203,7 +203,7 @@ export async function suppressShoppingItem(input: {
     },
   });
 
-  revalidatePath("/shopping");
+  revalidateTag(`shopping-${householdId}`, "max");
 }
 
 export async function updateShoppingItemLocation(input: {
@@ -252,7 +252,7 @@ export async function updateShoppingItemLocation(input: {
     },
   });
 
-  revalidatePath("/shopping");
+  revalidateTag(`shopping-${householdId}`, "max");
 }
 
 export async function clearShoppingListWeek(input: {
@@ -341,5 +341,5 @@ export async function clearShoppingListWeek(input: {
     }
   });
 
-  revalidatePath("/shopping");
+  revalidateTag(`shopping-${householdId}`, "max");
 }
