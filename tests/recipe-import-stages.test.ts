@@ -325,6 +325,41 @@ Recipe Notes:
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
 
+  it("filters bonappetit recirculation and serialized blobs from imported notes", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "Slow-Roast Gochujang Chicken",
+          content: `# Slow-Roast Gochujang Chicken
+
+Ingredients
+${Array.from({ length: 8 }, (_, i) => `- ${i + 1} cup stock`).join("\n")}
+
+Instructions
+${Array.from({ length: 5 }, (_, i) => `${i + 1}. Cook carefully.`).join("\n")}
+
+## Recipe notes
+Do Ahead: Chicken can be seasoned 12 hours ahead.
+Back to topTriangle
+RecipesShockingly Easy No-Knead FocacciaBy Sarah Jampel
+window.__PRELOADED_STATE__ = {"componentConfig":{"OneNav":{"settings":{"id":"header_menu"}}}}
+© 2026 Condé Nast. All rights reserved.
+`,
+        }),
+      } as Response)
+      .mockResolvedValueOnce({ ok: false } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://www.bonappetit.com/recipe/slow-roast-gochujang-chicken"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(createArg?.data.notes).toEqual(["Do Ahead: Chicken can be seasoned 12 hours ahead."]);
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
   it("backfills missing metadata on existing recipes without overwriting existing media", async () => {
     vi.mocked(prisma.recipe.findMany).mockResolvedValue([
       { id: "recipe_existing", sourceUrl: "https://example.com/reimport" } as never,

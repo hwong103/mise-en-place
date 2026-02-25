@@ -554,6 +554,47 @@ type ImportedNoteEntry = {
   number?: number;
 };
 
+const isLikelyJunkImportedNote = (value: string) => {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return true;
+  }
+
+  if (normalized.length > 600) {
+    return true;
+  }
+
+  if (
+    /window\.__|__PRELOADED_STATE__|@context|schema\.org|"@type"|^\{.+\}$|^```|<\/?[a-z][^>]*>/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /(all rights reserved|food innovation group|cond[ée]\s+nast|ad choices|copyright)/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+
+  if (/^(back to top|more from\b|share|pin|email|subscribe)\b/i.test(normalized)) {
+    return true;
+  }
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return true;
+  }
+
+  if (/^(cooking|recipes?)\S+.+\bBy\s+[A-Z][a-z]+/.test(normalized)) {
+    return true;
+  }
+
+  return false;
+};
+
 const splitInlineNumberedNotes = (value: string) => {
   const normalized = normalizeText(value).replace(/\\([.)])/g, "$1");
   if (!normalized) {
@@ -609,7 +650,12 @@ const normalizeImportedNotes = (notes: string[]) => {
       .replace(/^[-*]\s*/, "")
       .replace(/^\d+[.)]\s*/, "")
       .trim();
-    if (!cleaned || RECIPE_NOTE_HEADING_PATTERN.test(cleaned) || /^note\s*\d+$/i.test(cleaned)) {
+    if (
+      !cleaned ||
+      RECIPE_NOTE_HEADING_PATTERN.test(cleaned) ||
+      /^note\s*\d+$/i.test(cleaned) ||
+      isLikelyJunkImportedNote(cleaned)
+    ) {
       continue;
     }
 
