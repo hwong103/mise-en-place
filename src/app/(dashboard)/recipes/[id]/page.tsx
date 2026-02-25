@@ -291,286 +291,299 @@ export default async function RecipeDetailPage({
         </section>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <section className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
-              {ingredients.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No ingredients listed yet.</p>
-              ) : ingredientGroups.length > 0 ? (
-                <div className="mt-4 space-y-5">
-                  {ingredientGroups.map((group) => (
-                    <div key={group.title}>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{group.title}</h3>
-                      <ul className="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                        {group.items.map((item) => (
-                          <li key={`${group.title}-${item}`} className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
+      <form action={updateRecipeSection} className="space-y-6">
+        {isEditing ? (
+          <>
+            <input type="hidden" name="recipeId" value={recipe.id} />
+            <input type="hidden" name="section" value="all" />
+            <div className="sticky top-4 z-10 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                Editing recipe
+              </span>
+              <div className="flex gap-2">
+                <Link
+                  href={`/recipes/${recipe.id}`}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  Cancel
+                </Link>
+                <SubmitButton
+                  label="Save All Changes"
+                  pendingLabel="Saving..."
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <section className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
+                {!isEditing ? (
+                  ingredients.length === 0 ? (
+                    <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+                      No ingredients listed yet.
+                    </p>
+                  ) : ingredientGroups.length > 0 ? (
+                    <div className="mt-4 space-y-5">
+                      {ingredientGroups.map((group) => (
+                        <div key={group.title}>
+                          <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                            {group.title}
+                          </h3>
+                          <ul className="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                            {group.items.map((item) => (
+                              <li key={`${group.title}-${item}`} className="flex items-start gap-2">
+                                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                  {ingredients.map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {isEditing ? (
-                <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-                  <input type="hidden" name="recipeId" value={recipe.id} />
-                  <input type="hidden" name="section" value="ingredients" />
+                  ) : (
+                    <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                      {ingredients.map((item) => (
+                        <li key={item} className="flex items-start gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : (
                   <textarea
                     name="ingredients"
-                    rows={6}
+                    rows={10}
                     defaultValue={ingredients.join("\n")}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                   />
-                  <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                    Save Ingredients
-                  </button>
-                </form>
-              ) : null}
-            </section>
+                )}
+              </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
-              {instructions.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No instructions listed yet.</p>
-              ) : (
-                <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
-                  {instructions.map((step, index) => (
-                    <li key={`${index}-${step}`} className="flex gap-3">
-                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                        {index + 1}
-                      </span>
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {isEditing ? (
-                <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="instructions" />
-                <textarea
-                  name="instructions"
-                  rows={6}
-                  defaultValue={instructions.join("\n")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                />
-                <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                  Save Instructions
-                </button>
-                </form>
-              ) : null}
-            </section>
-          </div>
-
-        </section>
-
-        <aside className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex flex-wrap items-center gap-3">
-              {recipe.servings ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  {recipe.servings} servings
-                </span>
-              ) : null}
-              {formatMinutes(recipe.prepTime) ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  Prep {formatMinutes(recipe.prepTime)}
-                </span>
-              ) : null}
-              {formatMinutes(recipe.cookTime) ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                  Cook {formatMinutes(recipe.cookTime)}
-                </span>
-              ) : null}
-              {recipe.sourceUrl ? (
-                <a
-                  href={recipe.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-                >
-                  {authorLabel ? `By ${authorLabel}` : "Source"}
-                </a>
-              ) : null}
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
+                {!isEditing ? (
+                  instructions.length === 0 ? (
+                    <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+                      No instructions listed yet.
+                    </p>
+                  ) : (
+                    <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
+                      {instructions.map((step, index) => (
+                        <li key={`${index}-${step}`} className="flex gap-3">
+                          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                            {index + 1}
+                          </span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )
+                ) : (
+                  <textarea
+                    name="instructions"
+                    rows={10}
+                    defaultValue={instructions.join("\n")}
+                    className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                )}
+              </section>
             </div>
-
-            {recipe.tags?.length ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {recipe.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            {isEditing ? (
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="overview" />
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Inline Edit</p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Title
-                    <input
-                      name="title"
-                      defaultValue={recipe.title}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Tags
-                    <input
-                      name="tags"
-                      defaultValue={(recipe.tags ?? []).join(", ")}
-                      placeholder="Weeknight, Family"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Servings
-                    <input
-                      name="servings"
-                      type="number"
-                      min={1}
-                      defaultValue={recipe.servings ?? undefined}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Prep (min)
-                      <input
-                        name="prepTime"
-                        type="number"
-                        min={1}
-                        defaultValue={recipe.prepTime ?? undefined}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Cook (min)
-                      <input
-                        name="cookTime"
-                        type="number"
-                        min={1}
-                        defaultValue={recipe.cookTime ?? undefined}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                  </div>
-                  <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 md:col-span-2">
-                    Description
-                    <textarea
-                      name="description"
-                      rows={2}
-                      defaultValue={recipe.description ?? ""}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                </div>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <input
-                    name="sourceUrl"
-                    defaultValue={recipe.sourceUrl ?? ""}
-                    placeholder="Source URL"
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                  <input
-                    name="videoUrl"
-                    defaultValue={recipe.videoUrl ?? ""}
-                    placeholder="Video URL"
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                  <input
-                    name="imageUrl"
-                    defaultValue={recipe.imageUrl ?? ""}
-                    placeholder="Image URL"
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                </div>
-                <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                  Save Overview
-                </button>
-              </form>
-            ) : null}
-          </div>
-
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Notes</h2>
-            {notes.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No notes saved yet.</p>
-            ) : (
-              <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                {notes.map((note) => (
-                  <li key={note} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                    {note}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {isEditing ? (
-              <form action={updateRecipeSection} className="mt-6 space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-              <input type="hidden" name="recipeId" value={recipe.id} />
-              <input type="hidden" name="section" value="notes" />
-              <textarea
-                name="notes"
-                rows={4}
-                defaultValue={notes.join("\n")}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                Save Notes
-              </button>
-              </form>
-            ) : null}
           </section>
 
-          {recipe.videoUrl ? (
-            <section className="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:block dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
-                <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                  Open Video
-                </a>
-              </div>
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                {embedUrl ? (
-                  <div className="aspect-[16/9] w-full">
-                    <iframe
-                      src={embedUrl}
-                      title={`Video for ${recipe.title}`}
-                      className="h-full w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
+          <aside className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              {!isEditing ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {recipe.servings ? (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                        {recipe.servings} servings
+                      </span>
+                    ) : null}
+                    {formatMinutes(recipe.prepTime) ? (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                        Prep {formatMinutes(recipe.prepTime)}
+                      </span>
+                    ) : null}
+                    {formatMinutes(recipe.cookTime) ? (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                        Cook {formatMinutes(recipe.cookTime)}
+                      </span>
+                    ) : null}
+                    {recipe.sourceUrl ? (
+                      <a
+                        href={recipe.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      >
+                        {authorLabel ? `By ${authorLabel}` : "Source"}
+                      </a>
+                    ) : null}
+                  </div>
+
+                  {recipe.tags?.length ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {recipe.tags.map((tag: string) => (
+                        <span
+                          key={tag}
+                          className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                    Inline Edit
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Title
+                      <input
+                        name="title"
+                        defaultValue={recipe.title}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Tags
+                      <input
+                        name="tags"
+                        defaultValue={(recipe.tags ?? []).join(", ")}
+                        placeholder="Weeknight, Family"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Servings
+                      <input
+                        name="servings"
+                        type="number"
+                        min={1}
+                        defaultValue={recipe.servings ?? undefined}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Prep (min)
+                        <input
+                          name="prepTime"
+                          type="number"
+                          min={1}
+                          defaultValue={recipe.prepTime ?? undefined}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Cook (min)
+                        <input
+                          name="cookTime"
+                          type="number"
+                          min={1}
+                          defaultValue={recipe.cookTime ?? undefined}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                      </label>
+                    </div>
+                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 md:col-span-2">
+                      Description
+                      <textarea
+                        name="description"
+                        rows={2}
+                        defaultValue={recipe.description ?? ""}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <input
+                      name="sourceUrl"
+                      defaultValue={recipe.sourceUrl ?? ""}
+                      placeholder="Source URL"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                    <input
+                      name="videoUrl"
+                      defaultValue={recipe.videoUrl ?? ""}
+                      placeholder="Video URL"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                    <input
+                      name="imageUrl"
+                      defaultValue={recipe.imageUrl ?? ""}
+                      placeholder="Image URL"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                     />
                   </div>
+                </div>
+              )}
+            </div>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Notes</h2>
+              {!isEditing ? (
+                notes.length === 0 ? (
+                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No notes saved yet.</p>
                 ) : (
-                  <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-                    Video preview not available.
-                  </div>
-                )}
-              </div>
+                  <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                    {notes.map((note) => (
+                      <li key={note} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                        {note}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : (
+                <textarea
+                  name="notes"
+                  rows={6}
+                  defaultValue={notes.join("\n")}
+                  className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              )}
             </section>
-          ) : null}
-        </aside>
-      </div>
+
+            {recipe.videoUrl ? (
+              <section className="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:block dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
+                  <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                    Open Video
+                  </a>
+                </div>
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
+                  {embedUrl ? (
+                    <div className="aspect-[16/9] w-full">
+                      <iframe
+                        src={embedUrl}
+                        title={`Video for ${recipe.title}`}
+                        className="h-full w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                      Video preview not available.
+                    </div>
+                  )}
+                </div>
+              </section>
+            ) : null}
+          </aside>
+        </div>
+      </form>
     </div>
   );
 }

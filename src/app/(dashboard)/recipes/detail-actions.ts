@@ -257,6 +257,58 @@ export async function updateRecipeSection(formData: FormData) {
         },
       });
     }
+
+    if (section === "all") {
+      const title = toOptionalString(formData.get("title")) ?? recipe.title;
+      const description = toOptionalString(formData.get("description"));
+      const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
+      const imageUrl = toOptionalUrl(formData.get("imageUrl"));
+      const videoUrl = toOptionalUrl(formData.get("videoUrl"));
+      const servings = toOptionalInt(formData.get("servings"));
+      const prepTime = toOptionalInt(formData.get("prepTime"));
+      const cookTime = toOptionalInt(formData.get("cookTime"));
+      const tags = parseTags(formData.get("tags")?.toString() ?? "");
+
+      const rawIngredients = parseLines(formData.get("ingredients")?.toString() ?? "");
+      const cleanedIngredients = cleanIngredientLines(rawIngredients);
+      const rawInstructions = parseLines(formData.get("instructions")?.toString() ?? "");
+      const cleanedInstructions = cleanInstructionLines(rawInstructions);
+      const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
+      const cleanedNotes = cleanTextLines(rawNotes);
+
+      const instructionPrepGroups = buildPrepGroupsFromInstructions(
+        cleanedIngredients.lines,
+        cleanedInstructions.lines
+      );
+
+      await prisma.recipe.updateMany({
+        where: { id: recipeId, householdId },
+        data: {
+          title,
+          description: description ?? recipe.description,
+          sourceUrl: normalizeSourceUrl(sourceUrl) ?? sourceUrl ?? recipe.sourceUrl,
+          imageUrl: imageUrl ?? recipe.imageUrl,
+          videoUrl: normalizeVideoUrl(videoUrl) ?? videoUrl ?? recipe.videoUrl,
+          servings: servings ?? recipe.servings,
+          prepTime: prepTime ?? recipe.prepTime,
+          cookTime: cookTime ?? recipe.cookTime,
+          tags: tags.length > 0 ? tags : recipe.tags,
+          ingredientCount: cleanedIngredients.lines.length,
+          ingredients: cleanedIngredients.lines,
+          instructions: cleanedInstructions.lines,
+          notes:
+            cleanedNotes.length > 0
+              ? cleanedNotes
+              : existingNotes.length > 0
+                ? existingNotes
+                : cleanedIngredients.notes,
+          prepGroups:
+            instructionPrepGroups.length > 0
+              ? instructionPrepGroups
+              : buildPrepGroups(cleanedIngredients.lines),
+        },
+      });
+    }
   } catch (error) {
     logServerPerf({
       phase: "recipes.update_section_write",
