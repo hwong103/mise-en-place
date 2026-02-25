@@ -29,7 +29,7 @@ export default function AddToPlannerDialog({
     day.setDate(day.getDate() + i);
     return {
       key: toDateKey(day),
-      label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : day.toLocaleDateString("en-AU", { weekday: "short" }),
+      label: i === 0 ? "Today" : day.toLocaleDateString("en-AU", { weekday: "short" }),
       day: day.toLocaleDateString("en-AU", { day: "numeric" }),
       month: day.toLocaleDateString("en-AU", { month: "short" }),
     };
