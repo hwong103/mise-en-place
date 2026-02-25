@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Calendar, ClipboardList, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { getCurrentAuthUser } from "@/lib/auth";
 
 const highlights = [
   {
@@ -43,6 +44,8 @@ export default async function HomePage({
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const authDisabled = isAuthDisabled();
+  const authUser = authDisabled ? null : await getCurrentAuthUser();
+  const isLoggedIn = Boolean(authUser);
   const resolvedSearchParams = (await searchParams) ?? {};
   const joinStatus = Array.isArray(resolvedSearchParams.join)
     ? resolvedSearchParams.join[0]
@@ -74,29 +77,33 @@ export default async function HomePage({
               Open Recipes
               <ArrowRight className="h-4 w-4" />
             </Link>
-            {authDisabled ? (
-              <Link
-                href="/recipes"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
-              >
-                Continue Without Login
-              </Link>
-            ) : (
-              <form method="post" action="/start-household">
-                <button
-                  type="submit"
+            {!isLoggedIn ? (
+              <>
+                {authDisabled ? (
+                  <Link
+                    href="/recipes"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
+                  >
+                    Continue Without Login
+                  </Link>
+                ) : (
+                  <form method="post" action="/start-household">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
+                    >
+                      Start Without Login
+                    </button>
+                  </form>
+                )}
+                <Link
+                  href="/login"
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
                 >
-                  Start Without Login
-                </button>
-              </form>
-            )}
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
-            >
-              Login / Claim
-            </Link>
+                  Login / Claim
+                </Link>
+              </>
+            ) : null}
           </div>
         </section>
 
