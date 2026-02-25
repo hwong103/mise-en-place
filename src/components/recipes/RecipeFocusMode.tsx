@@ -2,6 +2,7 @@
 
 import { type TouchEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Play } from "lucide-react";
+import { createPortal } from "react-dom";
 
 type PrepGroup = {
   title: string;
@@ -44,6 +45,7 @@ export default function RecipeFocusMode({
   cookButtonClassName,
   showCookPlayIcon = false,
 }: RecipeFocusModeProps) {
+  const [isMounted, setIsMounted] = useState(false);
   const [mode, setMode] = useState<FocusMode | null>(null);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [renderedStepIndex, setRenderedStepIndex] = useState(0);
@@ -96,6 +98,10 @@ export default function RecipeFocusMode({
     },
     [activeStepIndex, clearTransitionTimers, stepCount, transitionPhase]
   );
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!mode) {
@@ -278,9 +284,10 @@ export default function RecipeFocusMode({
         </button>
       </div>
 
-      {mode ? (
-        <div className="fixed inset-0 z-[80] bg-slate-950/60 p-3 backdrop-blur-sm md:p-6">
-          <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+      {isMounted && mode
+        ? createPortal(
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 p-3 backdrop-blur-sm md:p-6">
+              <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
@@ -439,9 +446,11 @@ export default function RecipeFocusMode({
                 </section>
               </div>
             )}
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 }
