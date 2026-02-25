@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
+import LineListEditor from "@/components/recipes/LineListEditor";
 import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
+import UnsavedBadge from "@/components/recipes/UnsavedBadge";
 import SubmitButton from "@/components/forms/SubmitButton";
 import { getRecipeById } from "@/lib/recipes";
 import { getServerNow } from "@/lib/server-clock";
@@ -291,7 +293,7 @@ export default async function RecipeDetailPage({
         </section>
       ) : null}
 
-      <form action={updateRecipeSection} className="space-y-6">
+      <form id="recipe-edit-form" action={updateRecipeSection} className="space-y-6">
         {isEditing ? (
           <>
             <input type="hidden" name="recipeId" value={recipe.id} />
@@ -301,6 +303,7 @@ export default async function RecipeDetailPage({
                 Editing recipe
               </span>
               <div className="flex gap-2">
+                <UnsavedBadge formId="recipe-edit-form" />
                 <Link
                   href={`/recipes/${recipe.id}`}
                   className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
@@ -356,11 +359,12 @@ export default async function RecipeDetailPage({
                     </ul>
                   )
                 ) : (
-                  <textarea
+                  <LineListEditor
                     name="ingredients"
-                    rows={10}
-                    defaultValue={ingredients.join("\n")}
-                    className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    initialItems={ingredients}
+                    ordered={false}
+                    placeholder="e.g. 2 tbsp olive oil"
+                    addLabel="+ Add ingredient"
                   />
                 )}
               </section>
@@ -385,11 +389,12 @@ export default async function RecipeDetailPage({
                     </ol>
                   )
                 ) : (
-                  <textarea
+                  <LineListEditor
                     name="instructions"
-                    rows={10}
-                    defaultValue={instructions.join("\n")}
-                    className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    initialItems={instructions}
+                    ordered
+                    placeholder="Describe this step..."
+                    addLabel="+ Add step"
                   />
                 )}
               </section>
@@ -545,11 +550,12 @@ export default async function RecipeDetailPage({
                   </ul>
                 )
               ) : (
-                <textarea
+                <LineListEditor
                   name="notes"
-                  rows={6}
-                  defaultValue={notes.join("\n")}
-                  className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  initialItems={notes}
+                  ordered={false}
+                  placeholder="Add a note..."
+                  addLabel="+ Add note"
                 />
               )}
             </section>

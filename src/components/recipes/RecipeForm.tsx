@@ -1,6 +1,6 @@
 "use client";
 
-import type { Recipe } from "@prisma/client";
+import LineListEditor from "@/components/recipes/LineListEditor";
 
 export type RecipeFormValues = {
   title: string;
@@ -21,10 +21,9 @@ type RecipeFormProps = {
   action: (formData: FormData) => Promise<void>;
   submitLabel?: string;
   initialValues?: RecipeFormValues;
-  recipeId?: Recipe["id"];
+  recipeId?: string;
 };
 
-const joinLines = (lines?: string[] | null) => (lines?.length ? lines.join("\n") : "");
 const joinTags = (tags?: string[] | null) => (tags?.length ? tags.join(", ") : "");
 
 export default function RecipeForm({
@@ -171,45 +170,42 @@ export default function RecipeForm({
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="ingredients">
-            Ingredients (one per line)
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Ingredients
           </label>
-          <textarea
-            id="ingredients"
+          <LineListEditor
             name="ingredients"
-            rows={8}
-            defaultValue={joinLines(initialValues?.ingredients ?? null)}
-            placeholder="2 tbsp olive oil\n1 lb chicken thighs\n1 tsp cumin"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            initialItems={initialValues?.ingredients ?? []}
+            ordered={false}
+            placeholder="e.g. 2 tbsp olive oil"
+            addLabel="+ Add ingredient"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="instructions">
-            Instructions (one per line)
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Instructions
           </label>
-          <textarea
-            id="instructions"
+          <LineListEditor
             name="instructions"
-            rows={8}
-            defaultValue={joinLines(initialValues?.instructions ?? null)}
-            placeholder="Preheat oven to 425F.\nToss chicken with spices.\nRoast 20 minutes."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            initialItems={initialValues?.instructions ?? []}
+            ordered
+            placeholder="Describe this step..."
+            addLabel="+ Add step"
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="notes">
-          Notes (one per line)
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+          Notes
         </label>
-        <textarea
-          id="notes"
+        <LineListEditor
           name="notes"
-          rows={4}
-          defaultValue={joinLines(initialValues?.notes ?? null)}
-          placeholder="Note 1: Use freshly grated parmesan.\nNote 2: Slice mushrooms 1/2 cm thick."
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          initialItems={initialValues?.notes ?? []}
+          ordered={false}
+          placeholder="Add a note..."
+          addLabel="+ Add note"
         />
       </div>
 
