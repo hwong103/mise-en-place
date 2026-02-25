@@ -530,6 +530,55 @@ ${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
 
+  it("retains untitled WPRM ingredient groups when titled subgroups exist", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({ ok: false } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => `
+          <html>
+            <script type="application/ld+json">
+              {
+                "@context":"https://schema.org",
+                "@type":"Recipe",
+                "name":"Grouped Pumpkin Soup",
+                "recipeIngredient":["1 pumpkin","1 onion","2 garlic cloves","3 cups broth","1 cup water","salt and pepper","1/2 cup cream"],
+                "recipeInstructions":["Chop vegetables","Boil with broth","Blend until smooth","Stir in cream","Serve"]
+              }
+            </script>
+            <div class="wprm-recipe-ingredient-group">
+              <ul class="wprm-recipe-ingredients">
+                <li class="wprm-recipe-ingredient">1 pumpkin</li>
+                <li class="wprm-recipe-ingredient">1 onion</li>
+                <li class="wprm-recipe-ingredient">2 garlic cloves</li>
+                <li class="wprm-recipe-ingredient">3 cups broth</li>
+                <li class="wprm-recipe-ingredient">1 cup water</li>
+                <li class="wprm-recipe-ingredient">salt and pepper</li>
+              </ul>
+            </div>
+            <div class="wprm-recipe-ingredient-group">
+              <h4 class="wprm-recipe-group-name">Finishes:</h4>
+              <ul class="wprm-recipe-ingredients">
+                <li class="wprm-recipe-ingredient">1/2 cup cream</li>
+              </ul>
+            </div>
+          </html>
+        `,
+      } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://example.com/grouped-pumpkin"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    const prepGroups = (createArg?.data.prepGroups ?? []) as Array<{ title: string; items: string[] }>;
+    const prepGroupItemCount = prepGroups.flatMap((group) => group.items).length;
+    expect(createArg?.data.ingredients).toHaveLength(7);
+    expect(prepGroups.map((group) => group.title)).toEqual(["Ingredients", "Finishes"]);
+    expect(prepGroupItemCount).toBe(7);
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
   it("falls back to direct HTML when markdown fails", async () => {
     vi.mocked(global.fetch)
       .mockResolvedValueOnce({ ok: false } as Response)

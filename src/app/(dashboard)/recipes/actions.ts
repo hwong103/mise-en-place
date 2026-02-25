@@ -893,6 +893,7 @@ const cleanIngredientGroups = (groups: PrepGroup[]) => {
   const cleanedGroups: PrepGroup[] = [];
   const ingredients: string[] = [];
   const notes: string[] = [];
+  const untitledItems: string[] = [];
 
   for (const group of groups) {
     const title = normalizeIngredientHeading(group.title);
@@ -908,9 +909,23 @@ const cleanIngredientGroups = (groups: PrepGroup[]) => {
       notes.push(...result.notes);
     }
 
-    if (title && cleanedItems.length > 0) {
-      cleanedGroups.push({ title, items: cleanedItems });
+    if (cleanedItems.length === 0) {
+      continue;
     }
+
+    if (title) {
+      cleanedGroups.push({ title, items: cleanedItems });
+    } else {
+      untitledItems.push(...cleanedItems);
+    }
+  }
+
+  if (untitledItems.length > 0 && cleanedGroups.length > 0) {
+    const hasIngredientsGroup = cleanedGroups.some((group) => /^ingredients$/i.test(group.title));
+    cleanedGroups.unshift({
+      title: hasIngredientsGroup ? "Other Ingredients" : "Ingredients",
+      items: untitledItems,
+    });
   }
 
   return { groups: cleanedGroups, ingredients, notes };
@@ -1796,18 +1811,39 @@ export async function importRecipeFromUrl(formData: FormData) {
     selectedCandidate.ingredientGroups?.length
       ? selectedCandidate.ingredientGroups
       : extractIngredientGroupsFromLines(selectedCandidate.ingredients);
-  const groupedIngredients =
+  const cleanedCandidateIngredients = cleanIngredientLines(selectedCandidate.ingredients);
+  let groupedIngredients =
     ingredientGroupCandidates.length > 0
       ? cleanIngredientGroups(ingredientGroupCandidates)
       : null;
+  if (groupedIngredients && groupedIngredients.groups.length > 0 && groupedIngredients.ingredients.length > 0) {
+    const groupedSet = new Set(groupedIngredients.ingredients.map((line) => normalizeText(line)));
+    const missingLines = cleanedCandidateIngredients.lines.filter(
+      (line) => !groupedSet.has(normalizeText(line))
+    );
+    if (missingLines.length > 0) {
+      const hasIngredientsGroup = groupedIngredients.groups.some((group) => /^ingredients$/i.test(group.title));
+      groupedIngredients.groups.unshift({
+        title: hasIngredientsGroup ? "Other Ingredients" : "Ingredients",
+        items: missingLines,
+      });
+      groupedIngredients = {
+        ...groupedIngredients,
+        ingredients: [...missingLines, ...groupedIngredients.ingredients],
+      };
+    }
+  }
   const hasGroupedIngredients = Boolean(
     groupedIngredients &&
       groupedIngredients.groups.length > 0 &&
       groupedIngredients.ingredients.length > 0
   );
   const cleanedIngredientsSource = hasGroupedIngredients
-    ? { lines: groupedIngredients!.ingredients, notes: groupedIngredients!.notes }
-    : cleanIngredientLines(selectedCandidate.ingredients);
+    ? {
+      lines: groupedIngredients!.ingredients,
+      notes: [...groupedIngredients!.notes, ...cleanedCandidateIngredients.notes],
+    }
+    : cleanedCandidateIngredients;
   const cleanedIngredients = {
     lines: cleanedIngredientsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
     notes: cleanedIngredientsSource.notes,
