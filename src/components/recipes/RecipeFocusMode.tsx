@@ -1,3 +1,5 @@
+"use client";
+
 import { type TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Play } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -353,8 +355,8 @@ export default function RecipeFocusMode({
                     type="button"
                     onClick={() => setMode("mise")}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "mise"
-                        ? "border-[#C67B2A] bg-amber-50 text-[#C67B2A] dark:bg-amber-950/40"
-                        : "border-slate-200 bg-transparent text-slate-600 hover:border-[#C67B2A] hover:text-[#C67B2A] dark:border-slate-700 dark:text-slate-400"
+                      ? "border-[#C67B2A] bg-amber-50 text-[#C67B2A] dark:bg-amber-950/40"
+                      : "border-slate-200 bg-transparent text-slate-600 hover:border-[#C67B2A] hover:text-[#C67B2A] dark:border-slate-700 dark:text-slate-400"
                       }`}
                   >
                     Mise
@@ -363,8 +365,8 @@ export default function RecipeFocusMode({
                     type="button"
                     onClick={() => setMode("cook")}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "cook"
-                        ? "border-emerald-600 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40"
-                        : "border-slate-200 bg-transparent text-slate-600 hover:border-emerald-600 hover:text-emerald-600 dark:border-slate-700 dark:text-slate-400"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40"
+                      : "border-slate-200 bg-transparent text-slate-600 hover:border-emerald-600 hover:text-emerald-600 dark:border-slate-700 dark:text-slate-400"
                       }`}
                   >
                     <span className="inline-flex items-center gap-1.5">
