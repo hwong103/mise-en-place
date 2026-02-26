@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
 import LineListEditor from "@/components/recipes/LineListEditor";
 import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
+import PrepGroupEditor from "@/components/recipes/PrepGroupEditor";
 import UnsavedBadge from "@/components/recipes/UnsavedBadge";
 import SubmitButton from "@/components/forms/SubmitButton";
 import { getRecipeById } from "@/lib/recipes";
@@ -399,6 +400,22 @@ export default async function RecipeDetailPage({
                 )}
               </section>
             </div>
+
+            {isEditing ? (
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                  Ingredient &amp; Mise Groups
+                </h2>
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  Groups with source-style names (e.g. "Marinade", "Sauce", "Serving") appear
+                  in the Ingredients section. Groups with prep-style names (e.g. "Pat Dry",
+                  "Finely Grate") appear in Mise en Place mode only.
+                </p>
+                <div className="mt-4">
+                  <PrepGroupEditor initialGroups={prepGroups} />
+                </div>
+              </section>
+            ) : null}
           </section>
 
           <aside className="space-y-6">

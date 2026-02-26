@@ -168,10 +168,18 @@ export async function updateRecipeSection(formData: FormData) {
       const raw = parseLines(formData.get("ingredients")?.toString() ?? "");
       const cleanedIngredients = cleanIngredientLines(raw);
       const cleanedInstructions = cleanInstructionLines(existingInstructions);
-      const instructionPrepGroups = buildPrepGroupsFromInstructions(
-        cleanedIngredients.lines,
-        cleanedInstructions.lines
-      );
+      const rawPrepGroups = formData.get("prepGroups")?.toString() ?? "";
+      const prepGroups = rawPrepGroups
+        ? parsePrepGroupsFromText(rawPrepGroups)
+        : (() => {
+          const fromInstructions = buildPrepGroupsFromInstructions(
+            cleanedIngredients.lines,
+            cleanedInstructions.lines
+          );
+          return fromInstructions.length > 0
+            ? fromInstructions
+            : buildPrepGroups(cleanedIngredients.lines);
+        })();
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -179,10 +187,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups,
         },
       });
     }
@@ -276,10 +281,18 @@ export async function updateRecipeSection(formData: FormData) {
       const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
       const cleanedNotes = cleanTextLines(rawNotes);
 
-      const instructionPrepGroups = buildPrepGroupsFromInstructions(
-        cleanedIngredients.lines,
-        cleanedInstructions.lines
-      );
+      const rawPrepGroups = formData.get("prepGroups")?.toString() ?? "";
+      const prepGroups = rawPrepGroups
+        ? parsePrepGroupsFromText(rawPrepGroups)
+        : (() => {
+          const fromInstructions = buildPrepGroupsFromInstructions(
+            cleanedIngredients.lines,
+            cleanedInstructions.lines
+          );
+          return fromInstructions.length > 0
+            ? fromInstructions
+            : buildPrepGroups(cleanedIngredients.lines);
+        })();
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -302,10 +315,7 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups,
         },
       });
     }

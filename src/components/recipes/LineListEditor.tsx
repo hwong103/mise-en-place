@@ -26,6 +26,7 @@ type LineListEditorProps = {
   ordered?: boolean;
   placeholder?: string;
   addLabel?: string;
+  onChange?: (items: string[]) => void;
 };
 
 type Item = {
@@ -158,11 +159,16 @@ export default function LineListEditor({
   ordered = false,
   placeholder = "Add item...",
   addLabel = "+ Add item",
+  onChange,
 }: LineListEditorProps) {
   const [items, setItems] = useState<Item[]>(() => createInitialItems(initialItems));
   const [newItem, setNewItem] = useState("");
   const [focusItemId, setFocusItemId] = useState<string | null>(null);
   const newInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    onChange?.(items.map((item) => item.value));
+  }, [items, onChange]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -237,7 +243,7 @@ export default function LineListEditor({
 
   return (
     <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/70">
-      <input type="hidden" name={name} value={serializedValue} />
+      {!onChange && <input type="hidden" name={name} value={serializedValue} />}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-1">
