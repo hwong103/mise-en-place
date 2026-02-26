@@ -12,10 +12,12 @@ import {
   cleanIngredientLines,
   cleanInstructionLines,
   cleanTextLines,
+  coercePrepGroups,
   coerceStringArray,
   parseLines,
   parsePrepGroupsFromText,
   parseTags,
+  type PrepGroup,
 } from "@/lib/recipe-utils";
 
 const toOptionalInt = (value: FormDataEntryValue | null) => {
@@ -276,10 +278,41 @@ export async function updateRecipeSection(formData: FormData) {
       const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
       const cleanedNotes = cleanTextLines(rawNotes);
 
+      // We need to preserve sourceGroups if they exist, or build them if they don't
+      // For now, let's just rebuild instruction-based prep groups.
+      // The Ingredients card will handle its own grouping logic based on recipe.ingredients (if we change it to Json)
+      // Actually, recipe.ingredients IS Json.
+      // Collect grouped ingredient inputs (reflecting original source headers)
+      const ingredientGroups: PrepGroup[] = [];
+      let gIdx = 0;
+      while (formData.get(`ingredientGroupExists_${gIdx}`)) {
+        const title = formData.get(`ingredientGroupTitle_${gIdx}`) as string || "";
+        const itemsRaw = formData.get(`ingredientGroupItems_${gIdx}`) as string || "";
+        const items = itemsRaw.split("\n").filter(Boolean);
+        if (items.length > 0) {
+          ingredientGroups.push({ title, items, sourceGroup: true });
+        }
+        gIdx++;
+      }
+
+      // If no grouped inputs found, fall back to legacy 'ingredients' field if it exists
+      if (ingredientGroups.length === 0) {
+        const legacyIngredients = formData.get("ingredients") as string;
+        if (legacyIngredients) {
+          ingredientGroups.push({
+            title: "",
+            items: legacyIngredients.split("\n").filter(Boolean),
+            sourceGroup: true,
+          });
+        }
+      }
+
       const instructionPrepGroups = buildPrepGroupsFromInstructions(
-        cleanedIngredients.lines,
-        cleanedInstructions.lines
+        cleanedInstructions.lines,
+        ingredientGroups.flatMap((g) => g.items)
       );
+
+      const finalPrepGroups = [...ingredientGroups, ...instructionPrepGroups];
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -302,10 +335,9 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: finalPrepGroups.length > 0
+            ? finalPrepGroups
+            : buildPrepGroups(cleanedIngredients.lines),
         },
       });
     }

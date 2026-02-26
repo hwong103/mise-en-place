@@ -1,6 +1,8 @@
 export type PrepGroup = {
   title: string;
   items: string[];
+  stepIndex?: number;
+  sourceGroup?: boolean;
 };
 
 const HTML_ENTITY_MAP: Record<string, string> = {
@@ -442,7 +444,7 @@ export const cleanTextLines = (lines: string[]) =>
     .map((line) => cleanLineBase(line))
     .filter(Boolean);
 
-const extractIngredientKeywords = (line: string) => {
+export const extractIngredientKeywords = (line: string) => {
   const withoutParens = line.replace(/\([^)]*\)/g, " ");
   const cleaned = withoutParens.replace(/[^a-zA-Z0-9\s]/g, " ");
   const tokens = cleaned
@@ -563,14 +565,33 @@ export const buildPrepGroupsFromInstructions = (
     matches.forEach((match) => assigned.add(match.line));
   });
 
-  const groups: PrepGroup[] = Array.from(groupMap.entries()).map(([title, items]) => ({
-    title,
-    items,
-  }));
+  const groups: PrepGroup[] = Array.from(groupMap.entries()).map(([title, items]) => {
+    // Find the first instruction index that mentioned these ingredients
+    let stepIndex: number | undefined;
+    for (let i = 0; i < instructions.length; i++) {
+      const lower = instructions[i].toLowerCase();
+      const keywords = items.flatMap(extractIngredientKeywords);
+      if (keywords.some((keyword) => lower.includes(keyword))) {
+        stepIndex = i;
+        break;
+      }
+    }
+
+    return {
+      title,
+      items,
+      stepIndex,
+    };
+  });
+
   const remaining = ingredients.filter((line) => !assigned.has(line));
-  if (groups.length === 0) {
+  if (groups.length === 0 && remaining.length === 0) {
     return [];
   }
+
+  // Sort groups by stepIndex
+  groups.sort((a, b) => (a.stepIndex ?? 999) - (b.stepIndex ?? 999));
+
   if (remaining.length > 0) {
     groups.push({
       title: "Other Prep",
@@ -579,7 +600,7 @@ export const buildPrepGroupsFromInstructions = (
   }
 
   return groups;
-};
+}
 
 export function parseLines(value: string) {
   return value
@@ -642,9 +663,12 @@ export function coercePrepGroups(value: unknown): PrepGroup[] {
         return null;
       }
 
-      return { title, items } satisfies PrepGroup;
+      const stepIndex = typeof record.stepIndex === "number" ? record.stepIndex : undefined;
+      const sourceGroup = typeof record.sourceGroup === "boolean" ? record.sourceGroup : undefined;
+
+      return { title, items, stepIndex, sourceGroup } as PrepGroup;
     })
-    .filter((entry): entry is PrepGroup => Boolean(entry));
+    .filter((entry): entry is PrepGroup => entry !== null);
 }
 
 export function serializePrepGroupsToText(groups: PrepGroup[]) {
@@ -680,3 +704,17 @@ export function parsePrepGroupsFromText(text: string): PrepGroup[] {
 
   return groups.filter((g) => g.items.length > 0);
 }
+
+export const isIngredientGroupTitle = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (/(^|\b)(prep|preparation)\b/.test(normalized)) {
+    return false;
+  }
+  if (/^step\s+\d+/.test(normalized)) {
+    return false;
+  }
+  return true;
+};

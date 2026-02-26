@@ -6,6 +6,7 @@ import LineListEditor from "@/components/recipes/LineListEditor";
 import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
 import UnsavedBadge from "@/components/recipes/UnsavedBadge";
 import SubmitButton from "@/components/forms/SubmitButton";
+import IngredientGroupsEditor from "@/components/recipes/IngredientGroupsEditor";
 import { getRecipeById } from "@/lib/recipes";
 import { getServerNow } from "@/lib/server-clock";
 import { logServerPerf } from "@/lib/server-perf";
@@ -13,7 +14,23 @@ import {
   cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
+  isIngredientGroupTitle,
+  type PrepGroup,
 } from "@/lib/recipe-utils";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  Loader2,
+  Plus,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Timer,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { deleteRecipe, updateRecipeSection } from "../detail-actions";
 
@@ -79,19 +96,6 @@ const getAuthorLabel = (sourceUrl?: string | null) => {
   }
 };
 
-const isIngredientGroupTitle = (value: string) => {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-  if (/(^|\b)(prep|preparation)\b/.test(normalized)) {
-    return false;
-  }
-  if (/^step\s+\d+/.test(normalized)) {
-    return false;
-  }
-  return true;
-};
 
 export default async function RecipeDetailPage({
   params,
@@ -137,39 +141,27 @@ export default async function RecipeDetailPage({
   const instructions = coerceStringArray(recipe.instructions);
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
-  const ingredientGroups = (() => {
-    if (!prepGroups.length) {
-      return [];
-    }
-    const candidates = prepGroups.filter((group) => isIngredientGroupTitle(group.title));
-    if (!candidates.length) {
-      return [];
-    }
-    const ingredientSet = new Set(ingredients);
-    const groupedItems = new Set<string>();
-    const filtered = candidates
-      .map((group) => ({
-        title: group.title,
-        items: group.items
-          .map((item) => cleanIngredientLine(item).line)
-          .filter(Boolean)
-          .filter((item) => ingredientSet.has(item)),
-      }))
-      .filter((group) => group.items.length > 0);
 
-    filtered.forEach((group) => group.items.forEach((item) => groupedItems.add(item)));
-    const remaining = ingredients.filter((item) => !groupedItems.has(item));
-    if (remaining.length > 0) {
-      filtered.push({ title: "Other Ingredients", items: remaining });
+  const ingredientGroups = (() => {
+    const sourceGroups = prepGroups.filter((g) => g.sourceGroup);
+    if (sourceGroups.length > 0) return sourceGroups;
+    // Fallback if no sourceGroups but we have ingredients
+    if (ingredients.length > 0) {
+      return [{ title: "", items: ingredients }];
     }
-    return filtered;
+    return [];
   })();
-  const authorLabel = getAuthorLabel(recipe.sourceUrl);
-  const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
+
   const editParam = Array.isArray(resolvedSearchParams.edit)
     ? resolvedSearchParams.edit[0]
     : resolvedSearchParams.edit;
   const isEditing = editParam === "1" || editParam === "true";
+
+  const miseGroups = prepGroups.filter(
+    (group) => !group.sourceGroup && !isIngredientGroupTitle(group.title)
+  );
+  const authorLabel = getAuthorLabel(recipe.sourceUrl);
+  const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
   const transformMs = getServerNow() - transformStartedAt;
 
   logServerPerf({
@@ -298,7 +290,7 @@ export default async function RecipeDetailPage({
           <>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <input type="hidden" name="section" value="all" />
-            <div className="sticky top-4 z-10 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+            <div className="sticky top-4 z-10 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm dark:border-emerald-950/40 dark:bg-emerald-950/40">
               <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                 Editing recipe
               </span>
@@ -322,25 +314,81 @@ export default async function RecipeDetailPage({
 
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <section className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
-                {!isEditing ? (
-                  ingredients.length === 0 ? (
-                    <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                      No ingredients listed yet.
-                    </p>
-                  ) : ingredientGroups.length > 0 ? (
-                    <div className="mt-4 space-y-5">
-                      {ingredientGroups.map((group) => (
-                        <div key={group.title}>
-                          <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+            <div className="grid gap-6">
+              {/* Ingredients Card */}
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                      Ingredients
+                    </h2>
+                  </div>
+                  {!isEditing && (
+                    <RecipeFocusMode
+                      title={recipe.title}
+                      prepGroups={prepGroups}
+                      ingredients={ingredients}
+                      instructions={instructions}
+                    />
+                  )}
+                </div>
+
+                {isEditing ? (
+                  <IngredientGroupsEditor initialGroups={ingredientGroups} />
+                ) : (
+                  <div className="space-y-6">
+                    {ingredientGroups.map((group, groupIdx) => (
+                      <div key={groupIdx}>
+                        {group.title && (
+                          <h3 className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                             {group.title}
                           </h3>
-                          <ul className="mt-2 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                        )}
+                        <ul className="space-y-2.5">
+                          {group.items.map((item, itemIdx) => (
+                            <li
+                              key={itemIdx}
+                              className="flex items-start gap-3 text-[15px] text-slate-600 dark:text-slate-300"
+                            >
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/40" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {miseGroups.length > 0 || isEditing ? (
+                <section className="rounded-3xl border border-amber-200 bg-amber-50/30 p-6 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/10">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise Prep Groups</h2>
+                    {!isEditing && (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        Instruction Derived
+                      </span>
+                    )}
+                  </div>
+                  {!isEditing ? (
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      {miseGroups.map((group) => (
+                        <div key={group.title} className="group relative rounded-2xl border border-white bg-white/60 p-4 shadow-sm transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-900">
+                          <div className="flex items-start justify-between">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                              {group.title}
+                            </h3>
+                            {group.stepIndex !== undefined && (
+                              <span className="rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                                Step {group.stepIndex + 1}
+                              </span>
+                            )}
+                          </div>
+                          <ul className="mt-3 space-y-1.5 text-sm text-slate-700 dark:text-slate-200">
                             {group.items.map((item) => (
                               <li key={`${group.title}-${item}`} className="flex items-start gap-2">
-                                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
                                 <span>{item}</span>
                               </li>
                             ))}
@@ -349,25 +397,12 @@ export default async function RecipeDetailPage({
                       ))}
                     </div>
                   ) : (
-                    <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                      {ingredients.map((item) => (
-                        <li key={item} className="flex items-start gap-2">
-                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )
-                ) : (
-                  <LineListEditor
-                    name="ingredients"
-                    initialItems={ingredients}
-                    ordered={false}
-                    placeholder="e.g. 2 tbsp olive oil"
-                    addLabel="+ Add ingredient"
-                  />
-                )}
-              </section>
+                    <div className="mt-4 rounded-2xl border border-dashed border-slate-200 p-4 text-center dark:border-slate-800">
+                      <p className="text-sm text-slate-500">Mise groups are automatically updated when you save changes to ingredients or instructions.</p>
+                    </div>
+                  )}
+                </section>
+              ) : null}
 
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
