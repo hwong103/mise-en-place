@@ -207,15 +207,18 @@ export default async function RecipeDetailPage({
               href="/recipes"
               className="rounded-xl border border-white/40 bg-slate-900/45 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm hover:bg-slate-900/65"
             >
-              {"<- Back to Recipes"}
+              <span className="md:hidden">{"<- Back"}</span>
+              <span className="hidden md:inline">{"<- Back to Recipes"}</span>
             </Link>
-            <div className="absolute right-6 top-5 z-[3] flex items-center gap-2">
-              <AddToPlannerDialog
-                recipeId={recipe.id}
-                recipeTitle={recipe.title}
-                triggerLabel="+ Add to Planner"
-                triggerClassName="rounded-[20px] border border-white/15 bg-white/10 px-[14px] py-[7px] text-xs font-medium text-white/60 transition-colors hover:bg-white/15 hover:text-white/85"
-              />
+            <div className="relative z-[3] flex items-center gap-1.5 md:absolute md:right-6 md:top-5 md:gap-2">
+              <div className="hidden md:block">
+                <AddToPlannerDialog
+                  recipeId={recipe.id}
+                  recipeTitle={recipe.title}
+                  triggerLabel="+ Add to Planner"
+                  triggerClassName="rounded-[20px] border border-white/15 bg-white/10 px-[14px] py-[7px] text-xs font-medium text-white/60 transition-colors hover:bg-white/15 hover:text-white/85"
+                />
+              </div>
               <RecipeFocusMode
                 title={recipe.title}
                 prepGroups={prepGroups}
@@ -231,6 +234,14 @@ export default async function RecipeDetailPage({
                   &middot;&middot;&middot;
                 </summary>
                 <div className="absolute right-0 mt-2 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  <div className="md:hidden">
+                    <AddToPlannerDialog
+                      recipeId={recipe.id}
+                      recipeTitle={recipe.title}
+                      triggerLabel="Add to Planner"
+                      triggerClassName="block w-full px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    />
+                  </div>
                   <Link
                     href={
                       isEditing
