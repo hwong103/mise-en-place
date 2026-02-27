@@ -13,9 +13,11 @@ import {
   cleanInstructionLines,
   cleanTextLines,
   coerceStringArray,
+  parseGroupsFromIngredientsWithHeaders,
   parseLines,
   parsePrepGroupsFromText,
   parseTags,
+  stripIngredientHeaders,
 } from "@/lib/recipe-utils";
 
 const toOptionalInt = (value: FormDataEntryValue | null) => {
@@ -270,7 +272,9 @@ export async function updateRecipeSection(formData: FormData) {
       const tags = parseTags(formData.get("tags")?.toString() ?? "");
 
       const rawIngredients = parseLines(formData.get("ingredients")?.toString() ?? "");
-      const cleanedIngredients = cleanIngredientLines(rawIngredients);
+      // Extract explicit ingredient-group headers (## Group) before cleaning
+      const explicitGroups = parseGroupsFromIngredientsWithHeaders(rawIngredients);
+      const cleanedIngredients = cleanIngredientLines(stripIngredientHeaders(rawIngredients));
       const rawInstructions = parseLines(formData.get("instructions")?.toString() ?? "");
       const cleanedInstructions = cleanInstructionLines(rawInstructions);
       const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
@@ -303,9 +307,11 @@ export async function updateRecipeSection(formData: FormData) {
                 ? existingNotes
                 : cleanedIngredients.notes,
           prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+            explicitGroups.length > 0
+              ? explicitGroups
+              : instructionPrepGroups.length > 0
+                ? instructionPrepGroups
+                : buildPrepGroups(cleanedIngredients.lines),
         },
       });
     }

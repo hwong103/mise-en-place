@@ -653,6 +653,50 @@ export function serializePrepGroupsToText(groups: PrepGroup[]) {
     .join("\n\n");
 }
 
+/** Marker prefix used by LineListEditor to inline section headers in flat lists. */
+export const INGREDIENT_HEADER_PREFIX = "## ";
+
+/**
+ * Splits a flat ingredient list (possibly containing `## Header` lines) into
+ * PrepGroup[]. Returns an empty array if no headers are present.
+ */
+export function parseGroupsFromIngredientsWithHeaders(lines: string[]): PrepGroup[] {
+  const hasHeaders = lines.some((l) => l.startsWith(INGREDIENT_HEADER_PREFIX));
+  if (!hasHeaders) return [];
+
+  const groups: PrepGroup[] = [];
+  let current: PrepGroup | null = null;
+
+  for (const line of lines) {
+    if (line.startsWith(INGREDIENT_HEADER_PREFIX)) {
+      const title = line.slice(INGREDIENT_HEADER_PREFIX.length).trim();
+      if (title) {
+        current = { title, items: [] };
+        groups.push(current);
+      }
+    } else {
+      const item = line.trim();
+      if (!item) continue;
+      if (!current) {
+        // Items before any header go into a default group
+        current = { title: "Ingredients", items: [] };
+        groups.unshift(current);
+      }
+      current.items.push(item);
+    }
+  }
+
+  return groups.filter((g) => g.items.length > 0);
+}
+
+/**
+ * Strips `## ` header prefixes from ingredient lines, returning only
+ * the actual ingredient strings (for storage in the flat `ingredients` column).
+ */
+export function stripIngredientHeaders(lines: string[]): string[] {
+  return lines.filter((l) => !l.startsWith(INGREDIENT_HEADER_PREFIX));
+}
+
 export function parsePrepGroupsFromText(text: string): PrepGroup[] {
   const lines = parseLines(text);
   const groups: PrepGroup[] = [];

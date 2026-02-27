@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
 import LineListEditor from "@/components/recipes/LineListEditor";
+import PrepGroupEditor from "@/components/recipes/PrepGroupEditor";
 import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
 import UnsavedBadge from "@/components/recipes/UnsavedBadge";
 import SubmitButton from "@/components/forms/SubmitButton";
@@ -13,7 +14,7 @@ import {
   cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
-  serializePrepGroupsToText,
+  INGREDIENT_HEADER_PREFIX,
 } from "@/lib/recipe-utils";
 
 import { deleteRecipe, updateRecipeSection } from "../detail-actions";
@@ -165,6 +166,15 @@ export default async function RecipeDetailPage({
     }
     return filtered;
   })();
+  // Flat ingredients list with "## Group" headers interleaved, used for the edit mode LineListEditor
+  const ingredientsWithHeaders: string[] =
+    ingredientGroups.length > 0
+      ? ingredientGroups.flatMap((group) => [
+          `${INGREDIENT_HEADER_PREFIX}${group.title}`,
+          ...group.items,
+        ])
+      : ingredients;
+
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
   const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
   const editParam = Array.isArray(resolvedSearchParams.edit)
@@ -373,10 +383,11 @@ export default async function RecipeDetailPage({
                 ) : (
                   <LineListEditor
                     name="ingredients"
-                    initialItems={ingredients}
+                    initialItems={ingredientsWithHeaders}
                     ordered={false}
                     placeholder="e.g. 2 tbsp olive oil"
                     addLabel="+ Add ingredient"
+                    allowHeaders
                   />
                 )}
               </section>
@@ -411,6 +422,27 @@ export default async function RecipeDetailPage({
                 )}
               </section>
             </div>
+
+            {isEditing ? (
+              <form action={updateRecipeSection}>
+                <input type="hidden" name="recipeId" value={recipe.id} />
+                <input type="hidden" name="section" value="prepGroups" />
+                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise en Place Groups</h2>
+                    <SubmitButton
+                      label="Save Groups"
+                      pendingLabel="Saving..."
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Groups shown in the Mise focus screen. Edit group names and items, drag to reorder.
+                  </p>
+                  <PrepGroupEditor name="prepGroups" initialGroups={prepGroups} />
+                </section>
+              </form>
+            ) : null}
           </section>
 
           <aside className="space-y-6">
@@ -571,34 +603,6 @@ export default async function RecipeDetailPage({
                 />
               )}
             </section>
-
-            {isEditing ? (
-              <form action={updateRecipeSection}>
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="prepGroups" />
-                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise en Place Groups</h2>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    One group per block. Title on the first line, then each item on its own line starting with{" "}
-                    <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">-</code>.
-                  </p>
-                  <textarea
-                    name="prepGroups"
-                    rows={10}
-                    defaultValue={serializePrepGroupsToText(prepGroups)}
-                    placeholder={"Slice\n- onion\n- bell pepper\n\nChop\n- parsley"}
-                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
-                  <div className="mt-3 flex justify-end">
-                    <SubmitButton
-                      label="Save Mise Groups"
-                      pendingLabel="Saving..."
-                      className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </div>
-                </section>
-              </form>
-            ) : null}
 
             {recipe.videoUrl ? (
               <section className="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:block dark:border-slate-800 dark:bg-slate-900">
