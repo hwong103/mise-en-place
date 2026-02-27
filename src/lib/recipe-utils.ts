@@ -39,42 +39,6 @@ const MULTI_CLOSE_PAREN = /\){2,}/g;
 const TRAILING_OPEN_PAREN = /\(\s*$/g;
 const LEADING_CLOSE_PAREN = /^\s*\)/g;
 
-const PREP_VERBS = [
-  "mince",
-  "chop",
-  "slice",
-  "dice",
-  "grate",
-  "shred",
-  "mix",
-  "whisk",
-  "combine",
-  "crush",
-  "peel",
-  "zest",
-  "julienne",
-  "cube",
-  "cut",
-  "separate",
-  "rinse",
-  "wash",
-  "pat",
-  "trim",
-  "soak",
-  "marinate",
-  "toast",
-  "grind",
-];
-
-const PREP_ADVERBS = [
-  "finely",
-  "roughly",
-  "thinly",
-  "coarsely",
-  "gently",
-  "quickly",
-  "lightly",
-];
 
 const STOP_WORDS = new Set([
   "a",
@@ -296,7 +260,7 @@ export const convertIngredientMeasurementToMetric = (line: string) => {
         return match;
       }
 
-      let secondAmount = rawSecond ? parseMeasurementAmount(rawSecond) : null;
+      const secondAmount = rawSecond ? parseMeasurementAmount(rawSecond) : null;
       if (secondAmount !== null && firstAmount > secondAmount) {
         const fallbackMixed = parseMergedFractionAsMixed(rawFirst, secondAmount);
         if (fallbackMixed !== null) {
@@ -445,8 +409,15 @@ export const cleanTextLines = (lines: string[]) =>
     .filter(Boolean);
 
 export const extractIngredientKeywords = (line: string) => {
-  const withoutParens = line.replace(/\([^)]*\)/g, " ");
-  const cleaned = withoutParens.replace(/[^a-zA-Z0-9\s]/g, " ");
+  // 1. Strip parenthetical content
+  let cleaned = line.replace(/\([^)]*\)/g, " ");
+
+  // 2. Strip trailing prep descriptors after comma
+  cleaned = cleaned.split(",")[0];
+
+  // 3. Remove non-alphanumeric (except spaces)
+  cleaned = cleaned.replace(/[^a-zA-Z0-9\s]/g, " ");
+
   const tokens = cleaned
     .split(/\s+/)
     .map((token) => token.toLowerCase())
@@ -455,67 +426,14 @@ export const extractIngredientKeywords = (line: string) => {
     .filter((token) => !UNIT_WORDS.has(token))
     .filter((token) => !/^\d/.test(token))
     .filter((token) => token.length > 2);
-
   return Array.from(new Set(tokens));
 };
 
-const INGREDIENT_PREP_HINTS: Array<{ title: string; pattern: RegExp }> = [
-  { title: "Slice", pattern: /\b(sliced?|thinly\s+cut)\b/i },
-  { title: "Chop", pattern: /\b(chopped?|roughly\s+chopped?)\b/i },
-  { title: "Dice", pattern: /\b(diced?)\b/i },
-  { title: "Mince", pattern: /\b(minced?)\b/i },
-  { title: "Grate", pattern: /\b(grated?)\b/i },
-  { title: "Shred", pattern: /\b(shredded?)\b/i },
-  { title: "Crush", pattern: /\b(crushed?)\b/i },
-  { title: "Peel", pattern: /\b(peeled?)\b/i },
-  { title: "Zest", pattern: /\b(zested?)\b/i },
-];
 
-const findIngredientPrepTitle = (line: string) => {
-  for (const hint of INGREDIENT_PREP_HINTS) {
-    if (hint.pattern.test(line)) {
-      return hint.title;
-    }
-  }
-  return null;
-};
-
-const findPrepPhrase = (instruction: string) => {
-  const lower = instruction.toLowerCase();
-  for (const verb of PREP_VERBS) {
-    const regex = new RegExp(
-      `\\b(?:${PREP_ADVERBS.join("|")})?\\s*\\b${verb}\\b`,
-      "i"
-    );
-    const match = lower.match(regex);
-    if (match) {
-      return match[0].trim();
-    }
-  }
-  return null;
-};
-
-const titleCase = (value: string) =>
-  value.replace(/\b\w/g, (char) => char.toUpperCase());
-
-const addToGroupMap = (groupMap: Map<string, string[]>, title: string, items: string[]) => {
-  const existing = groupMap.get(title);
-  if (!existing) {
-    groupMap.set(title, Array.from(new Set(items)));
-    return;
-  }
-
-  for (const item of items) {
-    if (!existing.includes(item)) {
-      existing.push(item);
-    }
-  }
-};
-
-export const buildPrepGroupsFromInstructions = (
+export function buildPrepGroupsFromInstructions(
   ingredients: string[],
   instructions: string[]
-) => {
+) {
   if (ingredients.length === 0 || instructions.length === 0) {
     return [];
   }
@@ -525,82 +443,55 @@ export const buildPrepGroupsFromInstructions = (
     keywords: extractIngredientKeywords(line),
   }));
   const assigned = new Set<string>();
-  const groupMap = new Map<string, string[]>();
-
-  // Prefer explicit prep hints from ingredient lines ("sliced", "diced", etc)
-  // so mise en place reflects actual prep work instead of cooking-stage verbs.
-  for (const ingredient of ingredients) {
-    const prepTitle = findIngredientPrepTitle(ingredient);
-    if (!prepTitle) {
-      continue;
-    }
-    addToGroupMap(groupMap, prepTitle, [ingredient]);
-    assigned.add(ingredient);
-  }
+  const groups: PrepGroup[] = [];
 
   instructions.forEach((instruction, index) => {
     const lower = instruction.toLowerCase();
+    // Handle natural language lists by checking all keywords against the instruction
     const matches = ingredientKeywords.filter(
       (ingredient) =>
         !assigned.has(ingredient.line) &&
-        ingredient.keywords.some((keyword) => lower.includes(keyword))
+        ingredient.keywords.some((keyword) => {
+          // Robust whole-word match
+          const regex = new RegExp(`\\b${keyword} \\b`, "i");
+          return regex.test(lower);
+        })
     );
 
     if (matches.length === 0) {
       return;
     }
 
-    const prepPhrase = findPrepPhrase(instruction);
-    if (!prepPhrase && !/\bprep\b|\bprepare\b/.test(lower)) {
-      return;
-    }
+    // Default title is "Step N" as per spec
+    const title = `Step ${index + 1} `;
 
-    const title = prepPhrase ? titleCase(prepPhrase) : `Step ${index + 1} Prep`;
-    addToGroupMap(
-      groupMap,
+    groups.push({
       title,
-      matches.map((match) => match.line)
-    );
+      items: matches.map((match) => match.line),
+      stepIndex: index,
+    });
 
     matches.forEach((match) => assigned.add(match.line));
   });
 
-  const groups: PrepGroup[] = Array.from(groupMap.entries()).map(([title, items]) => {
-    // Find the first instruction index that mentioned these ingredients
-    let stepIndex: number | undefined;
-    for (let i = 0; i < instructions.length; i++) {
-      const lower = instructions[i].toLowerCase();
-      const keywords = items.flatMap(extractIngredientKeywords);
-      if (keywords.some((keyword) => lower.includes(keyword))) {
-        stepIndex = i;
-        break;
-      }
-    }
-
-    return {
-      title,
-      items,
-      stepIndex,
-    };
-  });
-
   const remaining = ingredients.filter((line) => !assigned.has(line));
-  if (groups.length === 0 && remaining.length === 0) {
+
+  // If no groups formed from instructions, we don't dump everything into one group.
+  // We return empty groups as per spec.
+  if (groups.length === 0) {
     return [];
   }
-
-  // Sort groups by stepIndex
-  groups.sort((a, b) => (a.stepIndex ?? 999) - (b.stepIndex ?? 999));
 
   if (remaining.length > 0) {
     groups.push({
       title: "Other Prep",
       items: remaining,
+      sourceGroup: false, // Added sourceGroup: false
     });
   }
 
   return groups;
-}
+};
 
 export function parseLines(value: string) {
   return value
@@ -673,7 +564,7 @@ export function coercePrepGroups(value: unknown): PrepGroup[] {
 
 export function serializePrepGroupsToText(groups: PrepGroup[]) {
   return groups
-    .map((group) => `${group.title}\n${group.items.map((item) => `- ${item}`).join("\n")}`)
+    .map((group) => `${group.title} \n${group.items.map((item) => `- ${item}`).join("\n")} `)
     .join("\n\n");
 }
 

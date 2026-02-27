@@ -7,12 +7,10 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import {
-  buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLines,
   cleanInstructionLines,
   cleanTextLines,
-  coercePrepGroups,
   coerceStringArray,
   parseLines,
   parsePrepGroupsFromText,
@@ -181,10 +179,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -203,10 +198,7 @@ export async function updateRecipeSection(formData: FormData) {
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -307,12 +299,32 @@ export async function updateRecipeSection(formData: FormData) {
         }
       }
 
-      const instructionPrepGroups = buildPrepGroupsFromInstructions(
-        cleanedInstructions.lines,
-        ingredientGroups.flatMap((g) => g.items)
-      );
+      const miseGroups: PrepGroup[] = [];
+      let mIdx = 0;
+      while (formData.get(`miseGroupExists_${mIdx}`)) {
+        const title = formData.get(`miseGroupTitle_${mIdx}`) as string || "";
+        const itemsRaw = formData.get(`miseGroupItems_${mIdx}`) as string || "";
+        const stepIndexRaw = formData.get(`miseGroupStepIndex_${mIdx}`) as string;
+        const items = itemsRaw.split("\n").filter(Boolean);
+        if (items.length > 0) {
+          miseGroups.push({
+            title,
+            items,
+            stepIndex: stepIndexRaw ? parseInt(stepIndexRaw, 10) : undefined,
+          });
+        }
+        mIdx++;
+      }
 
-      const finalPrepGroups = [...ingredientGroups, ...instructionPrepGroups];
+      // If no grouped inputs found for mise, and we're in section 'all', 
+      // check if we should rebuild them from instructions if they don't exist yet.
+      let finalMiseGroups = miseGroups;
+      if (finalMiseGroups.length === 0 && cleanedInstructions.lines.length > 0) {
+        finalMiseGroups = buildPrepGroupsFromInstructions(
+          ingredientGroups.flatMap((g) => g.items),
+          cleanedInstructions.lines
+        );
+      }
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -335,9 +347,7 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups: finalPrepGroups.length > 0
-            ? finalPrepGroups
-            : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: [...ingredientGroups, ...finalMiseGroups],
         },
       });
     }
@@ -390,4 +400,25 @@ export async function deleteRecipe(formData: FormData) {
   revalidatePath("/planner");
   revalidatePath("/shopping");
   redirect("/recipes");
+}
+
+export async function updatePrepGroupsOrder(formData: FormData) {
+  const recipeId = formData.get("recipeId")?.toString();
+  const prepGroupsRaw = formData.get("prepGroups")?.toString();
+
+  if (!recipeId || !prepGroupsRaw) {
+    return;
+  }
+
+  const householdId = await getCurrentHouseholdId();
+  try {
+    const prepGroups = JSON.parse(prepGroupsRaw);
+    await prisma.recipe.updateMany({
+      where: { id: recipeId, householdId },
+      data: { prepGroups },
+    });
+    revalidatePath(`/recipes/${recipeId}`);
+  } catch (error) {
+    console.error("Failed to update prep groups order:", error);
+  }
 }

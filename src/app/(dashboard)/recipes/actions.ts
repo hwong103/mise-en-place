@@ -1258,8 +1258,7 @@ const buildRecipePayload = (formData: FormData) => {
   const instructions = parseLines(formData.get("instructions")?.toString() ?? "");
   const notes = parseLines(formData.get("notes")?.toString() ?? "");
   const instructionPrepGroups = buildPrepGroupsFromInstructions(ingredients, instructions);
-  const prepGroups =
-    instructionPrepGroups.length > 0 ? instructionPrepGroups : buildPrepGroups(ingredients);
+  const prepGroups = instructionPrepGroups;
 
   return {
     title,
@@ -1802,8 +1801,8 @@ export async function importRecipeFromUrl(formData: FormData) {
       : null;
   const hasGroupedIngredients = Boolean(
     groupedIngredients &&
-      groupedIngredients.groups.length > 0 &&
-      groupedIngredients.ingredients.length > 0
+    groupedIngredients.groups.length > 0 &&
+    groupedIngredients.ingredients.length > 0
   );
   const cleanedIngredientsSource = hasGroupedIngredients
     ? { lines: groupedIngredients!.ingredients, notes: groupedIngredients!.notes }
@@ -1821,9 +1820,11 @@ export async function importRecipeFromUrl(formData: FormData) {
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
     cleanedIngredients.lines,
     cleanedInstructions.lines
-  );
+  ).map(g => ({ ...g, sourceGroup: false }));
+
   const metricGroupedPrepGroups = groupedIngredients?.groups.map((group) => ({
     ...group,
+    sourceGroup: true,
     items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
   }));
   const prepGroups =
@@ -1831,7 +1832,7 @@ export async function importRecipeFromUrl(formData: FormData) {
       ? metricGroupedPrepGroups!
       : instructionPrepGroups.length > 0
         ? instructionPrepGroups
-        : buildPrepGroups(cleanedIngredients.lines);
+        : [];
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||
@@ -1865,12 +1866,12 @@ export async function importRecipeFromUrl(formData: FormData) {
   const notes = normalizeImportedNotes(
     Array.from(
       new Set([
-      ...cleanedIngredients.notes,
-      ...cleanedInstructions.notes,
-      ...(markdownRecipe?.notes ?? []),
-      ...selectedCandidate.notes,
-      ...htmlNotes,
-      ...descriptionNotes,
+        ...cleanedIngredients.notes,
+        ...cleanedInstructions.notes,
+        ...(markdownRecipe?.notes ?? []),
+        ...selectedCandidate.notes,
+        ...htmlNotes,
+        ...descriptionNotes,
       ])
     )
   );

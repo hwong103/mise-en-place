@@ -15,22 +15,8 @@ import {
   coercePrepGroups,
   coerceStringArray,
   isIngredientGroupTitle,
-  type PrepGroup,
 } from "@/lib/recipe-utils";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  ExternalLink,
-  Loader2,
-  Plus,
-  Play,
-  RotateCcw,
-  Sparkles,
-  Timer,
-  Trash2,
-  X,
-} from "lucide-react";
+
 
 import { deleteRecipe, updateRecipeSection } from "../detail-actions";
 
@@ -213,6 +199,7 @@ export default async function RecipeDetailPage({
                 prepGroups={prepGroups}
                 ingredients={ingredients}
                 instructions={instructions}
+                notes={notes}
                 triggerWrapperClassName="contents"
                 miseButtonClassName="rounded-[20px] border-[1.5px] border-white/60 bg-transparent px-[18px] py-2 text-[13px] font-semibold text-white transition-colors hover:border-white hover:bg-white/10"
                 cookButtonClassName="rounded-[20px] border-0 bg-[#C67B2A] px-[18px] py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(198,123,42,0.35)] transition-colors hover:bg-[#B56E24]"
@@ -290,7 +277,7 @@ export default async function RecipeDetailPage({
           <>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <input type="hidden" name="section" value="all" />
-            <div className="sticky top-4 z-10 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm dark:border-emerald-950/40 dark:bg-emerald-950/40">
+            <div className="sticky top-4 z-10 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-md dark:border-emerald-950/40 dark:bg-emerald-950/40 backdrop-blur-md">
               <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                 Editing recipe
               </span>
@@ -329,6 +316,7 @@ export default async function RecipeDetailPage({
                       prepGroups={prepGroups}
                       ingredients={ingredients}
                       instructions={instructions}
+                      notes={notes}
                     />
                   )}
                 </div>
@@ -361,19 +349,35 @@ export default async function RecipeDetailPage({
                 )}
               </section>
 
-              {miseGroups.length > 0 || isEditing ? (
-                <section className="rounded-3xl border border-amber-200 bg-amber-50/30 p-6 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/10">
-                  <div className="flex items-center justify-between">
+              {/* Mise Prep Groups Card */}
+              <section className="rounded-3xl border border-amber-200 bg-amber-50/30 p-6 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/10">
+                <div className="flex items-center justify-between">
+                  <div>
                     <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise Prep Groups</h2>
                     {!isEditing && (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600/70 dark:text-amber-400/50">
                         Instruction Derived
                       </span>
                     )}
                   </div>
-                  {!isEditing ? (
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      {miseGroups.map((group) => (
+                </div>
+                {isEditing ? (
+                  <div className="mt-4">
+                    {/* We'll use a new MisePrepGroupsEditor here or update IngredientGroupsEditor */}
+                    <IngredientGroupsEditor
+                      initialGroups={miseGroups}
+                      prefix="miseGroup"
+                      showStepBadge
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    {miseGroups.length === 0 ? (
+                      <p className="col-span-2 py-4 text-center text-sm italic text-slate-500">
+                        No prep groups derived. Edit recipe to manually add groups.
+                      </p>
+                    ) : (
+                      miseGroups.map((group) => (
                         <div key={group.title} className="group relative rounded-2xl border border-white bg-white/60 p-4 shadow-sm transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-900">
                           <div className="flex items-start justify-between">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -394,15 +398,11 @@ export default async function RecipeDetailPage({
                             ))}
                           </ul>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed border-slate-200 p-4 text-center dark:border-slate-800">
-                      <p className="text-sm text-slate-500">Mise groups are automatically updated when you save changes to ingredients or instructions.</p>
-                    </div>
-                  )}
-                </section>
-              ) : null}
+                      ))
+                    )}
+                  </div>
+                )}
+              </section>
 
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
