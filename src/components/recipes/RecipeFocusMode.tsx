@@ -1,19 +1,25 @@
 "use client";
 
 import { type TouchEvent, useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Play } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Play } from "lucide-react";
 import { createPortal } from "react-dom";
+
+import { updatePrepGroupsOrder } from "@/app/(dashboard)/recipes/detail-actions";
 
 type PrepGroup = {
   title: string;
   items: string[];
+  stepIndex?: number;
+  sourceGroup?: boolean;
 };
 
 type RecipeFocusModeProps = {
   title: string;
+  recipeId?: string;
   prepGroups: PrepGroup[];
   ingredients: string[];
   instructions: string[];
+  notes: string[];
   triggerWrapperClassName?: string;
   miseButtonClassName?: string;
   cookButtonClassName?: string;
@@ -35,11 +41,132 @@ type NavigatorWithWakeLock = Navigator & {
   };
 };
 
+// Colour palette for ingredient highlight groups (amber, sky, violet, rose, teal)
+const GROUP_COLOURS = [
+  {
+    border: "border-l-amber-400 dark:border-l-amber-500",
+    badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+    highlight: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200",
+    dot: "bg-amber-400",
+  },
+  {
+    border: "border-l-sky-400 dark:border-l-sky-500",
+    badge: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+    highlight: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200",
+    dot: "bg-sky-400",
+  },
+  {
+    border: "border-l-violet-400 dark:border-l-violet-500",
+    badge: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
+    highlight: "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200",
+    dot: "bg-violet-400",
+  },
+  {
+    border: "border-l-rose-400 dark:border-l-rose-500",
+    badge: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
+    highlight: "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200",
+    dot: "bg-rose-400",
+  },
+  {
+    border: "border-l-teal-400 dark:border-l-teal-500",
+    badge: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
+    highlight: "bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200",
+    dot: "bg-teal-400",
+  },
+] as const;
+
+/**
+ * Strip quantities, units, and extra descriptors from an ingredient line
+ * to get the core ingredient noun(s) for text matching.
+ * e.g. "2 cloves garlic, minced" → "garlic"
+ */
+function extractIngredientNoun(line: string): string {
+  // Remove leading quantity + unit patterns
+  const withoutLeadingAmount = line
+    .replace(/^\d[\d\s/¼½¾⅓⅔⅛⅜⅝⅞.-]*/, "")
+    .replace(/^(?:g|kg|mg|ml|l|oz|lbs?|pounds?|tbsp|tsp|cups?|tablespoons?|teaspoons?|cloves?|pinch|dash|packages?|cans?|slices?|inches?)\s+/i, "")
+    .trim();
+  // Remove trailing prep descriptors after comma
+  const withoutNotes = withoutLeadingAmount.replace(/,.*$/, "").trim();
+  // Remove parenthetical notes
+  const withoutParens = withoutNotes.replace(/\([^)]*\)/g, "").trim();
+  return withoutParens.toLowerCase();
+}
+
+/**
+ * Build a map from ingredient noun → colour index, based on which prep group owns each ingredient.
+ */
+function buildIngredientColourMap(groups: PrepGroup[]): Map<string, number> {
+  const map = new Map<string, number>();
+  groups.forEach((group, groupIndex) => {
+    const colourIndex = groupIndex % GROUP_COLOURS.length;
+    for (const item of group.items) {
+      const noun = extractIngredientNoun(item);
+      if (noun.length > 2 && !map.has(noun)) {
+        map.set(noun, colourIndex);
+      }
+    }
+  });
+  return map;
+}
+
+/**
+ * Highlight ingredient nouns within an instruction step text.
+ * Returns an array of React-renderable segments.
+ */
+function highlightIngredients(
+  text: string,
+  colourMap: Map<string, number>
+): Array<{ text: string; colourIndex?: number }> {
+  if (colourMap.size === 0) return [{ text }];
+
+  // Build a sorted list of nouns (longest first to prefer specific matches)
+  const nouns = Array.from(colourMap.keys()).sort((a, b) => b.length - a.length);
+  const segments: Array<{ text: string; colourIndex?: number }> = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    let bestMatch: { index: number; noun: string; colourIndex: number } | null = null;
+    const lowerRemaining = remaining.toLowerCase();
+
+    for (const noun of nouns) {
+      if (noun.length < 3) continue;
+      const idx = lowerRemaining.indexOf(noun);
+      if (idx === -1) continue;
+      // Ensure it's a word boundary (not mid-word)
+      const before = idx > 0 ? remaining[idx - 1] : " ";
+      const after = idx + noun.length < remaining.length ? remaining[idx + noun.length] : " ";
+      if (/[a-z]/i.test(before) || /[a-z]/i.test(after)) continue;
+      if (!bestMatch || idx < bestMatch.index || (idx === bestMatch.index && noun.length > bestMatch.noun.length)) {
+        bestMatch = { index: idx, noun, colourIndex: colourMap.get(noun)! };
+      }
+    }
+
+    if (!bestMatch) {
+      segments.push({ text: remaining });
+      break;
+    }
+
+    if (bestMatch.index > 0) {
+      segments.push({ text: remaining.slice(0, bestMatch.index) });
+    }
+    segments.push({
+      text: remaining.slice(bestMatch.index, bestMatch.index + bestMatch.noun.length),
+      colourIndex: bestMatch.colourIndex,
+    });
+    remaining = remaining.slice(bestMatch.index + bestMatch.noun.length);
+  }
+
+  return segments;
+}
+
 export default function RecipeFocusMode({
   title,
-  prepGroups,
+  recipeId,
+  prepGroups: initialPrepGroups,
   ingredients,
   instructions,
+  notes,
   triggerWrapperClassName,
   miseButtonClassName,
   cookButtonClassName,
@@ -51,16 +178,27 @@ export default function RecipeFocusMode({
   const [renderedStepIndex, setRenderedStepIndex] = useState(0);
   const [transitionDirection, setTransitionDirection] = useState<1 | -1>(1);
   const [transitionPhase, setTransitionPhase] = useState<"idle" | "out" | "in">("idle");
+  const [prepGroups, setPrepGroups] = useState<PrepGroup[]>(initialPrepGroups);
+  const [dragSaveError, setDragSaveError] = useState(false);
   const misePrepRef = useRef<HTMLDivElement | null>(null);
-  const miseIngredientsRef = useRef<HTMLDivElement | null>(null);
+  const miseRightRef = useRef<HTMLDivElement | null>(null);
   const cookQuickRef = useRef<HTMLDivElement | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
+  const dragSourceIndexRef = useRef<number | null>(null);
   const stepCount = instructions.length;
+
+  // Keep local prepGroups in sync when prop changes (e.g. after revalidation)
+  useEffect(() => {
+    setPrepGroups(initialPrepGroups);
+  }, [initialPrepGroups]);
 
   const canGoPrev = stepCount > 0 && activeStepIndex > 0;
   const canGoNext = stepCount > 0 && activeStepIndex < stepCount - 1;
   const progressPercent = stepCount > 0 ? ((activeStepIndex + 1) / stepCount) * 100 : 0;
+
+  // Build ingredient → colour map for highlights
+  const ingredientColourMap = buildIngredientColourMap(prepGroups);
 
   const clearTransitionTimers = useCallback(() => {
     if (transitionTimeoutRef.current) {
@@ -245,6 +383,43 @@ export default function RecipeFocusMode({
     }
   };
 
+  // Drag-and-drop handlers for prep group reordering
+  const handleDragStart = (index: number) => {
+    dragSourceIndexRef.current = index;
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (targetIndex: number) => {
+    const sourceIndex = dragSourceIndexRef.current;
+    if (sourceIndex === null || sourceIndex === targetIndex) {
+      dragSourceIndexRef.current = null;
+      return;
+    }
+
+    const reordered = [...prepGroups];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    dragSourceIndexRef.current = null;
+
+    const previous = prepGroups;
+    setPrepGroups(reordered);
+    setDragSaveError(false);
+
+    if (recipeId) {
+      void updatePrepGroupsOrder(recipeId, reordered).then((result) => {
+        if (!result.success) {
+          // Revert optimistic update on failure
+          setPrepGroups(previous);
+          setDragSaveError(true);
+          setTimeout(() => setDragSaveError(false), 4000);
+        }
+      });
+    }
+  };
+
   const stepMotionClass =
     transitionPhase === "out"
       ? transitionDirection === 1
@@ -331,39 +506,120 @@ export default function RecipeFocusMode({
 
             {mode === "mise" ? (
               <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.4fr_1fr]">
+                {/* Left panel: Prep Groups with drag-and-drop */}
                 <section ref={misePrepRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                  <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                    Prep Groups
-                  </h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      Prep Groups
+                    </h3>
+                    {dragSaveError ? (
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-600 dark:bg-rose-900/40 dark:text-rose-400">
+                        Save failed — order reverted
+                      </span>
+                    ) : null}
+                    {recipeId ? (
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                        Drag to reorder
+                      </span>
+                    ) : null}
+                  </div>
                   {prepGroups.length === 0 ? (
                     <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No prep groups yet.</p>
                   ) : (
-                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                      {prepGroups.map((group) => (
-                        <div key={group.title} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{group.title}</h4>
-                          <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                            {group.items.map((item) => (
-                              <li key={`${group.title}-${item}`}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      {prepGroups.map((group, groupIndex) => {
+                        const colour = GROUP_COLOURS[groupIndex % GROUP_COLOURS.length];
+                        return (
+                          <div
+                            key={group.title}
+                            draggable={!!recipeId}
+                            onDragStart={() => handleDragStart(groupIndex)}
+                            onDragOver={handleDragOver}
+                            onDrop={() => handleDrop(groupIndex)}
+                            className={`group relative rounded-xl border border-slate-200 border-l-4 ${colour.border} bg-white p-3 dark:border-slate-700 dark:bg-slate-900 ${recipeId ? "cursor-grab active:cursor-grabbing active:opacity-60" : ""}`}
+                          >
+                            <div className="flex items-start gap-2">
+                              {recipeId ? (
+                                <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+                              ) : null}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    {group.title}
+                                  </h4>
+                                  {group.stepIndex !== undefined ? (
+                                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${colour.badge}`}>
+                                      Step {group.stepIndex + 1}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                                  {group.items.map((item) => (
+                                    <li key={`${group.title}-${item}`} className="flex items-start gap-1.5">
+                                      <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${colour.dot}`} />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </section>
 
-                <section ref={miseIngredientsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                {/* Right panel: Instructions with ingredient highlights + Notes */}
+                <section ref={miseRightRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                    Ingredients
+                    Instructions
                   </h3>
-                  <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                    {ingredients.map((ingredient) => (
-                      <li key={ingredient} className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-                        {ingredient}
-                      </li>
-                    ))}
-                  </ul>
+                  {instructions.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No instructions.</p>
+                  ) : (
+                    <ol className="mt-3 space-y-3">
+                      {instructions.map((step, stepIndex) => {
+                        const segments = highlightIngredients(step, ingredientColourMap);
+                        return (
+                          <li key={`step-${stepIndex}`} className="flex gap-3 text-sm text-slate-700 dark:text-slate-200">
+                            <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                              {stepIndex + 1}
+                            </span>
+                            <span className="leading-relaxed">
+                              {segments.map((seg, si) =>
+                                seg.colourIndex !== undefined ? (
+                                  <mark
+                                    key={si}
+                                    className={`rounded px-0.5 font-medium not-italic ${GROUP_COLOURS[seg.colourIndex % GROUP_COLOURS.length].highlight}`}
+                                  >
+                                    {seg.text}
+                                  </mark>
+                                ) : (
+                                  <span key={si}>{seg.text}</span>
+                                )
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+
+                  {notes.length > 0 ? (
+                    <div className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700">
+                      <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                        Notes
+                      </h3>
+                      <ul className="mt-3 space-y-2">
+                        {notes.map((note, ni) => (
+                          <li key={ni} className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                            {note}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </section>
               </div>
             ) : (

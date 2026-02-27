@@ -7,11 +7,13 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import {
+  type PrepGroup,
   buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLines,
   cleanInstructionLines,
   cleanTextLines,
+  coercePrepGroups,
   coerceStringArray,
   parseLines,
   parsePrepGroupsFromText,
@@ -336,6 +338,67 @@ export async function updateRecipeSection(formData: FormData) {
 
   revalidatePath(`/recipes/${recipeId}`);
   redirect(`/recipes/${recipeId}`);
+}
+
+export async function updatePrepGroupsOrder(recipeId: string, orderedGroups: PrepGroup[]) {
+  const startedAt = Date.now();
+  let householdId: string | undefined;
+
+  try {
+    householdId = await getCurrentHouseholdId();
+    const recipe = await prisma.recipe.findFirst({
+      where: { id: recipeId, householdId },
+      select: { id: true, prepGroups: true },
+    });
+
+    if (!recipe) {
+      logServerPerf({
+        phase: "recipes.update_prep_groups_order",
+        route: "/recipes/[id]",
+        startedAt,
+        success: false,
+        householdId,
+        meta: { recipe_id: recipeId, reason: "missing_recipe" },
+      });
+      return { success: false, error: "Recipe not found" };
+    }
+
+    // Validate orderedGroups preserves the same set as stored (don't allow injection)
+    const existingGroups = coercePrepGroups(recipe.prepGroups);
+    const existingTitles = new Set(existingGroups.map((g) => g.title));
+    const sanitized = orderedGroups.filter((g) => existingTitles.has(g.title));
+
+    await prisma.recipe.updateMany({
+      where: { id: recipeId, householdId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { prepGroups: sanitized as any },
+    });
+
+    logServerPerf({
+      phase: "recipes.update_prep_groups_order",
+      route: "/recipes/[id]",
+      startedAt,
+      success: true,
+      householdId,
+      meta: { recipe_id: recipeId, group_count: sanitized.length },
+    });
+
+    revalidatePath(`/recipes/${recipeId}`);
+    return { success: true };
+  } catch (error) {
+    logServerPerf({
+      phase: "recipes.update_prep_groups_order",
+      route: "/recipes/[id]",
+      startedAt,
+      success: false,
+      householdId,
+      meta: {
+        recipe_id: recipeId,
+        error: error instanceof Error ? error.message : "unknown_error",
+      },
+    });
+    return { success: false, error: "Failed to save order" };
+  }
 }
 
 export async function deleteRecipe(formData: FormData) {

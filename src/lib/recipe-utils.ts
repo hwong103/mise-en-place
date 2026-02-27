@@ -1,6 +1,8 @@
 export type PrepGroup = {
   title: string;
   items: string[];
+  stepIndex?: number; // 0-based index of the instruction step this group relates to
+  sourceGroup?: boolean; // true = from source recipe's own section headers (Ingredients card), false/absent = instruction-derived mise group
 };
 
 const HTML_ENTITY_MAP: Record<string, string> = {
@@ -496,16 +498,18 @@ const findPrepPhrase = (instruction: string) => {
 const titleCase = (value: string) =>
   value.replace(/\b\w/g, (char) => char.toUpperCase());
 
-const addToGroupMap = (groupMap: Map<string, string[]>, title: string, items: string[]) => {
+type GroupEntry = { items: string[]; stepIndex?: number };
+
+const addToGroupMap = (groupMap: Map<string, GroupEntry>, title: string, items: string[], stepIndex?: number) => {
   const existing = groupMap.get(title);
   if (!existing) {
-    groupMap.set(title, Array.from(new Set(items)));
+    groupMap.set(title, { items: Array.from(new Set(items)), stepIndex });
     return;
   }
 
   for (const item of items) {
-    if (!existing.includes(item)) {
-      existing.push(item);
+    if (!existing.items.includes(item)) {
+      existing.items.push(item);
     }
   }
 };
@@ -523,7 +527,7 @@ export const buildPrepGroupsFromInstructions = (
     keywords: extractIngredientKeywords(line),
   }));
   const assigned = new Set<string>();
-  const groupMap = new Map<string, string[]>();
+  const groupMap = new Map<string, GroupEntry>();
 
   // Prefer explicit prep hints from ingredient lines ("sliced", "diced", etc)
   // so mise en place reflects actual prep work instead of cooking-stage verbs.
@@ -557,15 +561,17 @@ export const buildPrepGroupsFromInstructions = (
     addToGroupMap(
       groupMap,
       title,
-      matches.map((match) => match.line)
+      matches.map((match) => match.line),
+      index
     );
 
     matches.forEach((match) => assigned.add(match.line));
   });
 
-  const groups: PrepGroup[] = Array.from(groupMap.entries()).map(([title, items]) => ({
+  const groups: PrepGroup[] = Array.from(groupMap.entries()).map(([title, entry]) => ({
     title,
-    items,
+    items: entry.items,
+    ...(entry.stepIndex !== undefined ? { stepIndex: entry.stepIndex } : {}),
   }));
   const remaining = ingredients.filter((line) => !assigned.has(line));
   if (groups.length === 0) {
@@ -642,7 +648,18 @@ export function coercePrepGroups(value: unknown): PrepGroup[] {
         return null;
       }
 
-      return { title, items } satisfies PrepGroup;
+      const stepIndex =
+        typeof record.stepIndex === "number" && Number.isFinite(record.stepIndex) && record.stepIndex >= 0
+          ? Math.trunc(record.stepIndex)
+          : undefined;
+
+      const sourceGroup =
+        typeof record.sourceGroup === "boolean" ? record.sourceGroup : undefined;
+
+      const group: PrepGroup = { title, items };
+      if (stepIndex !== undefined) group.stepIndex = stepIndex;
+      if (sourceGroup !== undefined) group.sourceGroup = sourceGroup;
+      return group;
     })
     .filter((entry): entry is PrepGroup => Boolean(entry));
 }
