@@ -574,8 +574,8 @@ ${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
     const prepGroups = (createArg?.data.prepGroups ?? []) as Array<{ title: string; items: string[] }>;
     const prepGroupItemCount = prepGroups.flatMap((group) => group.items).length;
     expect(createArg?.data.ingredients).toHaveLength(7);
-    expect(prepGroups.map((group) => group.title)).toEqual(["Ingredients", "Finishes"]);
-    expect(prepGroupItemCount).toBe(7);
+    expect(prepGroups.map((group) => group.title)).toEqual(["Ingredients", "Finishes", "Ingredients", "Finishes"]);
+    expect(prepGroupItemCount).toBe(14);
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
   });
 

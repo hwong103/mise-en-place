@@ -126,6 +126,18 @@ export default async function RecipeDetailPage({
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
 
+  // Ingredient groups (sourceGroup=true) for the Ingredients card with headers
+  const ingredientGroups = (() => {
+    const sourceGroups = prepGroups.filter((g) => g.sourceGroup);
+    if (sourceGroups.length > 0) return sourceGroups;
+    if (ingredients.length > 0) {
+      return [{ title: "", items: ingredients }];
+    }
+    return [];
+  })();
+
+  // Mise prep groups (sourceGroup=false) for the Prep Groups card and Mise Focus
+  const miseGroups = prepGroups.filter((g) => !g.sourceGroup);
 
   const editParam = Array.isArray(resolvedSearchParams.edit)
     ? resolvedSearchParams.edit[0]
@@ -308,25 +320,30 @@ export default async function RecipeDetailPage({
                 </div>
 
                 {isEditing ? (
-                  <LineListEditor
-                    name="ingredients"
-                    initialItems={ingredients}
-                    ordered={false}
-                    placeholder="e.g. 2 tbsp olive oil"
-                    addLabel="+ Add ingredient"
-                  />
+                  <IngredientGroupsEditor initialGroups={ingredientGroups} />
                 ) : (
-                  <ul className="space-y-2.5">
-                    {ingredients.map((item, idx) => (
-                      <li
-                        key={idx}
-                        className="flex items-start gap-3 text-[15px] text-slate-600 dark:text-slate-300"
-                      >
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/40" />
-                        <span>{item}</span>
-                      </li>
+                  <div className="space-y-6">
+                    {ingredientGroups.map((group, groupIdx) => (
+                      <div key={groupIdx}>
+                        {group.title && (
+                          <h3 className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                            {group.title}
+                          </h3>
+                        )}
+                        <ul className="space-y-2.5">
+                          {group.items.map((item, itemIdx) => (
+                            <li
+                              key={itemIdx}
+                              className="flex items-start gap-3 text-[15px] text-slate-600 dark:text-slate-300"
+                            >
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/40" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </section>
 
@@ -340,18 +357,18 @@ export default async function RecipeDetailPage({
                 {isEditing ? (
                   <div className="mt-4">
                     <IngredientGroupsEditor
-                      initialGroups={prepGroups}
-                      prefix="prepGroup"
+                      initialGroups={miseGroups}
+                      prefix="miseGroup"
                     />
                   </div>
                 ) : (
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    {prepGroups.length === 0 ? (
+                    {miseGroups.length === 0 ? (
                       <p className="col-span-2 py-4 text-center text-sm italic text-slate-500">
                         No prep groups. Edit recipe to add groups.
                       </p>
                     ) : (
-                      prepGroups.map((group) => (
+                      miseGroups.map((group) => (
                         <div key={group.title} className="group relative rounded-2xl border border-white bg-white/60 p-4 shadow-sm transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-900">
                           <div className="flex items-start justify-between">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">

@@ -1820,22 +1820,26 @@ export async function importRecipeFromUrl(formData: FormData) {
   };
   const htmlNotes = candidateHtml ? extractNotesFromHtml(candidateHtml) : [];
 
-  // Prep groups: use source ingredient groupings only (no instruction-derived groups).
-  // These are independent from the flat ingredients list so users can edit groups freely.
+  // Prep groups: store two copies of source groupings so ingredients and prep groups
+  // are independently editable. sourceGroup=true powers the Ingredients card (with headers),
+  // sourceGroup=false powers the Prep Groups card and Mise Focus mode.
   const ingredientGroupCandidates =
     selectedCandidate.ingredientGroups?.length
       ? selectedCandidate.ingredientGroups
       : extractIngredientGroupsFromLines(selectedCandidate.ingredients);
-  const prepGroups: PrepGroup[] =
+  const sourceGroupsRaw =
     ingredientGroupCandidates.length > 0
       ? cleanIngredientGroups(ingredientGroupCandidates).groups.map((group) => ({
         ...group,
-        sourceGroup: true,
         items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
       }))
       : cleanedIngredients.lines.length > 0
-        ? [{ title: "Ingredients", items: [...cleanedIngredients.lines], sourceGroup: true }]
+        ? [{ title: "Ingredients", items: [...cleanedIngredients.lines] }]
         : [];
+  const prepGroups: PrepGroup[] = [
+    ...sourceGroupsRaw.map((g) => ({ ...g, sourceGroup: true })),
+    ...sourceGroupsRaw.map((g) => ({ ...g, sourceGroup: false })),
+  ];
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||

@@ -270,18 +270,33 @@ export async function updateRecipeSection(formData: FormData) {
       const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
       const cleanedNotes = cleanTextLines(rawNotes);
 
-      // Collect prep groups from the form (these are independent from the flat ingredients list)
-      const prepGroupsList: PrepGroup[] = [];
+      // Collect ingredient groups (sourceGroup=true) from the Ingredients card
+      const ingredientGroups: PrepGroup[] = [];
       let gIdx = 0;
-      while (formData.get(`prepGroupExists_${gIdx}`)) {
-        const title = formData.get(`prepGroupTitle_${gIdx}`) as string || "";
-        const itemsRaw = formData.get(`prepGroupItems_${gIdx}`) as string || "";
+      while (formData.get(`ingredientGroupExists_${gIdx}`)) {
+        const title = formData.get(`ingredientGroupTitle_${gIdx}`) as string || "";
+        const itemsRaw = formData.get(`ingredientGroupItems_${gIdx}`) as string || "";
         const items = itemsRaw.split("\n").filter(Boolean);
         if (items.length > 0) {
-          prepGroupsList.push({ title, items, sourceGroup: true });
+          ingredientGroups.push({ title, items, sourceGroup: true });
         }
         gIdx++;
       }
+
+      // Collect mise/prep groups (sourceGroup=false) from the Prep Groups card
+      const miseGroups: PrepGroup[] = [];
+      let mIdx = 0;
+      while (formData.get(`miseGroupExists_${mIdx}`)) {
+        const title = formData.get(`miseGroupTitle_${mIdx}`) as string || "";
+        const itemsRaw = formData.get(`miseGroupItems_${mIdx}`) as string || "";
+        const items = itemsRaw.split("\n").filter(Boolean);
+        if (items.length > 0) {
+          miseGroups.push({ title, items, sourceGroup: false });
+        }
+        mIdx++;
+      }
+
+      const allPrepGroups = [...ingredientGroups, ...miseGroups];
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -304,7 +319,7 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups: prepGroupsList,
+          prepGroups: allPrepGroups,
         },
       });
     }
