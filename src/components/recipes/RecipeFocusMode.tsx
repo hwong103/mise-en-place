@@ -113,6 +113,10 @@ function buildIngredientColourMap(groups: PrepGroup[]): Map<string, number> {
 /**
  * Highlight ingredient nouns within an instruction step text.
  * Returns an array of React-renderable segments.
+ *
+ * Uses whole-word regex matching (\b boundaries) and prefers longer
+ * (more specific) nouns. The first matching group (lowest group index)
+ * wins for any given word position.
  */
 function highlightIngredients(
   text: string,
@@ -120,41 +124,48 @@ function highlightIngredients(
 ): Array<{ text: string; colourIndex?: number }> {
   if (colourMap.size === 0) return [{ text }];
 
-  // Build a sorted list of nouns (longest first to prefer specific matches)
-  const nouns = Array.from(colourMap.keys()).sort((a, b) => b.length - a.length);
-  const segments: Array<{ text: string; colourIndex?: number }> = [];
-  let remaining = text;
+  // Build a sorted list of nouns longest-first so compound nouns ("vegetable broth")
+  // are matched before single-word substrings ("broth").
+  const nouns = Array.from(colourMap.keys())
+    .filter((n) => n.length >= 3)
+    .sort((a, b) => b.length - a.length);
 
-  while (remaining.length > 0) {
-    let bestMatch: { index: number; noun: string; colourIndex: number } | null = null;
-    const lowerRemaining = remaining.toLowerCase();
+  // Find all non-overlapping matches across the full text, then build segments.
+  type MatchSpan = { start: number; end: number; colourIndex: number };
+  const spans: MatchSpan[] = [];
 
-    for (const noun of nouns) {
-      if (noun.length < 3) continue;
-      const idx = lowerRemaining.indexOf(noun);
-      if (idx === -1) continue;
-      // Ensure it's a word boundary (not mid-word)
-      const before = idx > 0 ? remaining[idx - 1] : " ";
-      const after = idx + noun.length < remaining.length ? remaining[idx + noun.length] : " ";
-      if (/[a-z]/i.test(before) || /[a-z]/i.test(after)) continue;
-      if (!bestMatch || idx < bestMatch.index || (idx === bestMatch.index && noun.length > bestMatch.noun.length)) {
-        bestMatch = { index: idx, noun, colourIndex: colourMap.get(noun)! };
+  for (const noun of nouns) {
+    // Escape special regex chars in the noun
+    const escaped = noun.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`\\b${escaped}\\b`, "gi");
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(text)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      // Skip if this range overlaps an already-claimed span (first match wins)
+      const overlaps = spans.some((s) => start < s.end && end > s.start);
+      if (!overlaps) {
+        spans.push({ start, end, colourIndex: colourMap.get(noun)! });
       }
     }
+  }
 
-    if (!bestMatch) {
-      segments.push({ text: remaining });
-      break;
-    }
+  if (spans.length === 0) return [{ text }];
 
-    if (bestMatch.index > 0) {
-      segments.push({ text: remaining.slice(0, bestMatch.index) });
+  // Sort spans by position ascending
+  spans.sort((a, b) => a.start - b.start);
+
+  const segments: Array<{ text: string; colourIndex?: number }> = [];
+  let cursor = 0;
+  for (const span of spans) {
+    if (span.start > cursor) {
+      segments.push({ text: text.slice(cursor, span.start) });
     }
-    segments.push({
-      text: remaining.slice(bestMatch.index, bestMatch.index + bestMatch.noun.length),
-      colourIndex: bestMatch.colourIndex,
-    });
-    remaining = remaining.slice(bestMatch.index + bestMatch.noun.length);
+    segments.push({ text: text.slice(span.start, span.end), colourIndex: span.colourIndex });
+    cursor = span.end;
+  }
+  if (cursor < text.length) {
+    segments.push({ text: text.slice(cursor) });
   }
 
   return segments;
@@ -180,6 +191,7 @@ export default function RecipeFocusMode({
   const [transitionPhase, setTransitionPhase] = useState<"idle" | "out" | "in">("idle");
   const [prepGroups, setPrepGroups] = useState<PrepGroup[]>(initialPrepGroups);
   const [dragSaveError, setDragSaveError] = useState(false);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const misePrepRef = useRef<HTMLDivElement | null>(null);
   const miseRightRef = useRef<HTMLDivElement | null>(null);
   const cookQuickRef = useRef<HTMLDivElement | null>(null);
@@ -388,11 +400,20 @@ export default function RecipeFocusMode({
     dragSourceIndexRef.current = index;
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>, index: number) => {
     event.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    // Only clear if leaving the card entirely (not entering a child element)
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setDragOverIndex(null);
+    }
   };
 
   const handleDrop = (targetIndex: number) => {
+    setDragOverIndex(null);
     const sourceIndex = dragSourceIndexRef.current;
     if (sourceIndex === null || sourceIndex === targetIndex) {
       dragSourceIndexRef.current = null;
@@ -534,9 +555,10 @@ export default function RecipeFocusMode({
                             key={group.title}
                             draggable={!!recipeId}
                             onDragStart={() => handleDragStart(groupIndex)}
-                            onDragOver={handleDragOver}
+                            onDragOver={(e) => handleDragOver(e, groupIndex)}
+                            onDragLeave={handleDragLeave}
                             onDrop={() => handleDrop(groupIndex)}
-                            className={`group relative rounded-xl border border-slate-200 border-l-4 ${colour.border} bg-white p-3 dark:border-slate-700 dark:bg-slate-900 ${recipeId ? "cursor-grab active:cursor-grabbing active:opacity-60" : ""}`}
+                            className={`group relative rounded-xl border border-l-4 ${colour.border} bg-white p-3 transition-colors dark:bg-slate-900 ${recipeId ? "cursor-grab active:cursor-grabbing active:opacity-60" : ""} ${dragOverIndex === groupIndex && dragSourceIndexRef.current !== groupIndex ? "border-amber-400 ring-2 ring-amber-300 dark:border-amber-500 dark:ring-amber-500/50" : "border-slate-200 dark:border-slate-700"}`}
                           >
                             <div className="flex items-start gap-2">
                               {recipeId ? (

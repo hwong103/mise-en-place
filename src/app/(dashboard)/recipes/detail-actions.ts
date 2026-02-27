@@ -8,7 +8,6 @@ import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import {
   type PrepGroup,
-  buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLines,
   cleanInstructionLines,
@@ -181,10 +180,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
         },
       });
     }
@@ -203,10 +199,7 @@ export async function updateRecipeSection(formData: FormData) {
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
         },
       });
     }
@@ -224,7 +217,19 @@ export async function updateRecipeSection(formData: FormData) {
 
     if (section === "prepGroups") {
       const raw = formData.get("prepGroups")?.toString() ?? "";
-      const prepGroups = parsePrepGroupsFromText(raw);
+      const parsed = parsePrepGroupsFromText(raw);
+      // Re-attach stepIndex and sourceGroup from existing stored groups when the
+      // title matches — the textarea edit loses these metadata fields.
+      const existingByTitle = new Map(
+        coercePrepGroups(recipe.prepGroups).map((g) => [g.title, g])
+      );
+      const prepGroups: PrepGroup[] = parsed.map((g) => {
+        const existing = existingByTitle.get(g.title);
+        const merged: PrepGroup = { ...g };
+        if (existing?.stepIndex !== undefined) merged.stepIndex = existing.stepIndex;
+        if (existing?.sourceGroup !== undefined) merged.sourceGroup = existing.sourceGroup;
+        return merged;
+      });
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
         data: {
@@ -304,10 +309,7 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
         },
       });
     }

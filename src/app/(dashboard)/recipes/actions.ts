@@ -8,12 +8,12 @@ import { logServerPerf } from "@/lib/server-perf";
 import { fromDateKey } from "@/lib/date";
 import { parseMarkdownRecipe } from "@/lib/recipe-import";
 import {
-  buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLine,
   cleanIngredientLines,
   cleanInstructionLines,
   cleanTextLines,
+  coercePrepGroups,
   coerceStringArray,
   convertIngredientMeasurementToMetric,
   parseLines,
@@ -1273,8 +1273,7 @@ const buildRecipePayload = (formData: FormData) => {
   const instructions = parseLines(formData.get("instructions")?.toString() ?? "");
   const notes = parseLines(formData.get("notes")?.toString() ?? "");
   const instructionPrepGroups = buildPrepGroupsFromInstructions(ingredients, instructions);
-  const prepGroups =
-    instructionPrepGroups.length > 0 ? instructionPrepGroups : buildPrepGroups(ingredients);
+  const prepGroups = instructionPrepGroups.length > 0 ? instructionPrepGroups : [];
 
   return {
     title,
@@ -1432,10 +1431,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
         },
       });
     }
@@ -1454,10 +1450,7 @@ export async function updateRecipeSection(formData: FormData) {
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
         },
       });
     }
@@ -1475,7 +1468,18 @@ export async function updateRecipeSection(formData: FormData) {
 
     if (section === "prepGroups") {
       const raw = formData.get("prepGroups")?.toString() ?? "";
-      const prepGroups = parsePrepGroupsFromText(raw);
+      const parsed = parsePrepGroupsFromText(raw);
+      // Re-attach stepIndex and sourceGroup from existing stored groups by title.
+      const existingByTitle = new Map(
+        coercePrepGroups(recipe.prepGroups).map((g) => [g.title, g])
+      );
+      const prepGroups: PrepGroup[] = parsed.map((g) => {
+        const existing = existingByTitle.get(g.title);
+        const merged: PrepGroup = { ...g };
+        if (existing?.stepIndex !== undefined) merged.stepIndex = existing.stepIndex;
+        if (existing?.sourceGroup !== undefined) merged.sourceGroup = existing.sourceGroup;
+        return merged;
+      });
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
         data: {
@@ -1860,6 +1864,7 @@ export async function importRecipeFromUrl(formData: FormData) {
   );
   const metricGroupedPrepGroups = groupedIngredients?.groups.map((group) => ({
     ...group,
+    sourceGroup: true as const,
     items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
   }));
   const prepGroups =
@@ -1867,7 +1872,7 @@ export async function importRecipeFromUrl(formData: FormData) {
       ? metricGroupedPrepGroups!
       : instructionPrepGroups.length > 0
         ? instructionPrepGroups
-        : buildPrepGroups(cleanedIngredients.lines);
+        : [];
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||

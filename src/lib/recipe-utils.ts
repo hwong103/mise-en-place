@@ -553,10 +553,6 @@ export const buildPrepGroupsFromInstructions = (
     }
 
     const prepPhrase = findPrepPhrase(instruction);
-    if (!prepPhrase && !/\bprep\b|\bprepare\b/.test(lower)) {
-      return;
-    }
-
     const title = prepPhrase ? titleCase(prepPhrase) : `Step ${index + 1} Prep`;
     addToGroupMap(
       groupMap,

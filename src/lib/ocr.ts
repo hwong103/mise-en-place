@@ -1,5 +1,4 @@
 import {
-  buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLines,
   cleanInstructionLines,
@@ -450,7 +449,7 @@ export function parseOcrText(text: string): ParsedOcrRecipe {
 export function buildOcrRecipePayload(text: string) {
   const parsed = parseOcrText(text);
   const instructionPrepGroups = buildPrepGroupsFromInstructions(parsed.ingredients, parsed.instructions);
-  const prepGroups = instructionPrepGroups.length > 0 ? instructionPrepGroups : buildPrepGroups(parsed.ingredients);
+  const prepGroups = instructionPrepGroups.length > 0 ? instructionPrepGroups : [];
 
   return {
     title: parsed.title ?? "Untitled Recipe",

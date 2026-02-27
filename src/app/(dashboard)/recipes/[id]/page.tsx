@@ -171,15 +171,11 @@ export default async function RecipeDetailPage({
   })();
 
   // Mise prep groups: instruction-derived groups (not source section headers).
-  // Sorted by stepIndex when available.
+  // Sorted by stepIndex when available. No fallback to source groups.
   const miseGroups = (() => {
     const candidates = prepGroups.filter(
       (group) => group.sourceGroup !== true && !isIngredientGroupTitle(group.title)
     );
-    if (candidates.length === 0) {
-      // Fall back to all prepGroups if none are instruction-derived
-      return prepGroups.filter((g) => g.sourceGroup !== true);
-    }
     return [...candidates].sort((a, b) => {
       if (a.stepIndex !== undefined && b.stepIndex !== undefined) {
         return a.stepIndex - b.stepIndex;
@@ -438,7 +434,7 @@ export default async function RecipeDetailPage({
               </section>
             </div>
 
-            {miseGroups.length > 0 ? (
+            {miseGroups.length > 0 || isEditing ? (
               <section className="rounded-3xl border border-amber-100 bg-white p-6 shadow-sm dark:border-amber-900/30 dark:bg-slate-900">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise Prep Groups</h2>
@@ -450,32 +446,40 @@ export default async function RecipeDetailPage({
                   Prep groups derived from instructions — what to prepare before you cook.
                 </p>
                 {!isEditing ? (
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {miseGroups.map((group) => (
-                      <div key={group.title} className="relative rounded-2xl border border-amber-100 bg-amber-50/60 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
-                        {group.stepIndex !== undefined ? (
-                          <span className="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                            Step {group.stepIndex + 1}
-                          </span>
-                        ) : null}
-                        <h3 className="pr-16 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                          {group.title}
-                        </h3>
-                        <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                          {group.items.map((item) => (
-                            <li key={`${group.title}-${item}`} className="flex items-start gap-2">
-                              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400 dark:bg-amber-500" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
+                  miseGroups.length === 0 ? (
+                    <p className="mt-4 text-sm text-slate-400 dark:text-slate-500">
+                      No prep groups yet. Edit this recipe to add mise en place groups manually.
+                    </p>
+                  ) : (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {miseGroups.map((group) => (
+                        <div key={group.title} className="relative rounded-2xl border border-amber-100 bg-amber-50/60 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
+                          {group.stepIndex !== undefined ? (
+                            <span className="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                              Step {group.stepIndex + 1}
+                            </span>
+                          ) : null}
+                          <h3 className="pr-16 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                            {group.title}
+                          </h3>
+                          <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                            {group.items.map((item) => (
+                              <li key={`${group.title}-${item}`} className="flex items-start gap-2">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400 dark:bg-amber-500" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )
                 ) : (
-                  <div className="mt-4">
+                  <form action={updateRecipeSection} className="mt-4">
+                    <input type="hidden" name="recipeId" value={recipe.id} />
+                    <input type="hidden" name="section" value="prepGroups" />
                     <textarea
-                      name="prepGroupsText"
+                      name="prepGroups"
                       rows={Math.max(6, miseGroups.reduce((acc, g) => acc + g.items.length + 2, 0))}
                       defaultValue={miseGroups.map((g) => `${g.title}\n${g.items.map((i) => `- ${i}`).join("\n")}`).join("\n\n")}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
@@ -484,7 +488,12 @@ export default async function RecipeDetailPage({
                     <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                       Each group starts with a title line, followed by items prefixed with <code>-</code>.
                     </p>
-                  </div>
+                    <SubmitButton
+                      label="Save Prep Groups"
+                      pendingLabel="Saving..."
+                      className="mt-3 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </form>
                 )}
               </section>
             ) : null}
