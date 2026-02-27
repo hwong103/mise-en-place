@@ -847,7 +847,9 @@ const extractIngredientGroupsFromLines = (lines: string[]): PrepGroup[] => {
     }
   }
 
-  if (groups.length > 0 && ungrouped.length > 0) {
+  if (groups.length === 0 && ungrouped.length > 0) {
+    groups.push({ title: "Ingredients", items: ungrouped });
+  } else if (groups.length > 0 && ungrouped.length > 0) {
     groups.push({ title: "Other Ingredients", items: ungrouped });
   }
 
@@ -881,8 +883,8 @@ const extractIngredientGroupsFromHtml = (html: string): PrepGroup[] => {
     );
     const title = titleMatch ? normalizeIngredientHeading(stripHtml(titleMatch[1])) : "";
     const items = extractWprmIngredientItems(groupHtml);
-    if (title && items.length > 0) {
-      groups.push({ title, items });
+    if (items.length > 0) {
+      groups.push({ title: title || "Ingredients", items });
     }
     match = groupRegex.exec(html);
   }
@@ -1273,8 +1275,7 @@ const buildRecipePayload = (formData: FormData) => {
   const instructions = parseLines(formData.get("instructions")?.toString() ?? "");
   const notes = parseLines(formData.get("notes")?.toString() ?? "");
   const instructionPrepGroups = buildPrepGroupsFromInstructions(ingredients, instructions);
-  const prepGroups =
-    instructionPrepGroups.length > 0 ? instructionPrepGroups : buildPrepGroups(ingredients);
+  const prepGroups = instructionPrepGroups;
 
   return {
     title,
@@ -1835,8 +1836,8 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
   const hasGroupedIngredients = Boolean(
     groupedIngredients &&
-      groupedIngredients.groups.length > 0 &&
-      groupedIngredients.ingredients.length > 0
+    groupedIngredients.groups.length > 0 &&
+    groupedIngredients.ingredients.length > 0
   );
   const cleanedIngredientsSource = hasGroupedIngredients
     ? {
@@ -1857,17 +1858,20 @@ export async function importRecipeFromUrl(formData: FormData) {
   const instructionPrepGroups = buildPrepGroupsFromInstructions(
     cleanedIngredients.lines,
     cleanedInstructions.lines
-  );
+  ).map(g => ({ ...g, sourceGroup: false }));
+
   const metricGroupedPrepGroups = groupedIngredients?.groups.map((group) => ({
     ...group,
+    sourceGroup: true,
     items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
   }));
-  const prepGroups =
+  const sourceGroups =
     hasGroupedIngredients
       ? metricGroupedPrepGroups!
-      : instructionPrepGroups.length > 0
-        ? instructionPrepGroups
-        : buildPrepGroups(cleanedIngredients.lines);
+      : extractIngredientGroupsFromLines(selectedCandidate.ingredients).map(
+        (g) => ({ ...g, sourceGroup: true })
+      );
+  const prepGroups = [...sourceGroups, ...instructionPrepGroups];
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||
@@ -1901,12 +1905,12 @@ export async function importRecipeFromUrl(formData: FormData) {
   const notes = normalizeImportedNotes(
     Array.from(
       new Set([
-      ...cleanedIngredients.notes,
-      ...cleanedInstructions.notes,
-      ...(markdownRecipe?.notes ?? []),
-      ...selectedCandidate.notes,
-      ...htmlNotes,
-      ...descriptionNotes,
+        ...cleanedIngredients.notes,
+        ...cleanedInstructions.notes,
+        ...(markdownRecipe?.notes ?? []),
+        ...selectedCandidate.notes,
+        ...htmlNotes,
+        ...descriptionNotes,
       ])
     )
   );

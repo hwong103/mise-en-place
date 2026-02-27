@@ -7,7 +7,6 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import {
-  buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLines,
   cleanInstructionLines,
@@ -16,6 +15,7 @@ import {
   parseLines,
   parsePrepGroupsFromText,
   parseTags,
+  type PrepGroup,
 } from "@/lib/recipe-utils";
 
 const toOptionalInt = (value: FormDataEntryValue | null) => {
@@ -179,10 +179,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -201,10 +198,7 @@ export async function updateRecipeSection(formData: FormData) {
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -276,10 +270,61 @@ export async function updateRecipeSection(formData: FormData) {
       const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
       const cleanedNotes = cleanTextLines(rawNotes);
 
-      const instructionPrepGroups = buildPrepGroupsFromInstructions(
-        cleanedIngredients.lines,
-        cleanedInstructions.lines
-      );
+      // We need to preserve sourceGroups if they exist, or build them if they don't
+      // For now, let's just rebuild instruction-based prep groups.
+      // The Ingredients card will handle its own grouping logic based on recipe.ingredients (if we change it to Json)
+      // Actually, recipe.ingredients IS Json.
+      // Collect grouped ingredient inputs (reflecting original source headers)
+      const ingredientGroups: PrepGroup[] = [];
+      let gIdx = 0;
+      while (formData.get(`ingredientGroupExists_${gIdx}`)) {
+        const title = formData.get(`ingredientGroupTitle_${gIdx}`) as string || "";
+        const itemsRaw = formData.get(`ingredientGroupItems_${gIdx}`) as string || "";
+        const items = itemsRaw.split("\n").filter(Boolean);
+        if (items.length > 0) {
+          ingredientGroups.push({ title, items, sourceGroup: true });
+        }
+        gIdx++;
+      }
+
+      // If no grouped inputs found, fall back to legacy 'ingredients' field if it exists
+      if (ingredientGroups.length === 0) {
+        const legacyIngredients = formData.get("ingredients") as string;
+        if (legacyIngredients) {
+          ingredientGroups.push({
+            title: "",
+            items: legacyIngredients.split("\n").filter(Boolean),
+            sourceGroup: true,
+          });
+        }
+      }
+
+      const miseGroups: PrepGroup[] = [];
+      let mIdx = 0;
+      while (formData.get(`miseGroupExists_${mIdx}`)) {
+        const title = formData.get(`miseGroupTitle_${mIdx}`) as string || "";
+        const itemsRaw = formData.get(`miseGroupItems_${mIdx}`) as string || "";
+        const stepIndexRaw = formData.get(`miseGroupStepIndex_${mIdx}`) as string;
+        const items = itemsRaw.split("\n").filter(Boolean);
+        if (items.length > 0) {
+          miseGroups.push({
+            title,
+            items,
+            stepIndex: stepIndexRaw ? parseInt(stepIndexRaw, 10) : undefined,
+          });
+        }
+        mIdx++;
+      }
+
+      // If no grouped inputs found for mise, and we're in section 'all', 
+      // check if we should rebuild them from instructions if they don't exist yet.
+      let finalMiseGroups = miseGroups;
+      if (finalMiseGroups.length === 0 && cleanedInstructions.lines.length > 0) {
+        finalMiseGroups = buildPrepGroupsFromInstructions(
+          ingredientGroups.flatMap((g) => g.items),
+          cleanedInstructions.lines
+        );
+      }
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -302,10 +347,7 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: [...ingredientGroups, ...finalMiseGroups],
         },
       });
     }
@@ -358,4 +400,25 @@ export async function deleteRecipe(formData: FormData) {
   revalidatePath("/planner");
   revalidatePath("/shopping");
   redirect("/recipes");
+}
+
+export async function updatePrepGroupsOrder(formData: FormData) {
+  const recipeId = formData.get("recipeId")?.toString();
+  const prepGroupsRaw = formData.get("prepGroups")?.toString();
+
+  if (!recipeId || !prepGroupsRaw) {
+    return;
+  }
+
+  const householdId = await getCurrentHouseholdId();
+  try {
+    const prepGroups = JSON.parse(prepGroupsRaw);
+    await prisma.recipe.updateMany({
+      where: { id: recipeId, householdId },
+      data: { prepGroups },
+    });
+    revalidatePath(`/recipes/${recipeId}`);
+  } catch (error) {
+    console.error("Failed to update prep groups order:", error);
+  }
 }
