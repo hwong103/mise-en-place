@@ -283,10 +283,30 @@ export async function updateRecipeSection(formData: FormData) {
       const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
       const cleanedNotes = cleanTextLines(rawNotes);
 
-      const instructionPrepGroups = buildPrepGroupsFromInstructions(
-        cleanedIngredients.lines,
-        cleanedInstructions.lines
-      );
+      // If the form submitted a prepGroups field (LineListEditor), honour the
+      // manual edit. Otherwise re-derive from the new ingredients + instructions.
+      const rawPrepGroups = formData.get("prepGroups")?.toString();
+      let finalPrepGroups: PrepGroup[];
+      if (rawPrepGroups !== undefined && rawPrepGroups !== null) {
+        const parsed = parsePrepGroupsFromText(rawPrepGroups);
+        // Re-attach stepIndex / sourceGroup from the existing DB record by title.
+        const existingByTitle = new Map(
+          coercePrepGroups(recipe.prepGroups).map((g) => [g.title, g])
+        );
+        finalPrepGroups = parsed.map((g) => {
+          const existing = existingByTitle.get(g.title);
+          const merged: PrepGroup = { ...g };
+          if (existing?.stepIndex !== undefined) merged.stepIndex = existing.stepIndex;
+          if (existing?.sourceGroup !== undefined) merged.sourceGroup = existing.sourceGroup;
+          return merged;
+        });
+      } else {
+        const instructionPrepGroups = buildPrepGroupsFromInstructions(
+          cleanedIngredients.lines,
+          cleanedInstructions.lines
+        );
+        finalPrepGroups = instructionPrepGroups;
+      }
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -309,7 +329,7 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
+          prepGroups: finalPrepGroups,
         },
       });
     }

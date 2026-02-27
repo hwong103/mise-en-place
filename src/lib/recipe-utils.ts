@@ -64,6 +64,12 @@ const PREP_VERBS = [
   "marinate",
   "toast",
   "grind",
+  "place",
+  "add",
+  "put",
+  "pour",
+  "toss",
+  "stir",
 ];
 
 const PREP_ADVERBS = [
@@ -514,6 +520,23 @@ const addToGroupMap = (groupMap: Map<string, GroupEntry>, title: string, items: 
   }
 };
 
+/**
+ * Strip a leading quantity + optional unit from an ingredient line to get the
+ * core noun phrase used as a fallback keyword when extractIngredientKeywords
+ * returns an empty array.
+ * e.g. "2 cups water" → "water", "Salt and pepper" → "salt and pepper"
+ */
+const extractFallbackKeyword = (line: string): string => {
+  const stripped = line
+    .replace(/^\d[\d\s/¼½¾⅓⅔⅛⅜⅝⅞.-]*/, "")
+    .replace(/^(?:g|kg|mg|ml|l|oz|lbs?|pounds?|tbsp|tsp|cups?|tablespoons?|teaspoons?|cloves?|pinch|dash|packages?|cans?|slices?|inches?)\s+/i, "")
+    .trim()
+    .toLowerCase();
+  // Return only the first meaningful word (before comma/parens) as fallback
+  const firstWord = stripped.replace(/[,(].*$/, "").trim();
+  return firstWord.length >= 3 ? firstWord : stripped;
+};
+
 export const buildPrepGroupsFromInstructions = (
   ingredients: string[],
   instructions: string[]
@@ -522,10 +545,16 @@ export const buildPrepGroupsFromInstructions = (
     return [];
   }
 
-  const ingredientKeywords = ingredients.map((line) => ({
-    line,
-    keywords: extractIngredientKeywords(line),
-  }));
+  const ingredientKeywords = ingredients.map((line) => {
+    const keywords = extractIngredientKeywords(line);
+    // If no keywords survive the stop/unit filters, fall back to extracting
+    // the bare ingredient noun directly so it can still match instruction text.
+    if (keywords.length === 0) {
+      const fallback = extractFallbackKeyword(line);
+      return { line, keywords: fallback ? [fallback] : [] };
+    }
+    return { line, keywords };
+  });
   const assigned = new Set<string>();
   const groupMap = new Map<string, GroupEntry>();
 

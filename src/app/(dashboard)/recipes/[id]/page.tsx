@@ -13,6 +13,7 @@ import {
   cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
+  serializePrepGroupsToText,
 } from "@/lib/recipe-utils";
 
 import { deleteRecipe, updateRecipeSection } from "../detail-actions";
@@ -475,25 +476,13 @@ export default async function RecipeDetailPage({
                     </div>
                   )
                 ) : (
-                  <form action={updateRecipeSection} className="mt-4">
-                    <input type="hidden" name="recipeId" value={recipe.id} />
-                    <input type="hidden" name="section" value="prepGroups" />
-                    <textarea
-                      name="prepGroups"
-                      rows={Math.max(6, miseGroups.reduce((acc, g) => acc + g.items.length + 2, 0))}
-                      defaultValue={miseGroups.map((g) => `${g.title}\n${g.items.map((i) => `- ${i}`).join("\n")}`).join("\n\n")}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-amber-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      placeholder="Group Title&#10;- ingredient one&#10;- ingredient two&#10;&#10;Another Group&#10;- ingredient three"
-                    />
-                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                      Each group starts with a title line, followed by items prefixed with <code>-</code>.
-                    </p>
-                    <SubmitButton
-                      label="Save Prep Groups"
-                      pendingLabel="Saving..."
-                      className="mt-3 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </form>
+                  <LineListEditor
+                    name="prepGroups"
+                    initialItems={serializePrepGroupsToText(miseGroups).split("\n").filter(Boolean)}
+                    ordered={false}
+                    placeholder="Group Title or - ingredient item"
+                    addLabel="+ Add line"
+                  />
                 )}
               </section>
             ) : null}
