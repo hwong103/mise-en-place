@@ -235,6 +235,7 @@ export default async function RecipeDetailPage({
                 prepGroups={prepGroups}
                 ingredients={ingredients}
                 instructions={instructions}
+                notes={notes}
                 triggerWrapperClassName="contents"
                 miseButtonClassName="rounded-[20px] border-[1.5px] border-white/60 bg-transparent px-[18px] py-2 text-[13px] font-semibold text-white transition-colors hover:border-white hover:bg-white/10"
                 cookButtonClassName="rounded-[20px] border-0 bg-[#C67B2A] px-[18px] py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(198,123,42,0.35)] transition-colors hover:bg-[#B56E24]"
@@ -423,26 +424,6 @@ export default async function RecipeDetailPage({
               </section>
             </div>
 
-            {isEditing ? (
-              <form action={updateRecipeSection}>
-                <input type="hidden" name="recipeId" value={recipe.id} />
-                <input type="hidden" name="section" value="prepGroups" />
-                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise en Place Groups</h2>
-                    <SubmitButton
-                      label="Save Groups"
-                      pendingLabel="Saving..."
-                      className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Groups shown in the Mise focus screen. Edit group names and items, drag to reorder.
-                  </p>
-                  <PrepGroupEditor name="prepGroups" initialGroups={prepGroups} />
-                </section>
-              </form>
-            ) : null}
           </section>
 
           <aside className="space-y-6">
@@ -634,6 +615,29 @@ export default async function RecipeDetailPage({
           </aside>
         </div>
       </form>
+
+      {isEditing ? (
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <form action={updateRecipeSection}>
+            <input type="hidden" name="recipeId" value={recipe.id} />
+            <input type="hidden" name="section" value="prepGroups" />
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise en Place Groups</h2>
+                <SubmitButton
+                  label="Save Groups"
+                  pendingLabel="Saving..."
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Groups shown in the Mise focus screen. Edit group names and items, drag to reorder.
+              </p>
+              <PrepGroupEditor name="prepGroups" initialGroups={prepGroups} />
+            </section>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
