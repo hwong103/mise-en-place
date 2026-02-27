@@ -847,7 +847,9 @@ const extractIngredientGroupsFromLines = (lines: string[]): PrepGroup[] => {
     }
   }
 
-  if (groups.length > 0 && ungrouped.length > 0) {
+  if (groups.length === 0 && ungrouped.length > 0) {
+    groups.push({ title: "Ingredients", items: ungrouped });
+  } else if (groups.length > 0 && ungrouped.length > 0) {
     groups.push({ title: "Other Ingredients", items: ungrouped });
   }
 
@@ -881,8 +883,8 @@ const extractIngredientGroupsFromHtml = (html: string): PrepGroup[] => {
     );
     const title = titleMatch ? normalizeIngredientHeading(stripHtml(titleMatch[1])) : "";
     const items = extractWprmIngredientItems(groupHtml);
-    if (title && items.length > 0) {
-      groups.push({ title, items });
+    if (items.length > 0) {
+      groups.push({ title: title || "Ingredients", items });
     }
     match = groupRegex.exec(html);
   }
@@ -1827,12 +1829,13 @@ export async function importRecipeFromUrl(formData: FormData) {
     sourceGroup: true,
     items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
   }));
-  const prepGroups =
+  const sourceGroups =
     hasGroupedIngredients
       ? metricGroupedPrepGroups!
-      : instructionPrepGroups.length > 0
-        ? instructionPrepGroups
-        : [];
+      : extractIngredientGroupsFromLines(selectedCandidate.ingredients).map(
+        (g) => ({ ...g, sourceGroup: true })
+      );
+  const prepGroups = [...sourceGroups, ...instructionPrepGroups];
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||
