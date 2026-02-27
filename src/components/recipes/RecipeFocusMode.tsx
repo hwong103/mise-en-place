@@ -342,47 +342,68 @@ export default function RecipeFocusMode({
                 { bg: "bg-orange-100 dark:bg-orange-900/40", border: "border-orange-200 dark:border-orange-700/50", label: "text-orange-700 dark:text-orange-300", highlight: "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200" },
               ];
 
-              // Build sorted list of ingredient keywords (longest first to avoid partial matches)
-              // Each entry: { pattern: RegExp, gi: number }
-              type IngredientPattern = { re: RegExp; gi: number };
-              const ingredientPatterns: IngredientPattern[] = [];
+              // Build keyword → groupIndex entries, sorted longest first so
+              // "olive oil" is matched before "oil".
+              type KW = { keyword: string; gi: number };
+              const keywords: KW[] = [];
               prepGroups.forEach((group, gi) => {
                 group.items.forEach((item) => {
-                  // Use the last meaningful word chunk (strips quantities like "2 tbsp")
-                  const keyword = item.trim().replace(/^[\d\s/½¼¾⅓⅔⅛⅜⅝⅞.,]+/, "").trim();
-                  if (keyword.length < 3) return;
-                  ingredientPatterns.push({
-                    re: new RegExp(`\\b(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})\\b`, "gi"),
-                    gi,
-                  });
+                  // Strip leading quantity/unit tokens, keep the food name.
+                  // e.g. "2 tbsp olive oil" → "olive oil", "1/2 cup flour" → "flour"
+                  const stripped = item
+                    .trim()
+                    .replace(/^[\d¼½¾⅓⅔⅛⅜⅝⅞.,\s/]+/, "") // leading numbers/fractions
+                    .replace(/^(tbsp|tsp|cup|cups|oz|lb|g|kg|ml|l|cloves?|clove|bunch|pinch|dash|handful|slice|slices|piece|pieces|small|medium|large|whole|fresh|dried|chopped|diced|minced|sliced|grated)\s+/i, "")
+                    .trim();
+                  if (stripped.length < 2) return;
+                  keywords.push({ keyword: stripped, gi });
                 });
               });
-              // Sort longest keyword first to avoid short matches clobbering long ones
-              ingredientPatterns.sort((a, b) => b.re.source.length - a.re.source.length);
+              keywords.sort((a, b) => b.keyword.length - a.keyword.length);
 
-              // Annotate a step string → array of {text, gi|null} segments
-              const annotateStep = (step: string): { text: string; gi: number | null }[] => {
-                if (ingredientPatterns.length === 0) return [{ text: step, gi: null }];
+              // Annotate a step string → segments with group index or null.
+              // Uses an interval-marking approach: find all non-overlapping matches
+              // across all keywords, then slice the string by those intervals.
+              type Seg = { text: string; gi: number | null };
+              const annotateStep = (step: string): Seg[] => {
+                if (keywords.length === 0) return [{ text: step, gi: null }];
 
-                // Work on segments; start with the full string unmarked
-                type Seg = { text: string; gi: number | null };
-                let segments: Seg[] = [{ text: step, gi: null }];
+                // Collect all matches as [start, end, gi] — no overlaps, first match wins
+                type Span = { start: number; end: number; gi: number };
+                const spans: Span[] = [];
+                const lower = step.toLowerCase();
 
-                for (const { re, gi } of ingredientPatterns) {
-                  const next: Seg[] = [];
-                  for (const seg of segments) {
-                    if (seg.gi !== null) { next.push(seg); continue; } // already colored
-                    re.lastIndex = 0;
-                    const parts = seg.text.split(re);
-                    // split with a capturing group gives: [before, match, before, match, ...]
-                    for (let i = 0; i < parts.length; i++) {
-                      if (parts[i] === "") continue;
-                      next.push({ text: parts[i], gi: i % 2 === 1 ? gi : null });
+                for (const { keyword, gi } of keywords) {
+                  const kl = keyword.toLowerCase();
+                  let pos = 0;
+                  while (pos < lower.length) {
+                    const idx = lower.indexOf(kl, pos);
+                    if (idx === -1) break;
+                    const end = idx + kl.length;
+                    // Check it doesn't overlap an existing span
+                    const overlaps = spans.some((s) => idx < s.end && end > s.start);
+                    if (!overlaps) {
+                      spans.push({ start: idx, end, gi });
                     }
+                    pos = idx + 1;
                   }
-                  segments = next;
                 }
-                return segments;
+
+                if (spans.length === 0) return [{ text: step, gi: null }];
+
+                // Sort spans by start position
+                spans.sort((a, b) => a.start - b.start);
+
+                // Build segments
+                const segs: Seg[] = [];
+                let cursor = 0;
+                for (const { start, end, gi } of spans) {
+                  if (start > cursor) segs.push({ text: step.slice(cursor, start), gi: null });
+                  segs.push({ text: step.slice(start, end), gi });
+                  cursor = end;
+                }
+                if (cursor < step.length) segs.push({ text: step.slice(cursor), gi: null });
+                return segs;
               };
 
               return (
