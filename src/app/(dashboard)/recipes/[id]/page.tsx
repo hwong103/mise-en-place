@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
 import LineListEditor from "@/components/recipes/LineListEditor";
 import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
-import UnsavedBadge from "@/components/recipes/UnsavedBadge";
 import SubmitButton from "@/components/forms/SubmitButton";
 import IngredientGroupsEditor from "@/components/recipes/IngredientGroupsEditor";
 import { getRecipeById } from "@/lib/recipes";
@@ -277,12 +276,11 @@ export default async function RecipeDetailPage({
           <>
             <input type="hidden" name="recipeId" value={recipe.id} />
             <input type="hidden" name="section" value="all" />
-            <div className="sticky top-4 z-10 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-md dark:border-emerald-950/40 dark:bg-emerald-950/40 backdrop-blur-md">
+            <div className="sticky top-4 z-50 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 shadow-md backdrop-blur-md dark:border-emerald-900/50 dark:bg-emerald-950/80">
               <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                 Editing recipe
               </span>
               <div className="flex gap-2">
-                <UnsavedBadge formId="recipe-edit-form" />
                 <Link
                   href={`/recipes/${recipe.id}`}
                   className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
@@ -299,8 +297,8 @@ export default async function RecipeDetailPage({
           </>
         ) : null}
 
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <section className="space-y-6">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <section className="space-y-6 lg:col-span-1">
             <div className="grid gap-6">
               {/* Ingredients Card */}
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -310,15 +308,6 @@ export default async function RecipeDetailPage({
                       Ingredients
                     </h2>
                   </div>
-                  {!isEditing && (
-                    <RecipeFocusMode
-                      title={recipe.title}
-                      prepGroups={prepGroups}
-                      ingredients={ingredients}
-                      instructions={instructions}
-                      notes={notes}
-                    />
-                  )}
                 </div>
 
                 {isEditing ? (
@@ -403,40 +392,42 @@ export default async function RecipeDetailPage({
                   </div>
                 )}
               </section>
-
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
-                {!isEditing ? (
-                  instructions.length === 0 ? (
-                    <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                      No instructions listed yet.
-                    </p>
-                  ) : (
-                    <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
-                      {instructions.map((step, index) => (
-                        <li key={`${index}-${step}`} className="flex gap-3">
-                          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                            {index + 1}
-                          </span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  )
-                ) : (
-                  <LineListEditor
-                    name="instructions"
-                    initialItems={instructions}
-                    ordered
-                    placeholder="Describe this step..."
-                    addLabel="+ Add step"
-                  />
-                )}
-              </section>
             </div>
           </section>
 
-          <aside className="space-y-6">
+          <section className="space-y-6 lg:col-span-1">
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
+              {!isEditing ? (
+                instructions.length === 0 ? (
+                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+                    No instructions listed yet.
+                  </p>
+                ) : (
+                  <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
+                    {instructions.map((step, index) => (
+                      <li key={`${index}-${step}`} className="flex gap-3">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                          {index + 1}
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )
+              ) : (
+                <LineListEditor
+                  name="instructions"
+                  initialItems={instructions}
+                  ordered
+                  placeholder="Describe this step..."
+                  addLabel="+ Add step"
+                />
+              )}
+            </section>
+          </section>
+
+          <aside className="space-y-6 lg:col-span-1">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               {!isEditing ? (
                 <>
@@ -624,7 +615,7 @@ export default async function RecipeDetailPage({
             ) : null}
           </aside>
         </div>
-      </form>
-    </div>
+      </form >
+    </div >
   );
 }
