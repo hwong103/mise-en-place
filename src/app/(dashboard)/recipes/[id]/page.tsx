@@ -174,9 +174,13 @@ export default async function RecipeDetailPage({
   // Mise prep groups: instruction-derived groups (not source section headers).
   // Sorted by stepIndex when available. No fallback to source groups.
   const miseGroups = (() => {
-    const candidates = prepGroups.filter(
-      (group) => group.sourceGroup !== true && !isIngredientGroupTitle(group.title)
-    );
+    const candidates = prepGroups.filter((group) => {
+      if (Object.prototype.hasOwnProperty.call(group, "sourceGroup")) {
+        return group.sourceGroup !== true; // trust the flag
+      }
+      // Legacy: no sourceGroup flag — use title heuristic
+      return !isIngredientGroupTitle(group.title);
+    });
     return [...candidates].sort((a, b) => {
       if (a.stepIndex !== undefined && b.stepIndex !== undefined) {
         return a.stepIndex - b.stepIndex;
