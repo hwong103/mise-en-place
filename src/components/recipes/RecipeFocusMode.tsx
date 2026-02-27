@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Play, GripVertical } from "lucide-react";
+import { type TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronUp, Play, GripVertical } from "lucide-react";
 import { createPortal } from "react-dom";
 import { extractIngredientKeywords, type PrepGroup } from "@/lib/recipe-utils";
 import { updatePrepGroupsOrder } from "@/app/(dashboard)/recipes/detail-actions";
@@ -110,11 +110,13 @@ export default function RecipeFocusMode({
   const [prepGroups, setPrepGroups] = useState(initialPrepGroups);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [renderedStepIndex, setRenderedStepIndex] = useState(0);
+  const [transitionDirection, setTransitionDirection] = useState<1 | -1>(1);
   const [transitionPhase, setTransitionPhase] = useState<"idle" | "out" | "in">("idle");
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const transitionTimeoutRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
 
   const stepCount = instructions.length;
   const canGoPrev = stepCount > 0 && activeStepIndex > 0;
@@ -148,6 +150,7 @@ export default function RecipeFocusMode({
       }
 
       clearTransitionTimers();
+      setTransitionDirection(direction);
       setTransitionPhase("out");
 
       transitionTimeoutRef.current = window.setTimeout(() => {
@@ -202,6 +205,39 @@ export default function RecipeFocusMode({
   const misePrepGroups = useMemo(() => {
     return prepGroups.filter(g => !g.sourceGroup);
   }, [prepGroups]);
+
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    touchStartYRef.current = event.changedTouches[0]?.clientY ?? null;
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const startY = touchStartYRef.current;
+    const endY = event.changedTouches[0]?.clientY ?? null;
+    touchStartYRef.current = null;
+    if (startY === null || endY === null) {
+      return;
+    }
+
+    const deltaY = endY - startY;
+    if (Math.abs(deltaY) < 40) {
+      return;
+    }
+
+    if (deltaY < 0) {
+      navigateStep(1);
+    } else {
+      navigateStep(-1);
+    }
+  };
+
+  const stepMotionClass =
+    transitionPhase === "out"
+      ? transitionDirection === 1
+        ? "-translate-y-[30px] opacity-0"
+        : "translate-y-[30px] opacity-0"
+      : transitionPhase === "in"
+        ? "translate-y-[20px] opacity-0"
+        : "translate-y-0 opacity-100";
 
   const stepText = instructions[renderedStepIndex] ?? "No steps available for this recipe.";
 
@@ -399,41 +435,45 @@ export default function RecipeFocusMode({
                       </p>
                     </div>
 
-                    <div className="relative flex min-h-0 flex-1 overflow-hidden">
+                    <div className="relative flex min-h-0 flex-1 overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                       <button
                         type="button"
+                        className="group absolute inset-x-0 top-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10 disabled:pointer-events-none disabled:cursor-default"
                         onClick={() => navigateStep(-1)}
-                        className={`absolute left-0 top-0 z-10 h-full w-24 bg-gradient-to-r from-white to-transparent opacity-0 transition-opacity hover:opacity-10 dark:from-slate-950 ${!canGoPrev && "pointer-events-none"
-                          }`}
+                        disabled={!canGoPrev}
                         aria-label="Previous step"
                       >
-                        <ChevronLeft className="ml-4 h-8 w-8 text-[#1a6b4a] dark:text-emerald-400" />
+                        <span className="pointer-events-none absolute right-5 top-5 hidden items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
+                          <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Previous</span>
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            <ChevronUp className="h-4 w-4" />
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="group absolute inset-x-0 bottom-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10 disabled:pointer-events-none disabled:cursor-default"
+                        onClick={() => navigateStep(1)}
+                        disabled={!canGoNext}
+                        aria-label="Next step"
+                      >
+                        <span className="pointer-events-none absolute bottom-5 right-5 hidden items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            <ChevronDown className="h-4 w-4" />
+                          </span>
+                          <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Next</span>
+                        </span>
                       </button>
 
                       <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center px-12 py-10">
                         <div
-                          className={`mx-auto max-w-2xl text-center transition-all duration-300 ${transitionPhase === "out"
-                            ? "scale-[0.98] opacity-0"
-                            : transitionPhase === "in"
-                              ? "scale-[1.02] opacity-0"
-                              : "scale-100 opacity-100"
-                            }`}
+                          className={`mx-auto max-w-2xl text-center transition-all duration-300 ease-out ${stepMotionClass}`}
                         >
                           <p className="text-[21px] leading-[1.65] text-[#0e1f1a] dark:text-slate-100 font-serif">
                             {stepText}
                           </p>
                         </div>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => navigateStep(1)}
-                        className={`absolute right-0 top-0 z-10 h-full w-24 bg-gradient-to-l from-white to-transparent opacity-0 transition-opacity hover:opacity-10 dark:from-slate-950 ${!canGoNext && "pointer-events-none"
-                          }`}
-                        aria-label="Next step"
-                      >
-                        <ChevronRight className="mr-4 h-8 w-8 text-[#1a6b4a] dark:text-emerald-400" />
-                      </button>
                     </div>
                   </section>
 
