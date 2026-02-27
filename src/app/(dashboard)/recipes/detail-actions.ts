@@ -335,9 +335,9 @@ export async function updateRecipeSection(formData: FormData) {
   });
 
   if (householdId) {
-    revalidateTag(`recipes-${householdId}`);
+    revalidateTag(`recipes-${householdId}`, "max");
   }
-  revalidateTag(`recipe-${recipeId}`);
+  revalidateTag(`recipe-${recipeId}`, "max");
   revalidatePath(`/recipes/${recipeId}`);
   redirect(`/recipes/${recipeId}`);
 }
