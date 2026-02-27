@@ -20,6 +20,7 @@ import {
   parsePrepGroupsFromText,
   parseTags,
   type PrepGroup,
+  extractIngredientKeywords,
 } from "@/lib/recipe-utils";
 import { buildOcrRecipePayload } from "@/lib/ocr";
 import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
@@ -1819,9 +1820,19 @@ export async function importRecipeFromUrl(formData: FormData) {
       : null;
   if (groupedIngredients && groupedIngredients.groups.length > 0 && groupedIngredients.ingredients.length > 0) {
     const groupedSet = new Set(groupedIngredients.ingredients.map((line) => normalizeText(line)));
-    const missingLines = cleanedCandidateIngredients.lines.filter(
-      (line) => !groupedSet.has(normalizeText(line))
+    const groupedFingerprints = new Set(
+      groupedIngredients.ingredients
+        .map((line) => extractIngredientKeywords(line).join(" "))
+        .filter(Boolean)
     );
+
+    const missingLines = cleanedCandidateIngredients.lines.filter((line) => {
+      const norm = normalizeText(line);
+      const fp = extractIngredientKeywords(line).join(" ");
+      if (groupedSet.has(norm)) return false;
+      if (fp && groupedFingerprints.has(fp)) return false;
+      return true;
+    });
     if (missingLines.length > 0) {
       const hasIngredientsGroup = groupedIngredients.groups.some((group) => /^ingredients$/i.test(group.title));
       groupedIngredients.groups.unshift({
