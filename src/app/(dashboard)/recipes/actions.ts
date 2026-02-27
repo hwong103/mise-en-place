@@ -20,7 +20,6 @@ import {
   parsePrepGroupsFromText,
   parseTags,
   type PrepGroup,
-  extractIngredientKeywords,
 } from "@/lib/recipe-utils";
 import { buildOcrRecipePayload } from "@/lib/ocr";
 import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
@@ -1809,56 +1808,10 @@ export async function importRecipeFromUrl(formData: FormData) {
     extractMeta(candidateHtml, "twitter:title", "name") ||
     extractTitle(candidateHtml) ||
     sourceHost;
-  const ingredientGroupCandidates =
-    selectedCandidate.ingredientGroups?.length
-      ? selectedCandidate.ingredientGroups
-      : extractIngredientGroupsFromLines(selectedCandidate.ingredients);
   const cleanedCandidateIngredients = cleanIngredientLines(selectedCandidate.ingredients);
-  let groupedIngredients =
-    ingredientGroupCandidates.length > 0
-      ? cleanIngredientGroups(ingredientGroupCandidates)
-      : null;
-  if (groupedIngredients && groupedIngredients.groups.length > 0 && groupedIngredients.ingredients.length > 0) {
-    const groupedSet = new Set(groupedIngredients.ingredients.map((line) => normalizeText(line)));
-    const groupedFingerprints = new Set(
-      groupedIngredients.ingredients
-        .map((line) => extractIngredientKeywords(line).join(" "))
-        .filter(Boolean)
-    );
-
-    const missingLines = cleanedCandidateIngredients.lines.filter((line) => {
-      const norm = normalizeText(line);
-      const fp = extractIngredientKeywords(line).join(" ");
-      if (groupedSet.has(norm)) return false;
-      if (fp && groupedFingerprints.has(fp)) return false;
-      return true;
-    });
-    if (missingLines.length > 0) {
-      const hasIngredientsGroup = groupedIngredients.groups.some((group) => /^ingredients$/i.test(group.title));
-      groupedIngredients.groups.unshift({
-        title: hasIngredientsGroup ? "Other Ingredients" : "Ingredients",
-        items: missingLines,
-      });
-      groupedIngredients = {
-        ...groupedIngredients,
-        ingredients: [...missingLines, ...groupedIngredients.ingredients],
-      };
-    }
-  }
-  const hasGroupedIngredients = Boolean(
-    groupedIngredients &&
-    groupedIngredients.groups.length > 0 &&
-    groupedIngredients.ingredients.length > 0
-  );
-  const cleanedIngredientsSource = hasGroupedIngredients
-    ? {
-      lines: groupedIngredients!.ingredients,
-      notes: [...groupedIngredients!.notes, ...cleanedCandidateIngredients.notes],
-    }
-    : cleanedCandidateIngredients;
   const cleanedIngredients = {
-    lines: cleanedIngredientsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
-    notes: cleanedIngredientsSource.notes,
+    lines: cleanedCandidateIngredients.lines.map((line) => convertIngredientMeasurementToMetric(line)),
+    notes: cleanedCandidateIngredients.notes,
   };
   const cleanedInstructionsSource = cleanInstructionLines(selectedCandidate.instructions);
   const cleanedInstructions = {
@@ -1866,23 +1819,23 @@ export async function importRecipeFromUrl(formData: FormData) {
     notes: cleanedInstructionsSource.notes,
   };
   const htmlNotes = candidateHtml ? extractNotesFromHtml(candidateHtml) : [];
-  const instructionPrepGroups = buildPrepGroupsFromInstructions(
-    cleanedIngredients.lines,
-    cleanedInstructions.lines
-  ).map(g => ({ ...g, sourceGroup: false }));
 
-  const metricGroupedPrepGroups = groupedIngredients?.groups.map((group) => ({
-    ...group,
-    sourceGroup: true,
-    items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
-  }));
-  const sourceGroups =
-    hasGroupedIngredients
-      ? metricGroupedPrepGroups!
-      : extractIngredientGroupsFromLines(selectedCandidate.ingredients).map(
-        (g) => ({ ...g, sourceGroup: true })
-      );
-  const prepGroups = [...sourceGroups, ...instructionPrepGroups];
+  // Prep groups: use source ingredient groupings only (no instruction-derived groups).
+  // These are independent from the flat ingredients list so users can edit groups freely.
+  const ingredientGroupCandidates =
+    selectedCandidate.ingredientGroups?.length
+      ? selectedCandidate.ingredientGroups
+      : extractIngredientGroupsFromLines(selectedCandidate.ingredients);
+  const prepGroups: PrepGroup[] =
+    ingredientGroupCandidates.length > 0
+      ? cleanIngredientGroups(ingredientGroupCandidates).groups.map((group) => ({
+        ...group,
+        sourceGroup: true,
+        items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
+      }))
+      : cleanedIngredients.lines.length > 0
+        ? [{ title: "Ingredients", items: [...cleanedIngredients.lines], sourceGroup: true }]
+        : [];
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||

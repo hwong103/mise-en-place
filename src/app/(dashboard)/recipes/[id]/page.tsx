@@ -13,7 +13,6 @@ import {
   cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
-  isIngredientGroupTitle,
 } from "@/lib/recipe-utils";
 
 
@@ -127,24 +126,12 @@ export default async function RecipeDetailPage({
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
 
-  const ingredientGroups = (() => {
-    const sourceGroups = prepGroups.filter((g) => g.sourceGroup);
-    if (sourceGroups.length > 0) return sourceGroups;
-    // Fallback if no sourceGroups but we have ingredients
-    if (ingredients.length > 0) {
-      return [{ title: "", items: ingredients }];
-    }
-    return [];
-  })();
 
   const editParam = Array.isArray(resolvedSearchParams.edit)
     ? resolvedSearchParams.edit[0]
     : resolvedSearchParams.edit;
   const isEditing = editParam === "1" || editParam === "true";
 
-  const miseGroups = prepGroups.filter(
-    (group) => !group.sourceGroup && !isIngredientGroupTitle(group.title)
-  );
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
   const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
   const transformMs = getServerNow() - transformStartedAt;
@@ -321,72 +308,55 @@ export default async function RecipeDetailPage({
                 </div>
 
                 {isEditing ? (
-                  <IngredientGroupsEditor initialGroups={ingredientGroups} />
+                  <LineListEditor
+                    name="ingredients"
+                    initialItems={ingredients}
+                    ordered={false}
+                    placeholder="e.g. 2 tbsp olive oil"
+                    addLabel="+ Add ingredient"
+                  />
                 ) : (
-                  <div className="space-y-6">
-                    {ingredientGroups.map((group, groupIdx) => (
-                      <div key={groupIdx}>
-                        {group.title && (
-                          <h3 className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                            {group.title}
-                          </h3>
-                        )}
-                        <ul className="space-y-2.5">
-                          {group.items.map((item, itemIdx) => (
-                            <li
-                              key={itemIdx}
-                              className="flex items-start gap-3 text-[15px] text-slate-600 dark:text-slate-300"
-                            >
-                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/40" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                  <ul className="space-y-2.5">
+                    {ingredients.map((item, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-3 text-[15px] text-slate-600 dark:text-slate-300"
+                      >
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/40" />
+                        <span>{item}</span>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </section>
 
-              {/* Mise Prep Groups Card */}
+              {/* Prep Groups Card */}
               <section className="rounded-3xl border border-amber-200 bg-amber-50/30 p-6 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise Prep Groups</h2>
-                    {!isEditing && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600/70 dark:text-amber-400/50">
-                        Instruction Derived
-                      </span>
-                    )}
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Prep Groups</h2>
                   </div>
                 </div>
                 {isEditing ? (
                   <div className="mt-4">
-                    {/* We'll use a new MisePrepGroupsEditor here or update IngredientGroupsEditor */}
                     <IngredientGroupsEditor
-                      initialGroups={miseGroups}
-                      prefix="miseGroup"
-                      showStepBadge
+                      initialGroups={prepGroups}
+                      prefix="prepGroup"
                     />
                   </div>
                 ) : (
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    {miseGroups.length === 0 ? (
+                    {prepGroups.length === 0 ? (
                       <p className="col-span-2 py-4 text-center text-sm italic text-slate-500">
-                        No prep groups derived. Edit recipe to manually add groups.
+                        No prep groups. Edit recipe to add groups.
                       </p>
                     ) : (
-                      miseGroups.map((group) => (
+                      prepGroups.map((group) => (
                         <div key={group.title} className="group relative rounded-2xl border border-white bg-white/60 p-4 shadow-sm transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-900">
                           <div className="flex items-start justify-between">
                             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                               {group.title}
                             </h3>
-                            {group.stepIndex !== undefined && (
-                              <span className="rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
-                                Step {group.stepIndex + 1}
-                              </span>
-                            )}
                           </div>
                           <ul className="mt-3 space-y-1.5 text-sm text-slate-700 dark:text-slate-200">
                             {group.items.map((item) => (
