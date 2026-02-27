@@ -363,7 +363,7 @@ export const resolveHouseholdFromShareToken = async (token: string) => {
 };
 
 export const claimHousehold = async (householdId: string, userId: string) => {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: typeof prisma) => {
     const household = await tx.household.findUnique({
       where: { id: householdId },
       select: { id: true, claimedByUserId: true },

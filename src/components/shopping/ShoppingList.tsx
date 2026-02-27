@@ -4,7 +4,21 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ShoppingCategory } from "@/lib/shopping";
-import type { ShoppingListItem } from "@prisma/client";
+
+// Local type for ShoppingListItem since Prisma client may not export it in all environments
+type ShoppingListItem = {
+  id: string;
+  householdId: string;
+  weekStart: Date;
+  line: string;
+  lineNormalized: string;
+  category: string;
+  location: string;
+  manual: boolean;
+  checked: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
 import ShoppingActions from "@/components/shopping/ShoppingActions";
 import {
   addManualShoppingItem,

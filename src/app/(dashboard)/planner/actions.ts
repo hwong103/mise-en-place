@@ -43,12 +43,12 @@ export async function upsertMealPlan(formData: FormData) {
     },
   });
 
-  const existingMatch = existingForDay.find((entry) => entry.recipeId === recipeId);
+  const existingMatch = existingForDay.find((entry: { id: string; recipeId: string; mealType: string }) => entry.recipeId === recipeId);
   if (existingMatch) {
     return { status: "exists" as const, id: existingMatch.id, mealType: existingMatch.mealType };
   }
 
-  const occupiedTypes = new Set(existingForDay.map((entry) => entry.mealType));
+  const occupiedTypes = new Set(existingForDay.map((entry: { id: string; recipeId: string; mealType: string }) => entry.mealType));
   const nextMealType = MEAL_TYPE_ORDER.find((mealType) => !occupiedTypes.has(mealType));
 
   if (!nextMealType) {

@@ -7,11 +7,11 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import {
-  buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLines,
   cleanInstructionLines,
   cleanTextLines,
+  coercePrepGroups,
   coerceStringArray,
   parseLines,
   parsePrepGroupsFromText,
@@ -179,10 +179,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -201,10 +198,7 @@ export async function updateRecipeSection(formData: FormData) {
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -302,10 +296,7 @@ export async function updateRecipeSection(formData: FormData) {
               : existingNotes.length > 0
                 ? existingNotes
                 : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+              prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -336,6 +327,55 @@ export async function updateRecipeSection(formData: FormData) {
 
   revalidatePath(`/recipes/${recipeId}`);
   redirect(`/recipes/${recipeId}`);
+}
+
+export async function updatePrepGroupsOrder(recipeId: string, prepGroupsJson: string) {
+  const startedAt = Date.now();
+  if (!recipeId) {
+    return { success: false, error: "missing_recipe_id" };
+  }
+
+  let householdId: string | undefined;
+  try {
+    householdId = await getCurrentHouseholdId();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(prepGroupsJson);
+    } catch {
+      return { success: false, error: "invalid_json" };
+    }
+    const prepGroups = coercePrepGroups(parsed);
+
+    await prisma.recipe.updateMany({
+      where: { id: recipeId, householdId },
+      data: { prepGroups },
+    });
+
+    logServerPerf({
+      phase: "recipes.update_prep_groups_order",
+      route: "/recipes/[id]",
+      startedAt,
+      success: true,
+      householdId,
+      meta: { recipe_id: recipeId },
+    });
+
+    revalidatePath(`/recipes/${recipeId}`);
+    return { success: true };
+  } catch (error) {
+    logServerPerf({
+      phase: "recipes.update_prep_groups_order",
+      route: "/recipes/[id]",
+      startedAt,
+      success: false,
+      householdId,
+      meta: {
+        recipe_id: recipeId,
+        error: error instanceof Error ? error.message : "unknown_error",
+      },
+    });
+    return { success: false, error: "save_failed" };
+  }
 }
 
 export async function deleteRecipe(formData: FormData) {

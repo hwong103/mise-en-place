@@ -8,7 +8,6 @@ import { logServerPerf } from "@/lib/server-perf";
 import { fromDateKey } from "@/lib/date";
 import { parseMarkdownRecipe } from "@/lib/recipe-import";
 import {
-  buildPrepGroups,
   buildPrepGroupsFromInstructions,
   cleanIngredientLine,
   cleanIngredientLines,
@@ -529,7 +528,7 @@ const findRecipeBySourceUrl = async (
     select: { id: true, sourceUrl: true },
   });
   return (
-    matches.find(
+    (matches as Array<{ id: string; sourceUrl: string | null }>).find(
       (match) => normalizeSourceUrl(match.sourceUrl ?? "") === normalized
     ) ?? null
   );
@@ -1273,8 +1272,7 @@ const buildRecipePayload = (formData: FormData) => {
   const instructions = parseLines(formData.get("instructions")?.toString() ?? "");
   const notes = parseLines(formData.get("notes")?.toString() ?? "");
   const instructionPrepGroups = buildPrepGroupsFromInstructions(ingredients, instructions);
-  const prepGroups =
-    instructionPrepGroups.length > 0 ? instructionPrepGroups : buildPrepGroups(ingredients);
+  const prepGroups = instructionPrepGroups;
 
   return {
     title,
@@ -1432,10 +1430,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -1454,10 +1449,7 @@ export async function updateRecipeSection(formData: FormData) {
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups:
-            instructionPrepGroups.length > 0
-              ? instructionPrepGroups
-              : buildPrepGroups(cleanedIngredients.lines),
+          prepGroups: instructionPrepGroups,
         },
       });
     }
@@ -1865,9 +1857,7 @@ export async function importRecipeFromUrl(formData: FormData) {
   const prepGroups =
     hasGroupedIngredients
       ? metricGroupedPrepGroups!
-      : instructionPrepGroups.length > 0
-        ? instructionPrepGroups
-        : buildPrepGroups(cleanedIngredients.lines);
+      : instructionPrepGroups;
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||
@@ -2065,12 +2055,12 @@ export async function addToMealPlan(formData: FormData) {
     select: { mealType: true, recipeId: true },
   });
 
-  const alreadyAdded = existingForDay.some((plan) => plan.recipeId === recipeId);
+  const alreadyAdded = (existingForDay as Array<{ recipeId: string; mealType: string }>).some((plan) => plan.recipeId === recipeId);
   if (alreadyAdded) {
     redirect("/planner");
   }
 
-  const occupied = new Set(existingForDay.map((plan) => plan.mealType));
+  const occupied = new Set((existingForDay as Array<{ recipeId: string; mealType: string }>).map((plan) => plan.mealType));
   const nextMealType = mealTypeOrder.find((mealType) => !occupied.has(mealType));
   if (!nextMealType) {
     redirect("/planner");

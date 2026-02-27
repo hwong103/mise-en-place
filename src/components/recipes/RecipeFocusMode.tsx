@@ -1,12 +1,15 @@
 "use client";
 
 import { type TouchEvent, useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Play } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Play } from "lucide-react";
 import { createPortal } from "react-dom";
+import { updatePrepGroupsOrder } from "@/app/(dashboard)/recipes/detail-actions";
 
 type PrepGroup = {
   title: string;
   items: string[];
+  stepIndex?: number;
+  sourceGroup?: boolean;
 };
 
 type RecipeFocusModeProps = {
@@ -14,10 +17,12 @@ type RecipeFocusModeProps = {
   prepGroups: PrepGroup[];
   ingredients: string[];
   instructions: string[];
+  notes: string[];
   triggerWrapperClassName?: string;
   miseButtonClassName?: string;
   cookButtonClassName?: string;
   showCookPlayIcon?: boolean;
+  recipeId?: string;
 };
 
 type FocusMode = "mise" | "cook";
@@ -35,15 +40,93 @@ type NavigatorWithWakeLock = Navigator & {
   };
 };
 
+// Colour palette for prep group highlights (soft backgrounds)
+const GROUP_COLOURS = [
+  { bg: "bg-amber-100", text: "text-amber-800", border: "border-l-amber-400", highlight: "rgba(251,191,36,0.25)" },
+  { bg: "bg-sky-100", text: "text-sky-800", border: "border-l-sky-400", highlight: "rgba(56,189,248,0.25)" },
+  { bg: "bg-violet-100", text: "text-violet-800", border: "border-l-violet-400", highlight: "rgba(167,139,250,0.25)" },
+  { bg: "bg-rose-100", text: "text-rose-800", border: "border-l-rose-400", highlight: "rgba(251,113,133,0.25)" },
+  { bg: "bg-teal-100", text: "text-teal-800", border: "border-l-teal-400", highlight: "rgba(45,212,191,0.25)" },
+  { bg: "bg-orange-100", text: "text-orange-800", border: "border-l-orange-400", highlight: "rgba(251,146,60,0.25)" },
+];
+
+// Extract searchable keywords from an ingredient line
+const extractKeywords = (line: string): string[] => {
+  const STOP = new Set(["a", "an", "and", "or", "of", "the", "to", "with", "for", "each", "fresh", "freshly", "optional", "taste", "about", "approx"]);
+  const UNITS = new Set(["g", "kg", "mg", "ml", "l", "oz", "lb", "lbs", "pound", "pounds", "tbsp", "tsp", "cup", "cups", "tablespoon", "tablespoons", "teaspoon", "teaspoons", "clove", "cloves", "pinch", "dash", "package", "packages", "can", "cans", "slice", "slices", "inch", "inches"]);
+
+  // Strip quantity/unit prefix, parenthetical content, prep descriptors after comma
+  const withoutParens = line.replace(/\([^)]*\)/g, " ");
+  const afterComma = withoutParens.split(",")[0];
+  const cleaned = afterComma.replace(/[^a-zA-Z\s]/g, " ");
+
+  return cleaned
+    .split(/\s+/)
+    .map((t) => t.toLowerCase())
+    .filter(Boolean)
+    .filter((t) => !STOP.has(t))
+    .filter((t) => !UNITS.has(t))
+    .filter((t) => !/^\d/.test(t))
+    .filter((t) => t.length > 2);
+};
+
+type HighlightSpan = { text: string; groupIndex: number | null };
+
+// Highlight ingredient keywords in an instruction text
+const highlightInstruction = (text: string, groupKeywords: Array<{ keywords: string[]; groupIndex: number }>): HighlightSpan[] => {
+  // Build sorted list of (start, end, groupIndex) matches, first-group wins
+  const matches: Array<{ start: number; end: number; groupIndex: number }> = [];
+  const claimed = new Set<number>();
+
+  for (const { keywords, groupIndex } of groupKeywords) {
+    for (const kw of keywords) {
+      const regex = new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
+      let m = regex.exec(text);
+      while (m) {
+        const start = m.index;
+        const end = start + m[0].length;
+        // Check no position is already claimed
+        let conflict = false;
+        for (let i = start; i < end; i++) {
+          if (claimed.has(i)) { conflict = true; break; }
+        }
+        if (!conflict) {
+          matches.push({ start, end, groupIndex });
+          for (let i = start; i < end; i++) claimed.add(i);
+        }
+        m = regex.exec(text);
+      }
+    }
+  }
+
+  if (matches.length === 0) return [{ text, groupIndex: null }];
+
+  matches.sort((a, b) => a.start - b.start);
+
+  const spans: HighlightSpan[] = [];
+  let cursor = 0;
+  for (const match of matches) {
+    if (match.start > cursor) {
+      spans.push({ text: text.slice(cursor, match.start), groupIndex: null });
+    }
+    spans.push({ text: text.slice(match.start, match.end), groupIndex: match.groupIndex });
+    cursor = match.end;
+  }
+  if (cursor < text.length) spans.push({ text: text.slice(cursor), groupIndex: null });
+  return spans;
+};
+
 export default function RecipeFocusMode({
   title,
-  prepGroups,
+  prepGroups: initialPrepGroups,
   ingredients,
   instructions,
+  notes,
   triggerWrapperClassName,
   miseButtonClassName,
   cookButtonClassName,
   showCookPlayIcon = false,
+  recipeId,
 }: RecipeFocusModeProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [mode, setMode] = useState<FocusMode | null>(null);
@@ -51,8 +134,13 @@ export default function RecipeFocusMode({
   const [renderedStepIndex, setRenderedStepIndex] = useState(0);
   const [transitionDirection, setTransitionDirection] = useState<1 | -1>(1);
   const [transitionPhase, setTransitionPhase] = useState<"idle" | "out" | "in">("idle");
+  const [localPrepGroups, setLocalPrepGroups] = useState<PrepGroup[]>(initialPrepGroups);
+  const [dragSaveError, setDragSaveError] = useState(false);
+  // Drag state
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   const misePrepRef = useRef<HTMLDivElement | null>(null);
-  const miseIngredientsRef = useRef<HTMLDivElement | null>(null);
   const cookQuickRef = useRef<HTMLDivElement | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -61,6 +149,17 @@ export default function RecipeFocusMode({
   const canGoPrev = stepCount > 0 && activeStepIndex > 0;
   const canGoNext = stepCount > 0 && activeStepIndex < stepCount - 1;
   const progressPercent = stepCount > 0 ? ((activeStepIndex + 1) / stepCount) * 100 : 0;
+
+  // Sync if parent prop changes
+  useEffect(() => {
+    setLocalPrepGroups(initialPrepGroups);
+  }, [initialPrepGroups]);
+
+  // Build keyword map for highlighting
+  const groupKeywords = localPrepGroups.map((group, groupIndex) => ({
+    groupIndex,
+    keywords: group.items.flatMap((item) => extractKeywords(item)),
+  }));
 
   const clearTransitionTimers = useCallback(() => {
     if (transitionTimeoutRef.current) {
@@ -245,6 +344,52 @@ export default function RecipeFocusMode({
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (index: number) => {
+    dragIndexRef.current = index;
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = async (dropIndex: number) => {
+    const dragIndex = dragIndexRef.current;
+    if (dragIndex === null || dragIndex === dropIndex) {
+      dragIndexRef.current = null;
+      setDragOverIndex(null);
+      return;
+    }
+
+    const prevGroups = localPrepGroups;
+    const newGroups = [...localPrepGroups];
+    const [moved] = newGroups.splice(dragIndex, 1);
+    newGroups.splice(dropIndex, 0, moved);
+
+    // Optimistic update
+    setLocalPrepGroups(newGroups);
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+    setDragSaveError(false);
+
+    // Persist if we have a recipeId
+    if (recipeId) {
+      const result = await updatePrepGroupsOrder(recipeId, JSON.stringify(newGroups));
+      if (!result.success) {
+        // Revert on failure
+        setLocalPrepGroups(prevGroups);
+        setDragSaveError(true);
+        setTimeout(() => setDragSaveError(false), 3000);
+      }
+    }
+  };
+
+  const handleDragEnd = () => {
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+  };
+
   const stepMotionClass =
     transitionPhase === "out"
       ? transitionDirection === 1
@@ -329,41 +474,120 @@ export default function RecipeFocusMode({
               </div>
             </div>
 
+            {dragSaveError ? (
+              <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+                Failed to save new order. Reverted.
+              </div>
+            ) : null}
+
             {mode === "mise" ? (
               <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.4fr_1fr]">
+                {/* Left panel: Prep Groups with drag-and-drop */}
                 <section ref={misePrepRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                     Prep Groups
                   </h3>
-                  {prepGroups.length === 0 ? (
+                  {localPrepGroups.length === 0 ? (
                     <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No prep groups yet.</p>
                   ) : (
-                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                      {prepGroups.map((group) => (
-                        <div key={group.title} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{group.title}</h4>
-                          <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                            {group.items.map((item) => (
-                              <li key={`${group.title}-${item}`}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      {localPrepGroups.map((group, index) => {
+                        const colour = GROUP_COLOURS[index % GROUP_COLOURS.length];
+                        const isDragOver = dragOverIndex === index;
+                        return (
+                          <div
+                            key={`${group.title}-${index}`}
+                            draggable
+                            onDragStart={() => handleDragStart(index)}
+                            onDragOver={(e) => handleDragOver(e, index)}
+                            onDrop={() => handleDrop(index)}
+                            onDragEnd={handleDragEnd}
+                            className={`relative rounded-xl border bg-white p-3 transition-all dark:bg-slate-900 ${
+                              isDragOver
+                                ? "border-amber-400 shadow-md dark:border-amber-500"
+                                : "border-slate-200 dark:border-slate-700"
+                            } border-l-4 ${colour.border}`}
+                            style={{ opacity: dragIndexRef.current === index ? 0.5 : 1, cursor: "grab" }}
+                          >
+                            <div className="flex items-start gap-2">
+                              <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{group.title}</h4>
+                                  {group.stepIndex !== undefined ? (
+                                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${colour.bg} ${colour.text}`}>
+                                      Step {group.stepIndex + 1}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                                  {group.items.map((item) => (
+                                    <li key={`${group.title}-${item}`}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </section>
 
-                <section ref={miseIngredientsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                {/* Right panel: Instructions with ingredient highlights + Notes */}
+                <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                   <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                    Ingredients
+                    Instructions
                   </h3>
-                  <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                    {ingredients.map((ingredient) => (
-                      <li key={ingredient} className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-                        {ingredient}
-                      </li>
-                    ))}
-                  </ul>
+                  {instructions.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No instructions.</p>
+                  ) : (
+                    <ol className="mt-3 space-y-3">
+                      {instructions.map((step, stepIdx) => {
+                        const spans = highlightInstruction(step, groupKeywords);
+                        return (
+                          <li key={`step-${stepIdx}`} className="flex gap-3">
+                            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                              {stepIdx + 1}
+                            </span>
+                            <span className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                              {spans.map((span, spanIdx) =>
+                                span.groupIndex !== null ? (
+                                  <mark
+                                    key={spanIdx}
+                                    className={`rounded px-0.5 ${GROUP_COLOURS[span.groupIndex % GROUP_COLOURS.length].bg} ${GROUP_COLOURS[span.groupIndex % GROUP_COLOURS.length].text}`}
+                                    style={{ backgroundColor: GROUP_COLOURS[span.groupIndex % GROUP_COLOURS.length].highlight }}
+                                  >
+                                    {span.text}
+                                  </mark>
+                                ) : (
+                                  <span key={spanIdx}>{span.text}</span>
+                                )
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+
+                  {notes.length > 0 ? (
+                    <div className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                        Notes
+                      </p>
+                      <ul className="mt-3 space-y-2">
+                        {notes.map((note, noteIdx) => (
+                          <li
+                            key={noteIdx}
+                            className="rounded-xl bg-slate-100/80 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+                          >
+                            {note}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </section>
               </div>
             ) : (

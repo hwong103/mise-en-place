@@ -13,6 +13,7 @@ import {
   cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
+  type PrepGroup,
 } from "@/lib/recipe-utils";
 
 import { deleteRecipe, updateRecipeSection } from "../detail-actions";
@@ -137,17 +138,20 @@ export default async function RecipeDetailPage({
   const instructions = coerceStringArray(recipe.instructions);
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
+
+  // Source-faithful ingredient groups: PrepGroups that came from the source recipe structure (e.g. "For the marinade:")
+  // These are groups that pass isIngredientGroupTitle (not "Step N" or "Prep" titles)
   const ingredientGroups = (() => {
     if (!prepGroups.length) {
-      return [];
+      return [] as PrepGroup[];
     }
     const candidates = prepGroups.filter((group) => isIngredientGroupTitle(group.title));
     if (!candidates.length) {
-      return [];
+      return [] as PrepGroup[];
     }
     const ingredientSet = new Set(ingredients);
     const groupedItems = new Set<string>();
-    const filtered = candidates
+    const filtered: PrepGroup[] = candidates
       .map((group) => ({
         title: group.title,
         items: group.items
@@ -164,6 +168,9 @@ export default async function RecipeDetailPage({
     }
     return filtered;
   })();
+
+  // Instruction-derived mise prep groups: "Step N" style groups derived from instructions
+  const misePrepGroups = prepGroups.filter((group) => !isIngredientGroupTitle(group.title));
   const authorLabel = getAuthorLabel(recipe.sourceUrl);
   const embedUrl = getVideoEmbedUrl(recipe.videoUrl);
   const editParam = Array.isArray(resolvedSearchParams.edit)
@@ -224,6 +231,8 @@ export default async function RecipeDetailPage({
                 prepGroups={prepGroups}
                 ingredients={ingredients}
                 instructions={instructions}
+                notes={notes}
+                recipeId={recipe.id}
                 triggerWrapperClassName="contents"
                 miseButtonClassName="rounded-[20px] border-[1.5px] border-white/60 bg-transparent px-[18px] py-2 text-[13px] font-semibold text-white transition-colors hover:border-white hover:bg-white/10"
                 cookButtonClassName="rounded-[20px] border-0 bg-[#C67B2A] px-[18px] py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(198,123,42,0.35)] transition-colors hover:bg-[#B56E24]"
@@ -334,6 +343,7 @@ export default async function RecipeDetailPage({
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <section className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
+              {/* Ingredients Card — source-faithful, with editable section headers */}
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Ingredients</h2>
                 {!isEditing ? (
@@ -380,6 +390,7 @@ export default async function RecipeDetailPage({
                 )}
               </section>
 
+              {/* Instructions Card */}
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
                 {!isEditing ? (
@@ -410,6 +421,51 @@ export default async function RecipeDetailPage({
                 )}
               </section>
             </div>
+
+            {/* Mise Prep Groups Card — instruction-derived, with step badges */}
+            {misePrepGroups.length > 0 || isEditing ? (
+              <section className="rounded-3xl border border-amber-100 bg-white p-6 shadow-sm dark:border-amber-900/30 dark:bg-slate-900">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Mise Prep Groups</h2>
+                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950/40 dark:text-amber-300">
+                    Instruction-derived
+                  </span>
+                </div>
+                {misePrepGroups.length === 0 ? (
+                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+                    No prep groups yet. Save ingredients and instructions to generate them.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {misePrepGroups.map((group, groupIndex) => (
+                      <div
+                        key={`${group.title}-${groupIndex}`}
+                        className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 dark:border-amber-900/30 dark:bg-amber-950/20"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                            {group.title}
+                          </h3>
+                          {group.stepIndex !== undefined ? (
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                              Step {group.stepIndex + 1}
+                            </span>
+                          ) : null}
+                        </div>
+                        <ul className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                          {group.items.map((item) => (
+                            <li key={`${group.title}-${item}`} className="flex items-start gap-2">
+                              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
           </section>
 
           <aside className="space-y-6">

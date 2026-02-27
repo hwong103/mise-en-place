@@ -57,7 +57,7 @@ export default async function ShoppingPage() {
       )
     : null;
 
-  const ingredientEntries = mealPlans.flatMap((plan) => {
+  const ingredientEntries = (mealPlans as Array<{ recipe?: { title?: string | null; ingredients?: unknown } | null }>).flatMap((plan) => {
     const recipeTitle = plan.recipe?.title ?? null;
     const ingredients = plan.recipe ? coerceStringArray(plan.recipe.ingredients) : [];
     return ingredients.map((line) => ({ line, recipeTitle }));

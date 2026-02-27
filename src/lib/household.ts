@@ -34,7 +34,7 @@ export const ensureDefaultHouseholdForUser = async (userId: string) => {
   }
 
   const name = process.env.DEFAULT_HOUSEHOLD_NAME?.trim() || DEFAULT_HOUSEHOLD_NAME;
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx: typeof prisma) => {
     const household = await tx.household.create({
       data: { name },
       select: { id: true },

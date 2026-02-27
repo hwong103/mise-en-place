@@ -1,6 +1,8 @@
 export type PrepGroup = {
   title: string;
   items: string[];
+  stepIndex?: number; // 0-based index of the instruction step this group relates to
+  sourceGroup?: boolean; // true = comes from source recipe structure (ingredient sections), not instruction-derived
 };
 
 const HTML_ENTITY_MAP: Record<string, string> = {
@@ -496,20 +498,6 @@ const findPrepPhrase = (instruction: string) => {
 const titleCase = (value: string) =>
   value.replace(/\b\w/g, (char) => char.toUpperCase());
 
-const addToGroupMap = (groupMap: Map<string, string[]>, title: string, items: string[]) => {
-  const existing = groupMap.get(title);
-  if (!existing) {
-    groupMap.set(title, Array.from(new Set(items)));
-    return;
-  }
-
-  for (const item of items) {
-    if (!existing.includes(item)) {
-      existing.push(item);
-    }
-  }
-};
-
 export const buildPrepGroupsFromInstructions = (
   ingredients: string[],
   instructions: string[]
@@ -523,61 +511,48 @@ export const buildPrepGroupsFromInstructions = (
     keywords: extractIngredientKeywords(line),
   }));
   const assigned = new Set<string>();
-  const groupMap = new Map<string, string[]>();
-
-  // Prefer explicit prep hints from ingredient lines ("sliced", "diced", etc)
-  // so mise en place reflects actual prep work instead of cooking-stage verbs.
-  for (const ingredient of ingredients) {
-    const prepTitle = findIngredientPrepTitle(ingredient);
-    if (!prepTitle) {
-      continue;
-    }
-    addToGroupMap(groupMap, prepTitle, [ingredient]);
-    assigned.add(ingredient);
-  }
+  // Map from stepIndex -> matched ingredient lines
+  const stepGroups = new Map<number, string[]>();
 
   instructions.forEach((instruction, index) => {
     const lower = instruction.toLowerCase();
     const matches = ingredientKeywords.filter(
       (ingredient) =>
         !assigned.has(ingredient.line) &&
-        ingredient.keywords.some((keyword) => lower.includes(keyword))
+        ingredient.keywords.some((keyword) => {
+          // Use whole-word matching to avoid false positives
+          const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+          return regex.test(lower);
+        })
     );
 
     if (matches.length === 0) {
       return;
     }
 
-    const prepPhrase = findPrepPhrase(instruction);
-    if (!prepPhrase && !/\bprep\b|\bprepare\b/.test(lower)) {
-      return;
+    const existing = stepGroups.get(index) ?? [];
+    for (const match of matches) {
+      if (!existing.includes(match.line)) {
+        existing.push(match.line);
+      }
+      assigned.add(match.line);
     }
-
-    const title = prepPhrase ? titleCase(prepPhrase) : `Step ${index + 1} Prep`;
-    addToGroupMap(
-      groupMap,
-      title,
-      matches.map((match) => match.line)
-    );
-
-    matches.forEach((match) => assigned.add(match.line));
+    stepGroups.set(index, existing);
   });
 
-  const groups: PrepGroup[] = Array.from(groupMap.entries()).map(([title, items]) => ({
-    title,
-    items,
-  }));
-  const remaining = ingredients.filter((line) => !assigned.has(line));
+  const groups: PrepGroup[] = Array.from(stepGroups.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([stepIndex, items]) => ({
+      title: `Step ${stepIndex + 1}`,
+      items,
+      stepIndex,
+    }));
+
   if (groups.length === 0) {
     return [];
   }
-  if (remaining.length > 0) {
-    groups.push({
-      title: "Other Prep",
-      items: remaining,
-    });
-  }
 
+  // Do NOT add remaining unmatched ingredients — per spec, store empty groups rather than dump
   return groups;
 };
 
@@ -634,7 +609,7 @@ export function coercePrepGroups(value: unknown): PrepGroup[] {
       const items = Array.isArray(record.items)
         ? record.items
           .filter((item) => typeof item === "string")
-          .map((item) => item.trim())
+          .map((item) => (item as string).trim())
           .filter(Boolean)
         : [];
 
@@ -642,7 +617,10 @@ export function coercePrepGroups(value: unknown): PrepGroup[] {
         return null;
       }
 
-      return { title, items } satisfies PrepGroup;
+      const stepIndex = typeof record.stepIndex === "number" ? record.stepIndex : undefined;
+      const sourceGroup = typeof record.sourceGroup === "boolean" ? record.sourceGroup : undefined;
+
+      return { title, items, ...(stepIndex !== undefined ? { stepIndex } : {}), ...(sourceGroup !== undefined ? { sourceGroup } : {}) } satisfies PrepGroup;
     })
     .filter((entry): entry is PrepGroup => Boolean(entry));
 }

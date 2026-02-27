@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 250;
 
@@ -45,7 +45,7 @@ const createPrismaClient = () => {
 
   if (queryLoggingEnabled) {
     const thresholdMs = readSlowQueryThreshold();
-    client.$on("query", (event: Prisma.QueryEvent) => {
+    client.$on("query", (event: { duration: number; query: string; target: string }) => {
       if (event.duration < thresholdMs) {
         return;
       }

@@ -16,7 +16,7 @@ export default async function RecipesPage({
     : resolvedSearchParams.importError;
 
   const recipes = await listRecipes();
-  const summaries = recipes.map((recipe) => ({
+  const summaries = (recipes as Array<{ id: string; title: string; description?: string | null; imageUrl?: string | null; tags?: string[] | null; servings?: number | null; prepTime?: number | null; cookTime?: number | null; ingredientCount: number; sourceUrl?: string | null }>).map((recipe) => ({
     id: recipe.id,
     title: recipe.title,
     description: recipe.description,

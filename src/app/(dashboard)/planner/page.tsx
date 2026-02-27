@@ -31,7 +31,8 @@ export default async function PlannerPage() {
   ]);
 
   const hasRecipes = recipes.length > 0;
-  const slots = mealPlans.map((plan) => ({
+  type MealType = "DINNER" | "LUNCH" | "BREAKFAST" | "SNACK";
+  const slots = (mealPlans as Array<{ id: string; date: Date; recipeId: string; mealType: MealType; recipe?: { title: string; imageUrl?: string | null } | null }>).map((plan) => ({
     id: plan.id,
     dateKey: toDateKey(plan.date),
     recipeId: plan.recipeId,
@@ -69,7 +70,7 @@ export default async function PlannerPage() {
           dateKey: dateKeys[index],
           label: formatDate(day),
         }))}
-        recipes={recipes.map((recipe) => ({ id: recipe.id, title: recipe.title, imageUrl: recipe.imageUrl ?? null }))}
+        recipes={(recipes as Array<{ id: string; title: string; imageUrl?: string | null }>).map((recipe) => ({ id: recipe.id, title: recipe.title, imageUrl: recipe.imageUrl ?? null }))}
         slots={slots}
       />
     </div>
