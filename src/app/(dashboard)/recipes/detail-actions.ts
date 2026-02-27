@@ -173,6 +173,7 @@ export async function updateRecipeSection(formData: FormData) {
         cleanedIngredients.lines,
         cleanedInstructions.lines
       );
+      const existingSourceGroups = coercePrepGroups(recipe.prepGroups).filter((g) => g.sourceGroup === true);
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -180,7 +181,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
+          prepGroups: [...existingSourceGroups, ...instructionPrepGroups],
         },
       });
     }
@@ -193,13 +194,14 @@ export async function updateRecipeSection(formData: FormData) {
         cleanedIngredients.lines,
         cleanedInstructions.lines
       );
+      const existingSourceGroups = coercePrepGroups(recipe.prepGroups).filter((g) => g.sourceGroup === true);
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
+          prepGroups: [...existingSourceGroups, ...instructionPrepGroups],
         },
       });
     }
@@ -217,19 +219,20 @@ export async function updateRecipeSection(formData: FormData) {
 
     if (section === "prepGroups") {
       const raw = formData.get("prepGroups")?.toString() ?? "";
-      const parsed = parsePrepGroupsFromText(raw);
-      // Re-attach stepIndex and sourceGroup from existing stored groups when the
-      // title matches — the textarea edit loses these metadata fields.
-      const existingByTitle = new Map(
-        coercePrepGroups(recipe.prepGroups).map((g) => [g.title, g])
+      const existingGroups = coercePrepGroups(recipe.prepGroups);
+      const existingSourceGroups = existingGroups.filter((g) => g.sourceGroup === true);
+      // Re-attach stepIndex from existing mise groups by title.
+      const existingMiseByTitle = new Map(
+        existingGroups.filter((g) => g.sourceGroup !== true).map((g) => [g.title, g])
       );
-      const prepGroups: PrepGroup[] = parsed.map((g) => {
-        const existing = existingByTitle.get(g.title);
+      const parsedMise: PrepGroup[] = parsePrepGroupsFromText(raw).map((g) => {
+        const existing = existingMiseByTitle.get(g.title);
         const merged: PrepGroup = { ...g };
         if (existing?.stepIndex !== undefined) merged.stepIndex = existing.stepIndex;
-        if (existing?.sourceGroup !== undefined) merged.sourceGroup = existing.sourceGroup;
         return merged;
       });
+      // Preserve source section groups alongside the edited mise groups.
+      const prepGroups: PrepGroup[] = [...existingSourceGroups, ...parsedMise];
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
         data: {
@@ -286,26 +289,29 @@ export async function updateRecipeSection(formData: FormData) {
       // If the form submitted a prepGroups field (LineListEditor), honour the
       // manual edit. Otherwise re-derive from the new ingredients + instructions.
       const rawPrepGroups = formData.get("prepGroups")?.toString();
+      const existingGroups = coercePrepGroups(recipe.prepGroups);
+      const existingSourceGroups = existingGroups.filter((g) => g.sourceGroup === true);
       let finalPrepGroups: PrepGroup[];
       if (rawPrepGroups !== undefined && rawPrepGroups !== null) {
-        const parsed = parsePrepGroupsFromText(rawPrepGroups);
-        // Re-attach stepIndex / sourceGroup from the existing DB record by title.
-        const existingByTitle = new Map(
-          coercePrepGroups(recipe.prepGroups).map((g) => [g.title, g])
+        // Form submitted mise prep groups from LineListEditor.
+        // Re-attach stepIndex from existing DB groups by title.
+        const existingMiseByTitle = new Map(
+          existingGroups.filter((g) => g.sourceGroup !== true).map((g) => [g.title, g])
         );
-        finalPrepGroups = parsed.map((g) => {
-          const existing = existingByTitle.get(g.title);
+        const parsedMise = parsePrepGroupsFromText(rawPrepGroups).map((g) => {
+          const existing = existingMiseByTitle.get(g.title);
           const merged: PrepGroup = { ...g };
           if (existing?.stepIndex !== undefined) merged.stepIndex = existing.stepIndex;
-          if (existing?.sourceGroup !== undefined) merged.sourceGroup = existing.sourceGroup;
           return merged;
         });
+        // Preserve source groups (ingredient sections) alongside the new mise groups.
+        finalPrepGroups = [...existingSourceGroups, ...parsedMise];
       } else {
         const instructionPrepGroups = buildPrepGroupsFromInstructions(
           cleanedIngredients.lines,
           cleanedInstructions.lines
         );
-        finalPrepGroups = instructionPrepGroups;
+        finalPrepGroups = [...existingSourceGroups, ...instructionPrepGroups];
       }
 
       await prisma.recipe.updateMany({

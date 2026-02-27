@@ -1424,6 +1424,7 @@ export async function updateRecipeSection(formData: FormData) {
         cleanedIngredients.lines,
         cleanedInstructions.lines
       );
+      const existingSourceGroups = coercePrepGroups(recipe.prepGroups).filter((g) => g.sourceGroup === true);
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -1431,7 +1432,7 @@ export async function updateRecipeSection(formData: FormData) {
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedIngredients.notes,
-          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
+          prepGroups: [...existingSourceGroups, ...instructionPrepGroups],
         },
       });
     }
@@ -1444,13 +1445,14 @@ export async function updateRecipeSection(formData: FormData) {
         cleanedIngredients.lines,
         cleanedInstructions.lines
       );
+      const existingSourceGroups = coercePrepGroups(recipe.prepGroups).filter((g) => g.sourceGroup === true);
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
         data: {
           instructions: cleanedInstructions.lines,
           notes: existingNotes.length > 0 ? existingNotes : cleanedInstructions.notes,
-          prepGroups: instructionPrepGroups.length > 0 ? instructionPrepGroups : [],
+          prepGroups: [...existingSourceGroups, ...instructionPrepGroups],
         },
       });
     }
@@ -1867,12 +1869,14 @@ export async function importRecipeFromUrl(formData: FormData) {
     sourceGroup: true as const,
     items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
   }));
-  const prepGroups =
-    hasGroupedIngredients
-      ? metricGroupedPrepGroups!
-      : instructionPrepGroups.length > 0
-        ? instructionPrepGroups
-        : [];
+  // Always store both: source section headers (sourceGroup: true) for the
+  // Ingredients card, and instruction-derived mise groups (no sourceGroup) for
+  // the Mise Prep Groups card. They coexist in the same prepGroups array and
+  // are separated by the sourceGroup flag when rendering.
+  const prepGroups: PrepGroup[] = [
+    ...(hasGroupedIngredients ? metricGroupedPrepGroups! : []),
+    ...instructionPrepGroups,
+  ];
   const rawDescription =
     selectedCandidate.description ||
     extractMeta(candidateHtml, "description", "name") ||
