@@ -10,7 +10,6 @@ type RecipeFocusModeProps = {
   recipeId?: string;
   title: string;
   prepGroups: PrepGroup[];
-  ingredients: string[];
   instructions: string[];
   notes: string[];
   triggerWrapperClassName?: string;
@@ -99,7 +98,6 @@ export default function RecipeFocusMode({
   recipeId,
   title,
   prepGroups: initialPrepGroups,
-  ingredients,
   instructions,
   notes,
   triggerWrapperClassName,
@@ -439,16 +437,21 @@ export default function RecipeFocusMode({
                   </section>
 
                   <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                    <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                      Quick Reference
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      Instructions
                     </h3>
-                    <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                      {ingredients.map((ingredient) => (
-                        <li key={ingredient} className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-                          {ingredient}
-                        </li>
+                    <div className="mt-4 space-y-4">
+                      {instructions.map((step, index) => (
+                        <div key={index} className={`flex gap-3 ${index === activeStepIndex ? "opacity-100" : "opacity-40"}`}>
+                          <span className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold border ${index === activeStepIndex ? "bg-[#1a6b4a] text-white border-[#1a6b4a] dark:bg-emerald-500 dark:text-slate-950 dark:border-emerald-500" : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-500"}`}>
+                            {index + 1}
+                          </span>
+                          <p className={`text-[13px] leading-relaxed ${index === activeStepIndex ? "text-slate-900 font-medium dark:text-slate-100" : "text-slate-600 dark:text-slate-400"}`}>
+                            {step}
+                          </p>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </section>
                 </div>
               )}

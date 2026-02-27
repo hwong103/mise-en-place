@@ -196,7 +196,6 @@ export default async function RecipeDetailPage({
               <RecipeFocusMode
                 title={recipe.title}
                 prepGroups={prepGroups}
-                ingredients={ingredients}
                 instructions={instructions}
                 notes={notes}
                 triggerWrapperClassName="contents"
