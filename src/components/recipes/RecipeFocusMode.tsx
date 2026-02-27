@@ -332,28 +332,62 @@ export default function RecipeFocusMode({
             </div>
 
             {mode === "mise" ? (() => {
-              // Build ingredient → group index map for highlighting
-              const ingredientGroupMap = new Map<string, number>();
-              prepGroups.forEach((group, gi) => {
-                group.items.forEach((item) => {
-                  const key = item.trim().toLowerCase();
-                  if (!ingredientGroupMap.has(key)) ingredientGroupMap.set(key, gi);
-                });
-              });
-
-              // Palette: one hue per group, cycling through
+              // Palette: one hue per group, cycling
               const groupColors = [
-                { bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-amber-200 dark:border-amber-700/50", label: "text-amber-600 dark:text-amber-400" },
-                { bg: "bg-sky-50 dark:bg-sky-950/30", border: "border-sky-200 dark:border-sky-700/50", label: "text-sky-600 dark:text-sky-400" },
-                { bg: "bg-violet-50 dark:bg-violet-950/30", border: "border-violet-200 dark:border-violet-700/50", label: "text-violet-600 dark:text-violet-400" },
-                { bg: "bg-rose-50 dark:bg-rose-950/30", border: "border-rose-200 dark:border-rose-700/50", label: "text-rose-600 dark:text-rose-400" },
-                { bg: "bg-teal-50 dark:bg-teal-950/30", border: "border-teal-200 dark:border-teal-700/50", label: "text-teal-600 dark:text-teal-400" },
-                { bg: "bg-orange-50 dark:bg-orange-950/30", border: "border-orange-200 dark:border-orange-700/50", label: "text-orange-600 dark:text-orange-400" },
+                { bg: "bg-amber-100 dark:bg-amber-900/40", border: "border-amber-200 dark:border-amber-700/50", label: "text-amber-700 dark:text-amber-300", highlight: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200" },
+                { bg: "bg-sky-100 dark:bg-sky-900/40", border: "border-sky-200 dark:border-sky-700/50", label: "text-sky-700 dark:text-sky-300", highlight: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200" },
+                { bg: "bg-violet-100 dark:bg-violet-900/40", border: "border-violet-200 dark:border-violet-700/50", label: "text-violet-700 dark:text-violet-300", highlight: "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200" },
+                { bg: "bg-rose-100 dark:bg-rose-900/40", border: "border-rose-200 dark:border-rose-700/50", label: "text-rose-700 dark:text-rose-300", highlight: "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200" },
+                { bg: "bg-teal-100 dark:bg-teal-900/40", border: "border-teal-200 dark:border-teal-700/50", label: "text-teal-700 dark:text-teal-300", highlight: "bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200" },
+                { bg: "bg-orange-100 dark:bg-orange-900/40", border: "border-orange-200 dark:border-orange-700/50", label: "text-orange-700 dark:text-orange-300", highlight: "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200" },
               ];
 
+              // Build sorted list of ingredient keywords (longest first to avoid partial matches)
+              // Each entry: { pattern: RegExp, gi: number }
+              type IngredientPattern = { re: RegExp; gi: number };
+              const ingredientPatterns: IngredientPattern[] = [];
+              prepGroups.forEach((group, gi) => {
+                group.items.forEach((item) => {
+                  // Use the last meaningful word chunk (strips quantities like "2 tbsp")
+                  const keyword = item.trim().replace(/^[\d\s/½¼¾⅓⅔⅛⅜⅝⅞.,]+/, "").trim();
+                  if (keyword.length < 3) return;
+                  ingredientPatterns.push({
+                    re: new RegExp(`\\b(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})\\b`, "gi"),
+                    gi,
+                  });
+                });
+              });
+              // Sort longest keyword first to avoid short matches clobbering long ones
+              ingredientPatterns.sort((a, b) => b.re.source.length - a.re.source.length);
+
+              // Annotate a step string → array of {text, gi|null} segments
+              const annotateStep = (step: string): { text: string; gi: number | null }[] => {
+                if (ingredientPatterns.length === 0) return [{ text: step, gi: null }];
+
+                // Work on segments; start with the full string unmarked
+                type Seg = { text: string; gi: number | null };
+                let segments: Seg[] = [{ text: step, gi: null }];
+
+                for (const { re, gi } of ingredientPatterns) {
+                  const next: Seg[] = [];
+                  for (const seg of segments) {
+                    if (seg.gi !== null) { next.push(seg); continue; } // already colored
+                    re.lastIndex = 0;
+                    const parts = seg.text.split(re);
+                    // split with a capturing group gives: [before, match, before, match, ...]
+                    for (let i = 0; i < parts.length; i++) {
+                      if (parts[i] === "") continue;
+                      next.push({ text: parts[i], gi: i % 2 === 1 ? gi : null });
+                    }
+                  }
+                  segments = next;
+                }
+                return segments;
+              };
+
               return (
-                <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1.4fr_1fr]">
-                  {/* Left: Prep Groups + Instructions + Notes */}
+                <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[1fr_1.4fr]">
+                  {/* Left: Prep Groups */}
                   <section ref={misePrepRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                     <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                       Prep Groups
@@ -361,7 +395,7 @@ export default function RecipeFocusMode({
                     {prepGroups.length === 0 ? (
                       <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No prep groups yet.</p>
                     ) : (
-                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      <div className="mt-4 space-y-3">
                         {prepGroups.map((group, gi) => {
                           const color = groupColors[gi % groupColors.length];
                           return (
@@ -377,24 +411,43 @@ export default function RecipeFocusMode({
                         })}
                       </div>
                     )}
+                  </section>
 
-                    {instructions.length > 0 ? (
-                      <>
-                        <h3 className="mt-6 text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                          Instructions
-                        </h3>
-                        <ol className="mt-3 space-y-3">
-                          {instructions.map((step, i) => (
-                            <li key={i} className="flex gap-3 text-sm text-slate-700 dark:text-slate-200">
-                              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  {/* Right: Instructions (with ingredient highlights) + Notes */}
+                  <section ref={miseIngredientsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                    <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      Instructions
+                    </h3>
+                    {instructions.length === 0 ? (
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No instructions yet.</p>
+                    ) : (
+                      <ol className="mt-3 space-y-4">
+                        {instructions.map((step, i) => {
+                          const segments = annotateStep(step);
+                          return (
+                            <li key={i} className="flex gap-3">
+                              <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                 {i + 1}
                               </span>
-                              <span className="leading-relaxed">{step}</span>
+                              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                                {segments.map((seg, si) =>
+                                  seg.gi !== null ? (
+                                    <mark
+                                      key={si}
+                                      className={`rounded px-0.5 font-medium ${groupColors[seg.gi % groupColors.length].highlight}`}
+                                    >
+                                      {seg.text}
+                                    </mark>
+                                  ) : (
+                                    <span key={si}>{seg.text}</span>
+                                  )
+                                )}
+                              </p>
                             </li>
-                          ))}
-                        </ol>
-                      </>
-                    ) : null}
+                          );
+                        })}
+                      </ol>
+                    )}
 
                     {notes.length > 0 ? (
                       <>
@@ -410,37 +463,6 @@ export default function RecipeFocusMode({
                         </ul>
                       </>
                     ) : null}
-                  </section>
-
-                  {/* Right: Ingredients with prep-group highlighting */}
-                  <section ref={miseIngredientsRef} className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-                    <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                      Ingredients
-                    </h3>
-                    <ul className="mt-3 space-y-1.5 text-sm">
-                      {ingredients.map((ingredient) => {
-                        const gi = ingredientGroupMap.get(ingredient.trim().toLowerCase());
-                        const color = gi !== undefined ? groupColors[gi % groupColors.length] : null;
-                        const groupTitle = gi !== undefined ? prepGroups[gi]?.title : null;
-                        return (
-                          <li
-                            key={ingredient}
-                            className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
-                              color
-                                ? `${color.bg} ${color.border}`
-                                : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-                            }`}
-                          >
-                            <span className="text-slate-700 dark:text-slate-200">{ingredient}</span>
-                            {groupTitle ? (
-                              <span className={`ml-2 shrink-0 text-[10px] font-semibold uppercase tracking-wider ${color!.label}`}>
-                                {groupTitle}
-                              </span>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
                   </section>
                 </div>
               );
