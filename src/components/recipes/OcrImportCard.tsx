@@ -140,6 +140,9 @@ export default function OcrImportCard() {
           setError(result.error ?? "Extraction failed. Please try a clearer photo.");
         }
       } catch (err) {
+        if ((err as any)?.digest?.startsWith("NEXT_REDIRECT")) {
+          return;
+        }
         console.error("OCR submission failed:", err);
         setError("Could not process the photo. It might be too large or invalid.");
       }
