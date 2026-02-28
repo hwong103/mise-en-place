@@ -83,7 +83,7 @@ function RecipeTile({
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate">{recipe.title}</span>
           {recipe.cookCount && recipe.cookCount > 0 ? (
-            <span className="text-[10px] font-medium text-slate-400">🍳 cooked {recipe.cookCount}×</span>
+            <span className="text-[10px] font-medium text-slate-400">🍳 Cooked x{recipe.cookCount}</span>
           ) : null}
         </div>
         {isSelected && (

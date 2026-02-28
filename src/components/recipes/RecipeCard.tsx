@@ -155,7 +155,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         {recipe.cookCount && recipe.cookCount > 0 ? (
           <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
             <span className="text-sm">🍳</span>
-            Cooked <CountUp to={recipe.cookCount} duration={600} />×
+            Cooked x<CountUp to={recipe.cookCount} duration={600} />
           </div>
         ) : null}
 

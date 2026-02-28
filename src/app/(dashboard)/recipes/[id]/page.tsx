@@ -437,7 +437,7 @@ export default async function RecipeDetailPage({
                     ) : null}
                     {recipe.cookCount && recipe.cookCount > 0 ? (
                       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30">
-                        🍳 Cooked {recipe.cookCount}×
+                        🍳 Cooked x{recipe.cookCount}
                       </span>
                     ) : null}
                     {formatMinutes(recipe.prepTime) ? (
