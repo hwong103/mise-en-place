@@ -196,6 +196,7 @@ export default async function RecipeDetailPage({
                 />
               </div>
               <RecipeFocusMode
+                recipeId={recipe.id}
                 title={recipe.title}
                 prepGroups={prepGroups}
                 instructions={instructions}

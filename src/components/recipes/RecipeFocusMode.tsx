@@ -106,6 +106,7 @@ export default function RecipeFocusMode({
   cookButtonClassName,
   showCookPlayIcon = false,
 }: RecipeFocusModeProps) {
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [mode, setMode] = useState<FocusMode | null>(null);
   const [prepGroups, setPrepGroups] = useState(initialPrepGroups);
@@ -212,6 +213,7 @@ export default function RecipeFocusMode({
       formData.append("recipeId", recipeId);
       formData.append("prepGroups", JSON.stringify(prepGroups));
       await updatePrepGroupsOrder(formData);
+      router.refresh();
     } catch (err) {
       console.error("Failed to save reorder", err);
     } finally {
@@ -237,6 +239,7 @@ export default function RecipeFocusMode({
       formData.append("recipeId", recipeId);
       formData.append("prepGroups", JSON.stringify(merged));
       await updatePrepGroupsOrder(formData);
+      router.refresh();
     } catch (err) {
       console.error("Failed to save prep groups", err);
       // rollback on error
