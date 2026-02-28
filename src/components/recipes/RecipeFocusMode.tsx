@@ -518,15 +518,17 @@ export default function RecipeFocusMode({
 
       {isMounted && (
         <div className={`fab-container ${isFabVisible ? "visible" : ""}`} id="fab">
-          <button className="fab-mise" onClick={() => setMode("mise")}>
-            Mise
-          </button>
-          <button className="fab-cook" onClick={() => setMode("cook")}>
-            <span className="inline-flex items-center gap-1.5">
-              <Play className="h-[10px] w-[10px] fill-current" />
-              <span>Cook</span>
-            </span>
-          </button>
+          <div className="fab-group">
+            <button className="fab-mise" onClick={() => setMode("mise")}>
+              Mise
+            </button>
+            <button className="fab-cook" onClick={() => setMode("cook")}>
+              <span className="inline-flex items-center gap-1.5 w-full justify-center">
+                <Play className="h-[10px] w-[10px] fill-current" />
+                <span>Cook</span>
+              </span>
+            </button>
+          </div>
         </div>
       )}
     </>
