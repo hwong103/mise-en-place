@@ -114,6 +114,7 @@ export default function RecipeFocusMode({
   const [transitionPhase, setTransitionPhase] = useState<"idle" | "out" | "in">("idle");
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFabVisible, setIsFabVisible] = useState(false);
 
   const transitionTimeoutRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -125,6 +126,19 @@ export default function RecipeFocusMode({
 
   useEffect(() => {
     setIsMounted(true);
+
+    const heroActions = document.getElementById("heroActions");
+    if (!heroActions) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsFabVisible(!entry.isIntersecting);
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(heroActions);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -501,6 +515,20 @@ export default function RecipeFocusMode({
           document.body
         )
         : null}
+
+      {isMounted && (
+        <div className={`fab-container ${isFabVisible ? "visible" : ""}`} id="fab">
+          <button className="fab-mise" onClick={() => setMode("mise")}>
+            Mise
+          </button>
+          <button className="fab-cook" onClick={() => setMode("cook")}>
+            <span className="inline-flex items-center gap-1.5">
+              <Play className="h-[10px] w-[10px] fill-current" />
+              <span>Cook</span>
+            </span>
+          </button>
+        </div>
+      )}
     </>
   );
 }

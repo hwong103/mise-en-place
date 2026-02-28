@@ -186,7 +186,7 @@ export default async function RecipeDetailPage({
               <span className="md:hidden">{"<- Back"}</span>
               <span className="hidden md:inline">{"<- Back to Recipes"}</span>
             </Link>
-            <div className="relative z-[3] flex items-center gap-1.5 md:absolute md:right-6 md:top-5 md:gap-2">
+            <div id="heroActions" className="relative z-[3] flex items-center gap-1.5 md:absolute md:right-6 md:top-5 md:gap-2">
               <div className="hidden md:block">
                 <AddToPlannerDialog
                   recipeId={recipe.id}
