@@ -53,15 +53,17 @@ export default async function ShoppingPage() {
 
   const shareInviteUrl = accessContext.canManageLink
     ? await getCurrentHouseholdShareLink(householdId).then((shareLink) =>
-        buildHouseholdJoinUrl(shareLink.token, "/shopping")
-      )
+      buildHouseholdJoinUrl(shareLink.token, "/shopping")
+    )
     : null;
 
-  const ingredientEntries = mealPlans.flatMap((plan) => {
-    const recipeTitle = plan.recipe?.title ?? null;
-    const ingredients = plan.recipe ? coerceStringArray(plan.recipe.ingredients) : [];
-    return ingredients.map((line) => ({ line, recipeTitle }));
-  });
+  const ingredientEntries = mealPlans
+    .filter((plan) => !plan.cooked)
+    .flatMap((plan) => {
+      const recipeTitle = plan.recipe?.title ?? null;
+      const ingredients = plan.recipe ? coerceStringArray(plan.recipe.ingredients) : [];
+      return ingredients.map((line) => ({ line, recipeTitle }));
+    });
 
   const categories = buildShoppingList(ingredientEntries);
   return (

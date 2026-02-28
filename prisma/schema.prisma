@@ -9,104 +9,98 @@ datasource db {
 }
 
 model Household {
-  id        String   @id @default(cuid())
-  name      String
-  shareTokenHash String?  @unique
-  shareTokenVersion Int   @default(1)
+  id                String             @id @default(cuid())
+  name              String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  shareTokenHash    String?            @unique
+  shareTokenVersion Int                @default(1)
   claimedByUserId   String?
   claimedAt         DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  claimedBy         User?            @relation("ClaimedHouseholds", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+  claimedBy         User?              @relation("ClaimedHouseholds", fields: [claimedByUserId], references: [id])
   members           HouseholdMember[]
-  recipes           Recipe[]
   mealPlans         MealPlan[]
+  recipes           Recipe[]
   shoppingListItems ShoppingListItem[]
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  authProviderUserId String? @unique
-  name      String?
-  avatarUrl String?
-  createdAt DateTime @default(now())
-
-  households HouseholdMember[]
-  claimedHouseholds Household[] @relation("ClaimedHouseholds")
+  id                 String            @id @default(cuid())
+  email              String            @unique
+  name               String?
+  avatarUrl          String?
+  createdAt          DateTime          @default(now())
+  authProviderUserId String?           @unique
+  claimedHouseholds  Household[]       @relation("ClaimedHouseholds")
+  households         HouseholdMember[]
 }
 
 model HouseholdMember {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   householdId String
-  role        Role     @default(MEMBER)
-  joinedAt    DateTime @default(now())
-
-  user      User      @relation(fields: [userId], references: [id])
-  household Household @relation(fields: [householdId], references: [id])
+  role        Role      @default(MEMBER)
+  joinedAt    DateTime  @default(now())
+  household   Household @relation(fields: [householdId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
 
   @@unique([userId, householdId])
 }
 
 model Recipe {
-  id           String   @id @default(cuid())
-  householdId  String
-  title        String
-  description  String?
-  imageUrl     String?
-  videoUrl     String?
-  sourceUrl    String?
-  servings     Int?
-  prepTime     Int? // minutes
-  cookTime     Int? // minutes
-  ingredientCount Int @default(0)
-  ingredients  Json // Structured ingredient list
-  instructions Json // Step-by-step instructions
-  notes        Json? // Notes or tips
-  prepGroups   Json // "Mise" section - prep groupings
-  tags         String[]
-  cookCount    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  household Household  @relation(fields: [householdId], references: [id])
-  mealPlans MealPlan[]
+  id              String     @id @default(cuid())
+  householdId     String
+  title           String
+  description     String?
+  imageUrl        String?
+  sourceUrl       String?
+  servings        Int?
+  prepTime        Int?
+  cookTime        Int?
+  ingredients     Json
+  instructions    Json
+  notes           Json?
+  prepGroups      Json
+  tags            String[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  videoUrl        String?
+  ingredientCount Int        @default(0)
+  cookCount       Int        @default(0)
+  mealPlans       MealPlan[]
+  household       Household  @relation(fields: [householdId], references: [id])
 
   @@index([householdId, createdAt])
 }
 
 model MealPlan {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   householdId String
   recipeId    String
-  date        DateTime @db.Date
-  mealType    MealType @default(DINNER)
-  servings    Int      @default(2)
-  cooked      Boolean  @default(false)
+  date        DateTime  @db.Date
+  mealType    MealType  @default(DINNER)
+  servings    Int       @default(2)
+  cooked      Boolean   @default(false)
   cookedAt    DateTime?
-
-  household Household @relation(fields: [householdId], references: [id])
-  recipe    Recipe    @relation(fields: [recipeId], references: [id])
+  household   Household @relation(fields: [householdId], references: [id])
+  recipe      Recipe    @relation(fields: [recipeId], references: [id])
 
   @@unique([householdId, date, mealType])
 }
 
 model ShoppingListItem {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   householdId    String
-  weekStart      DateTime @db.Date
+  weekStart      DateTime  @db.Date
   line           String
   lineNormalized String
   category       String
-  location       String   @default("Woolies")
-  manual         Boolean  @default(false)
-  checked        Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  household Household @relation(fields: [householdId], references: [id])
+  manual         Boolean   @default(false)
+  checked        Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  location       String    @default("Woolies")
+  household      Household @relation(fields: [householdId], references: [id])
 
   @@unique([householdId, weekStart, lineNormalized, category, manual])
   @@index([householdId, weekStart])
