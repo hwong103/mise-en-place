@@ -110,3 +110,56 @@ export async function clearMealPlanDay(input: { date: string }) {
   revalidatePath("/planner");
   revalidatePath("/shopping");
 }
+
+export async function markMealPlanCooked(input: { planId: string }) {
+  const householdId = await getCurrentHouseholdId();
+
+  const plan = await prisma.mealPlan.findFirst({
+    where: { id: input.planId, householdId },
+    select: { id: true, recipeId: true, cooked: true },
+  });
+
+  if (!plan || plan.cooked) return;
+
+  await prisma.$transaction([
+    prisma.mealPlan.update({
+      where: { id: plan.id },
+      data: { cooked: true, cookedAt: new Date() },
+    }),
+    prisma.recipe.update({
+      where: { id: plan.recipeId },
+      data: { cookCount: { increment: 1 } },
+    }),
+  ]);
+
+  revalidatePath("/planner");
+  revalidatePath(`/recipes/${plan.recipeId}`);
+  revalidatePath("/recipes");
+}
+
+export async function unmarkMealPlanCooked(input: { planId: string }) {
+  const householdId = await getCurrentHouseholdId();
+
+  const plan = await prisma.mealPlan.findFirst({
+    where: { id: input.planId, householdId },
+    select: { id: true, recipeId: true, cooked: true },
+  });
+
+  if (!plan || !plan.cooked) return;
+
+  await prisma.$transaction([
+    prisma.mealPlan.update({
+      where: { id: plan.id },
+      data: { cooked: false, cookedAt: null },
+    }),
+    // Decrement but never go below 0
+    prisma.recipe.updateMany({
+      where: { id: plan.recipeId, cookCount: { gt: 0 } },
+      data: { cookCount: { decrement: 1 } },
+    }),
+  ]);
+
+  revalidatePath("/planner");
+  revalidatePath(`/recipes/${plan.recipeId}`);
+  revalidatePath("/recipes");
+}

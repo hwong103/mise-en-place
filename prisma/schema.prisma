@@ -67,6 +67,7 @@ model Recipe {
   notes        Json? // Notes or tips
   prepGroups   Json // "Mise" section - prep groupings
   tags         String[]
+  cookCount    Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -83,6 +84,8 @@ model MealPlan {
   date        DateTime @db.Date
   mealType    MealType @default(DINNER)
   servings    Int      @default(2)
+  cooked      Boolean  @default(false)
+  cookedAt    DateTime?
 
   household Household @relation(fields: [householdId], references: [id])
   recipe    Recipe    @relation(fields: [recipeId], references: [id])

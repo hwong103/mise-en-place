@@ -47,3 +47,13 @@ export function getWeekRange(referenceDate = new Date(), weekStartsOn = 1) {
 
   return { start, end, days };
 }
+
+export function getPastRange(daysCount = 7, referenceDate = new Date()) {
+  const today = normalizeToUtcDate(referenceDate);
+  const days = Array.from({ length: daysCount }, (_, index) => {
+    const day = new Date(today);
+    day.setUTCDate(today.getUTCDate() - (daysCount - index));
+    return day;
+  });
+  return { days };
+}

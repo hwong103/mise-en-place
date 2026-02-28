@@ -27,6 +27,7 @@ export async function listRecipes(householdId?: string) {
             cookTime: true,
             ingredientCount: true,
             sourceUrl: true,
+            cookCount: true,
           },
         });
 
@@ -71,6 +72,7 @@ export async function listRecipeTitles(householdId?: string) {
       id: true,
       title: true,
       imageUrl: true,
+      cookCount: true,
     },
   });
 }

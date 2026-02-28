@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import prisma from "@/lib/prisma";
-import { getUpcomingRange, toDateKey } from "@/lib/date";
+import { getUpcomingRange, getPastRange, toDateKey } from "@/lib/date";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { listRecipeTitles } from "@/lib/recipes";
 import PlannerBoard from "@/components/planner/PlannerBoard";
@@ -12,8 +12,9 @@ const formatDate = (date: Date) =>
   date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
 export default async function PlannerPage() {
-  const { days } = getUpcomingRange();
-  const dateKeys = days.map((day) => toDateKey(day));
+  const { days: upcomingDays } = getUpcomingRange();
+  const { days: pastDays } = getPastRange(7);
+  const allDays = [...pastDays, ...upcomingDays];
 
   const householdId = await getCurrentHouseholdId();
   const [recipes, mealPlans] = await Promise.all([
@@ -21,7 +22,7 @@ export default async function PlannerPage() {
     prisma.mealPlan.findMany({
       where: {
         householdId,
-        date: { in: days },
+        date: { in: allDays },
       },
       include: {
         recipe: true,
@@ -38,14 +39,19 @@ export default async function PlannerPage() {
     recipeTitle: plan.recipe?.title ?? null,
     recipeImageUrl: plan.recipe?.imageUrl ?? null,
     mealType: plan.mealType,
+    cooked: plan.cooked,
+    cookedAt: plan.cookedAt?.toISOString() ?? null,
   }));
+
+  const upcomingDateKeys = upcomingDays.map((day) => toDateKey(day));
+  const pastDateKeys = pastDays.map((day) => toDateKey(day));
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Planner</h1>
-          <p className="text-slate-500 dark:text-slate-400">Plan one recipe per day for the next 7 days.</p>
+          <p className="text-slate-500 dark:text-slate-400">Plan items for the next 7 days and track your cooking history.</p>
         </div>
         <Link
           href="/shopping"
@@ -65,8 +71,12 @@ export default async function PlannerPage() {
       ) : null}
 
       <PlannerBoard
-        days={days.map((day, index) => ({
-          dateKey: dateKeys[index],
+        days={upcomingDays.map((day, index) => ({
+          dateKey: upcomingDateKeys[index],
+          label: formatDate(day),
+        }))}
+        pastDays={pastDays.map((day, index) => ({
+          dateKey: pastDateKeys[index],
           label: formatDate(day),
         }))}
         recipes={recipes.map((recipe) => ({ id: recipe.id, title: recipe.title, imageUrl: recipe.imageUrl ?? null }))}

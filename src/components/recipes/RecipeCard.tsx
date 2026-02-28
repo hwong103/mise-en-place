@@ -22,6 +22,7 @@ export type RecipeSummary = {
   prepTime?: number | null;
   cookTime?: number | null;
   ingredientCount: number;
+  cookCount?: number;
 };
 
 const getSourceDomain = (sourceUrl?: string | null): string | null => {
@@ -147,6 +148,13 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         {ingredientCount > 0 ? (
           <div className="mt-4 text-xs text-slate-400 dark:text-slate-500">
             {ingredientCount} ingredient{ingredientCount === 1 ? "" : "s"}
+          </div>
+        ) : null}
+
+        {recipe.cookCount && recipe.cookCount > 0 ? (
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <span className="text-sm">🍳</span>
+            Cooked {recipe.cookCount}×
           </div>
         ) : null}
 

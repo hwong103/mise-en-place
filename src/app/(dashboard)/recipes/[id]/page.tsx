@@ -435,6 +435,11 @@ export default async function RecipeDetailPage({
                         {recipe.servings} servings
                       </span>
                     ) : null}
+                    {recipe.cookCount && recipe.cookCount > 0 ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30">
+                        🍳 Cooked {recipe.cookCount}×
+                      </span>
+                    ) : null}
                     {formatMinutes(recipe.prepTime) ? (
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                         Prep {formatMinutes(recipe.prepTime)}

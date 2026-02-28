@@ -12,7 +12,15 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { clearMealPlanDay, removeMealPlanEntry, upsertMealPlan } from "@/app/(dashboard)/planner/actions";
+import {
+  clearMealPlanDay,
+  removeMealPlanEntry,
+  upsertMealPlan,
+  markMealPlanCooked,
+  unmarkMealPlanCooked
+} from "@/app/(dashboard)/planner/actions";
+import { fromDateKey, normalizeToUtcDate, toDateKey } from "@/lib/date";
+import { Play } from "lucide-react";
 
 type MealType = "DINNER" | "LUNCH" | "BREAKFAST" | "SNACK";
 
@@ -23,6 +31,7 @@ type PlannerRecipe = {
   id: string;
   title: string;
   imageUrl?: string | null;
+  cookCount?: number;
 };
 
 type PlannerDay = {
@@ -37,10 +46,13 @@ type PlannerSlot = {
   recipeTitle: string | null;
   recipeImageUrl?: string | null;
   mealType: MealType;
+  cooked: boolean;
+  cookedAt?: string | null;
 };
 
 type PlannerBoardProps = {
   days: PlannerDay[];
+  pastDays: PlannerDay[];
   recipes: PlannerRecipe[];
   slots: PlannerSlot[];
 };
@@ -76,9 +88,88 @@ function RecipeTile({ recipe }: { recipe: PlannerRecipe }) {
             <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
           ) : null}
         </span>
-        <span>{recipe.title}</span>
+        <div className="flex flex-col min-w-0">
+          <span className="truncate">{recipe.title}</span>
+          {recipe.cookCount && recipe.cookCount > 0 ? (
+            <span className="text-[10px] text-slate-400 font-medium">🍳 cooked {recipe.cookCount}x</span>
+          ) : null}
+        </div>
       </span>
     </button>
+  );
+}
+
+function PastDayCard({
+  label,
+  recipeSlots,
+  onMarkCooked,
+  onUnmarkCooked,
+  onClear,
+}: {
+  label: string;
+  recipeSlots: PlannerSlot[];
+  onMarkCooked: (planId: string) => void;
+  onUnmarkCooked: (planId: string) => void;
+  onClear: (planId: string) => void;
+}) {
+  return (
+    <div className="flex min-h-[120px] flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all dark:border-slate-800 dark:bg-slate-900">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{label}</p>
+
+      {recipeSlots.length === 0 ? (
+        <p className="text-xs text-slate-400 italic">No plans for this day</p>
+      ) : (
+        <div className="space-y-3">
+          {recipeSlots.map((slot) => (
+            <div key={slot.id} className="space-y-1.5">
+              {slot.cooked ? (
+                <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800/50 dark:bg-green-950/30">
+                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-green-200">
+                    {slot.recipeImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={slot.recipeImageUrl} alt="" className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
+                  <Link href={`/recipes/${slot.recipeId}`} className="flex-1 truncate text-sm font-semibold text-green-800 dark:text-green-300 transition-colors hover:underline underline-offset-4 decoration-green-400/50">
+                    {slot.recipeTitle}
+                  </Link>
+                  <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-900/60 dark:text-green-300">
+                    ✓ Cooked
+                  </span>
+                  <button onClick={() => onUnmarkCooked(slot.id)} className="text-slate-400 hover:text-rose-500 text-base leading-none font-medium px-1" title="Undo">
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 opacity-70 dark:border-slate-700 dark:bg-slate-900/40">
+                    <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-slate-200 grayscale">
+                      {slot.recipeImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={slot.recipeImageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <Link href={`/recipes/${slot.recipeId}`} className="flex-1 truncate text-sm font-semibold text-slate-500 line-through decoration-slate-400 decoration-1 underline-offset-4 transition-colors">
+                      {slot.recipeTitle}
+                    </Link>
+                  </div>
+                  <div className="flex gap-2 pl-12">
+                    <button onClick={() => onMarkCooked(slot.id)}
+                      className="rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700 hover:bg-green-100 transition-colors dark:border-green-900 dark:bg-green-950/40 dark:text-green-400 dark:hover:bg-green-900/60">
+                      ✓ Mark cooked
+                    </button>
+                    <button onClick={() => onClear(slot.id)}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-400 hover:border-rose-200 hover:text-rose-500 transition-colors dark:border-slate-700 dark:bg-slate-950 dark:hover:border-rose-900 dark:hover:text-rose-400">
+                      Clear
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -86,14 +177,20 @@ function DayCard({
   slotKey,
   label,
   recipeSlots,
+  isToday,
   onClearDay,
   onRemoveEntry,
+  onMarkCooked,
+  onUnmarkCooked,
 }: {
   slotKey: string;
   label: string;
   recipeSlots: PlannerSlot[];
+  isToday?: boolean;
   onClearDay: () => void;
   onRemoveEntry: (planId: string) => void;
+  onMarkCooked: (planId: string) => void;
+  onUnmarkCooked: (planId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: slotKey });
 
@@ -119,40 +216,75 @@ function DayCard({
       </div>
 
       {recipeSlots.length === 0 ? (
-        <div className="flex flex-1 items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
+        <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
           Drop recipe here
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-4">
           {recipeSlots.map((slot) => (
-            <div
-              key={slot.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
-                  {slot.recipeImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={slot.recipeImageUrl} alt="" className="h-full w-full object-cover" />
-                  ) : null}
+            <div key={slot.id} className="space-y-2">
+              <div
+                className={`flex items-center justify-between gap-3 rounded-2xl border p-3 transition-colors ${slot.cooked
+                    ? "border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-950/20"
+                    : "border-slate-200 bg-slate-50 dark:border-slate-700/50 dark:bg-slate-950/30"
+                  }`}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border transition-all ${slot.cooked ? "border-green-200" : "border-slate-200 dark:border-slate-700"
+                    }`}>
+                    {slot.recipeImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={slot.recipeImageUrl} alt="" className={`h-full w-full object-cover transition-all ${slot.cooked ? "grayscale-0" : ""}`} />
+                    ) : null}
+                  </div>
+                  <Link
+                    href={`/recipes/${slot.recipeId}`}
+                    className={`truncate text-sm font-semibold transition-colors hover:underline underline-offset-4 ${slot.cooked
+                        ? "text-green-800 dark:text-green-300 decoration-green-300"
+                        : "text-slate-700 dark:text-slate-200 decoration-slate-400"
+                      }`}
+                  >
+                    {slot.recipeTitle}
+                  </Link>
                 </div>
-                <Link
-                  href={`/recipes/${slot.recipeId}`}
-                  className="truncate text-sm font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 transition-colors hover:text-emerald-700 dark:text-slate-200 dark:decoration-slate-600 dark:hover:text-emerald-300"
-                >
-                  {slot.recipeTitle}
-                </Link>
+
+                {!slot.cooked && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveEntry(slot.id)}
+                    className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 hover:text-rose-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-rose-300"
+                    aria-label={`Remove ${slot.recipeTitle ?? "recipe"}`}
+                    title="Remove recipe"
+                  >
+                    x
+                  </button>
+                )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => onRemoveEntry(slot.id)}
-                className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 hover:text-rose-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-rose-300"
-                aria-label={`Remove ${slot.recipeTitle ?? "recipe"}`}
-                title="Remove recipe"
-              >
-                x
-              </button>
+              {isToday && (
+                <div className="flex gap-2 px-1">
+                  {slot.cooked ? (
+                    <>
+                      <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold text-green-700 dark:bg-green-900/60 dark:text-green-300">
+                        ✓ Cooked
+                      </span>
+                      <button
+                        onClick={() => onUnmarkCooked(slot.id)}
+                        className="text-[10px] font-bold text-slate-400 hover:text-rose-500 uppercase tracking-tight transition-colors"
+                      >
+                        Undo
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => onMarkCooked(slot.id)}
+                      className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700 hover:bg-green-100 transition-colors dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-400 dark:hover:bg-green-900/60"
+                    >
+                      ✓ Mark as cooked
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -180,8 +312,9 @@ const getNextMealType = (entries: PlannerSlot[]) => {
   return MEAL_TYPE_ORDER.find((mealType) => !used.has(mealType));
 };
 
-export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps) {
-  const [slotState, setSlotState] = useState(() => getInitialSlotState(days, slots));
+export default function PlannerBoard({ days, pastDays, recipes, slots }: PlannerBoardProps) {
+  const allDaysForState = useMemo(() => [...pastDays, ...days], [pastDays, days]);
+  const [slotState, setSlotState] = useState(() => getInitialSlotState(allDaysForState, slots));
   const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -228,6 +361,7 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
       recipeTitle: recipe.title,
       recipeImageUrl: recipe.imageUrl ?? null,
       mealType: nextMealType,
+      cooked: false,
     };
 
     setSlotState((prev) => {
@@ -313,8 +447,40 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
     });
   };
 
+  const handleMarkCooked = (dateKey: string, planId: string) => {
+    const slotKey = buildSlotKey(dateKey);
+    setSlotState((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(slotKey) ?? [];
+      next.set(slotKey, existing.map(s =>
+        s.id === planId ? { ...s, cooked: true, cookedAt: new Date().toISOString() } : s
+      ));
+      return next;
+    });
+    startTransition(async () => {
+      await markMealPlanCooked({ planId });
+    });
+  };
+
+  const handleUnmarkCooked = (dateKey: string, planId: string) => {
+    const slotKey = buildSlotKey(dateKey);
+    setSlotState((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(slotKey) ?? [];
+      next.set(slotKey, existing.map(s =>
+        s.id === planId ? { ...s, cooked: false, cookedAt: null } : s
+      ));
+      return next;
+    });
+    startTransition(async () => {
+      await unmarkMealPlanCooked({ planId });
+    });
+  };
+
+  const todayKey = toDateKey(new Date());
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+    <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -323,70 +489,113 @@ export default function PlannerBoard({ days, recipes, slots }: PlannerBoardProps
           setActiveRecipeId(null);
           const recipeId = String(event.active.id);
           const overId = event.over?.id;
-          if (!overId || typeof overId !== "string") {
-            return;
-          }
-          if (!overId.startsWith("slot:")) {
-            return;
-          }
+          if (!overId || typeof overId !== "string") return;
+          if (!overId.startsWith("slot:")) return;
+
           const [, dateKey] = overId.split(":");
-          if (!dateKey) {
-            return;
-          }
+          if (!dateKey) return;
+
+          const targetDate = fromDateKey(dateKey);
+          const today = normalizeToUtcDate(new Date());
+          if (targetDate < today) return; // block past drops
+
           handleAssign(dateKey, recipeId);
         }}
       >
         <aside className="space-y-4">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Recipes</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Search and drag onto a day.</p>
-          </div>
+          <div className="sticky top-6">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Recipes</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Search and drag onto a day.</p>
+            </div>
 
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search recipes"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-          />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search recipes"
+              className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            />
 
-          <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
-            {filteredRecipes.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-                No matching recipes.
-              </div>
-            ) : (
-              filteredRecipes.map((recipe) => <RecipeTile key={recipe.id} recipe={recipe} />)
-            )}
+            <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
+              {filteredRecipes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                  No matching recipes.
+                </div>
+              ) : (
+                filteredRecipes.map((recipe) => <RecipeTile key={recipe.id} recipe={recipe} />)
+              )}
+            </div>
           </div>
         </aside>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {days.map((day) => {
-            const slotKey = buildSlotKey(day.dateKey);
-            const daySlots = slotState.get(slotKey) ?? [];
-            return (
-              <DayCard
-                key={slotKey}
-                slotKey={slotKey}
-                label={day.label}
-                recipeSlots={daySlots}
-                onClearDay={() => handleClearDay(day.dateKey)}
-                onRemoveEntry={(planId) => handleRemove(day.dateKey, planId)}
-              />
-            );
-          })}
+        <div className="space-y-12">
+          {/* Past days */}
+          <div>
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400/80">
+              Past 7 days
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+              {pastDays.map((day) => {
+                const slotKey = buildSlotKey(day.dateKey);
+                const daySlots = slotState.get(slotKey) ?? [];
+                return (
+                  <PastDayCard
+                    key={slotKey}
+                    label={day.label}
+                    recipeSlots={daySlots}
+                    onMarkCooked={(planId) => handleMarkCooked(day.dateKey, planId)}
+                    onUnmarkCooked={(planId) => handleUnmarkCooked(day.dateKey, planId)}
+                    onClear={(planId) => handleRemove(day.dateKey, planId)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+              Upcoming Plans
+            </span>
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+            {days.map((day) => {
+              const slotKey = buildSlotKey(day.dateKey);
+              const daySlots = slotState.get(slotKey) ?? [];
+              return (
+                <DayCard
+                  key={slotKey}
+                  slotKey={slotKey}
+                  label={day.dateKey === todayKey ? `Today, ${day.label.split(', ')[1]}` : day.label}
+                  recipeSlots={daySlots}
+                  isToday={day.dateKey === todayKey}
+                  onClearDay={() => handleClearDay(day.dateKey)}
+                  onRemoveEntry={(planId) => handleRemove(day.dateKey, planId)}
+                  onMarkCooked={(planId) => handleMarkCooked(day.dateKey, planId)}
+                  onUnmarkCooked={(planId) => handleUnmarkCooked(day.dateKey, planId)}
+                />
+              );
+            })}
+          </div>
         </div>
 
         <DragOverlay>
           {activeRecipeId ? (
-            <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-lg dark:border-emerald-500/40 dark:bg-slate-900 dark:text-slate-200">
+            <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-xl dark:border-emerald-500/40 dark:bg-slate-900 dark:text-slate-200">
               {recipeLookup.get(activeRecipeId)?.title ?? "Recipe"}
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
 
-      {isPending ? <div className="text-xs text-slate-400 dark:text-slate-500">Saving plan...</div> : null}
+      {isPending && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-2xl dark:bg-white dark:text-slate-900">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+          Saving...
+        </div>
+      )}
     </div>
   );
 }
