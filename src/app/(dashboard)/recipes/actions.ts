@@ -1398,7 +1398,7 @@ export async function createRecipeFromOcr(formData: FormData): Promise<{ success
     revalidatePath("/planner");
     redirect(`/recipes/${recipe.id}`);
   } catch (err) {
-    const error = err as any;
+    const error = err as Error & { digest?: string };
     if (error?.digest?.startsWith("NEXT_REDIRECT")) {
       throw err;
     }

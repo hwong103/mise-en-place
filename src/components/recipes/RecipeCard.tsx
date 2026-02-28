@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type SyntheticEvent } from "react";
+import CountUp from "@/components/ui/CountUp";
 
 const formatMinutes = (value?: number | null) => {
   if (!value) {
@@ -154,7 +155,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         {recipe.cookCount && recipe.cookCount > 0 ? (
           <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
             <span className="text-sm">🍳</span>
-            Cooked {recipe.cookCount}×
+            Cooked <CountUp to={recipe.cookCount} duration={600} />×
           </div>
         ) : null}
 

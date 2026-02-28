@@ -2,7 +2,7 @@
 
 import { type TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, Play, GripVertical, ChevronLeft, ChevronRight, Check, Info, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Play, GripVertical } from "lucide-react";
 import { createPortal } from "react-dom";
 import { extractIngredientKeywords, type PrepGroup } from "@/lib/recipe-utils";
 import { updatePrepGroupsOrder } from "@/app/(dashboard)/recipes/detail-actions";

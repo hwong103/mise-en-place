@@ -5,6 +5,7 @@ import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard"
 import RecipeForm from "@/components/recipes/RecipeForm";
 import SubmitButton from "@/components/forms/SubmitButton";
 import OcrImportCard from "@/components/recipes/OcrImportCard";
+import FadeContent from "@/components/ui/FadeContent";
 
 const normalize = (value: string) =>
   value
@@ -231,8 +232,10 @@ export default function RecipeLibraryClient({
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((recipe) => (
-            <RecipeCard key={recipe.id} recipe={recipe} />
+          {filtered.map((recipe, index) => (
+            <FadeContent key={recipe.id} delay={Math.min(index * 0.05, 0.3)}>
+              <RecipeCard recipe={recipe} />
+            </FadeContent>
           ))}
         </div>
       )}

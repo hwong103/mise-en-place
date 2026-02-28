@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createRecipeFromOcr } from "@/app/(dashboard)/recipes/actions";
+import Magnet from "@/components/ui/Magnet";
+import { useToast } from "@/components/ui/Toast";
 
 const isHeicFile = (file: File) => {
   const name = file.name.toLowerCase();
@@ -73,6 +75,7 @@ export default function OcrImportCard() {
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
 
   const previewUrl = useMemo(() => {
@@ -106,8 +109,9 @@ export default function OcrImportCard() {
             type: "image/jpeg",
           })
         );
+        showToast("Converted HEIC to JPG. Ready to import.", "success");
       } catch {
-        setError("HEIC conversion failed. Please convert to JPG or PNG and try again.");
+        showToast("HEIC conversion failed. Please convert to JPG or PNG.", "error");
         setFile(null);
       } finally {
         setIsConverting(false);
@@ -137,10 +141,10 @@ export default function OcrImportCard() {
 
         const result = await createRecipeFromOcr(formData);
         if (result && !result.success) {
-          setError(result.error ?? "Extraction failed. Please try a clearer photo.");
+          showToast(result.error ?? "Extraction failed. Please try a clearer photo.", "error");
         }
       } catch (err) {
-        if ((err as any)?.digest?.startsWith("NEXT_REDIRECT")) {
+        if ((err as Error & { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) {
           return;
         }
         console.error("OCR submission failed:", err);
@@ -202,13 +206,15 @@ export default function OcrImportCard() {
           <p className="text-sm text-slate-500 dark:text-slate-400">Converting HEIC photo…</p>
         )}
 
-        <button
-          type="submit"
-          disabled={!file || isLoading}
-          className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
-        >
-          {isPending ? "Extracting recipe…" : "Extract Recipe"}
-        </button>
+        <Magnet strength={0.25} className="w-full">
+          <button
+            type="submit"
+            disabled={!file || isLoading}
+            className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
+          >
+            {isPending ? "Extracting recipe…" : "Extract Recipe"}
+          </button>
+        </Magnet>
 
         {isPending && (
           <p className="text-center text-xs text-slate-500 dark:text-slate-400">

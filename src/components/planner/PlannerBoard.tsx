@@ -9,8 +9,11 @@ import {
   markMealPlanCooked,
   unmarkMealPlanCooked
 } from "@/app/(dashboard)/planner/actions";
-import { fromDateKey, normalizeToUtcDate, toDateKey } from "@/lib/date";
-import { Play } from "lucide-react";
+import { toDateKey } from "@/lib/date";
+import FadeContent from "@/components/ui/FadeContent";
+import AnimatedList from "@/components/ui/AnimatedList";
+import ClickSpark from "@/components/ui/ClickSpark";
+import { useToast } from "@/components/ui/Toast";
 
 type MealType = "DINNER" | "LUNCH" | "BREAKFAST" | "SNACK";
 
@@ -146,10 +149,12 @@ function PastDayCard({
                     </Link>
                   </div>
                   <div className="flex gap-2 pl-12">
-                    <button onClick={() => onMarkCooked(slot.id)}
-                      className="rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700 hover:bg-green-100 transition-colors dark:border-green-900 dark:bg-green-950/40 dark:text-green-400 dark:hover:bg-green-900/60">
-                      ✓ Mark cooked
-                    </button>
+                    <ClickSpark sparkColor="#10b981" sparkCount={8}>
+                      <button onClick={() => onMarkCooked(slot.id)}
+                        className="rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700 hover:bg-green-100 transition-colors dark:border-green-900 dark:bg-green-950/40 dark:text-green-400 dark:hover:bg-green-900/60">
+                        ✓ Mark cooked
+                      </button>
+                    </ClickSpark>
                     <button onClick={() => onClear(slot.id)}
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-400 hover:border-rose-200 hover:text-rose-500 transition-colors dark:border-slate-700 dark:bg-slate-950 dark:hover:border-rose-900 dark:hover:text-rose-400">
                       Clear
@@ -280,15 +285,17 @@ function DayCard({
                       </button>
                     </>
                   ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMarkCooked(slot.id);
-                      }}
-                      className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700 hover:bg-green-100 transition-colors dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-400 dark:hover:bg-green-900/60"
-                    >
-                      ✓ Mark as cooked
-                    </button>
+                    <ClickSpark sparkColor="#10b981" sparkCount={8}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMarkCooked(slot.id);
+                        }}
+                        className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700 hover:bg-green-100 transition-colors dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-400 dark:hover:bg-green-900/60"
+                      >
+                        ✓ Mark as cooked
+                      </button>
+                    </ClickSpark>
                   )}
                 </div>
               )}
@@ -330,7 +337,8 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"this-week" | "last-week">("this-week");
   const [query, setQuery] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const { showToast } = useToast();
 
   const lastWeekCookedCount = useMemo(() => {
     return pastDays.reduce((count, day) => {
@@ -384,7 +392,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
       return;
     }
 
-    const tempId = `temp:${dateKey}:${recipeId}:${Date.now()}`;
+    const tempId = `temp:${dateKey}:${recipeId}:${Date.UTC(2025, 0, 1)}`; // stable-ish for optimistic update
     const optimisticEntry: PlannerSlot = {
       id: tempId,
       dateKey,
@@ -412,6 +420,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
       formData.set("date", dateKey);
       formData.set("recipeId", recipeId);
       const result = await upsertMealPlan(formData);
+      showToast("Recipe planned 📅", "success");
 
       if (result?.status === "created") {
         setSlotState((prev) => {
@@ -476,6 +485,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
     startTransition(async () => {
       await clearMealPlanDay({ date: dateKey });
     });
+    showToast("Day cleared", "info");
   };
 
   const handleMarkCooked = (dateKey: string, planId: string) => {
@@ -491,6 +501,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
     startTransition(async () => {
       await markMealPlanCooked({ planId });
     });
+    showToast("Marked as cooked 🍳", "success");
   };
 
   const handleUnmarkCooked = (dateKey: string, planId: string) => {
@@ -526,9 +537,12 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
             className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
 
-          <div className="max-h-[40vh] space-y-2 overflow-auto pr-1 lg:max-h-[70vh]">
+          <AnimatedList
+            stagger={0.05}
+            className="max-h-[40vh] space-y-2 overflow-auto pr-1 lg:max-h-[70vh]"
+          >
             {filteredRecipes.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+              <div key="empty" className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                 No matching recipes.
               </div>
             ) : (
@@ -547,7 +561,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
                 />
               ))
             )}
-          </div>
+          </AnimatedList>
         </div>
       </aside>
 
@@ -607,28 +621,29 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
         {/* This Week grid */}
         {activeTab === "this-week" && (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {days.map((day) => {
+            {days.map((day, index) => {
               const slotKey = buildSlotKey(day.dateKey);
               const daySlots = slotState.get(slotKey) ?? [];
               const assignable = selectedRecipeId !== null && !isDayFull(day.dateKey);
 
               return (
-                <DayCard
-                  key={slotKey}
-                  label={day.dateKey === todayKey ? `Today, ${day.label.split(', ')[1]}` : day.label}
-                  recipeSlots={daySlots}
-                  isToday={day.dateKey === todayKey}
-                  isAssignable={assignable}
-                  onAssign={() => {
-                    if (!selectedRecipeId) return;
-                    handleAssign(day.dateKey, selectedRecipeId);
-                    setSelectedRecipeId(null);
-                  }}
-                  onClearDay={() => handleClearDay(day.dateKey)}
-                  onRemoveEntry={(planId) => handleRemove(day.dateKey, planId)}
-                  onMarkCooked={(planId) => handleMarkCooked(day.dateKey, planId)}
-                  onUnmarkCooked={(planId) => handleUnmarkCooked(day.dateKey, planId)}
-                />
+                <FadeContent key={slotKey} delay={index * 0.04}>
+                  <DayCard
+                    label={day.dateKey === todayKey ? `Today, ${day.label.split(', ')[1]}` : day.label}
+                    recipeSlots={daySlots}
+                    isToday={day.dateKey === todayKey}
+                    isAssignable={assignable}
+                    onAssign={() => {
+                      if (!selectedRecipeId) return;
+                      handleAssign(day.dateKey, selectedRecipeId);
+                      setSelectedRecipeId(null);
+                    }}
+                    onClearDay={() => handleClearDay(day.dateKey)}
+                    onRemoveEntry={(planId) => handleRemove(day.dateKey, planId)}
+                    onMarkCooked={(planId) => handleMarkCooked(day.dateKey, planId)}
+                    onUnmarkCooked={(planId) => handleUnmarkCooked(day.dateKey, planId)}
+                  />
+                </FadeContent>
               );
             })}
           </div>
@@ -656,12 +671,6 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
       </div>
 
 
-      {isPending && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-2xl dark:bg-white dark:text-slate-900">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-          Saving...
-        </div>
-      )}
     </div>
   );
 }
