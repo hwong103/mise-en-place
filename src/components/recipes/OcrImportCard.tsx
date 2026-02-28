@@ -13,16 +13,59 @@ const isHeicFile = (file: File) => {
   );
 };
 
-const fileToBase64 = (file: File): Promise<string> =>
+const resizeImage = (file: File, maxDimension: number): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
+
+      if (width > height) {
+        if (width > maxDimension) {
+          height *= maxDimension / width;
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width *= maxDimension / height;
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Could not get canvas context"));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Canvas toBlob failed"));
+          }
+        },
+        "image/jpeg",
+        0.8 // high enough for OCR but significant size reduction
+      );
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Strip the data:image/...;base64, prefix
       resolve(result.split(",")[1] ?? "");
     };
     reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 
 export default function OcrImportCard() {
@@ -83,19 +126,23 @@ export default function OcrImportCard() {
 
     const formData = new FormData(e.currentTarget);
 
-    let base64: string;
-    try {
-      base64 = await fileToBase64(file);
-    } catch {
-      setError("Could not read the photo. Please try again.");
-      return;
-    }
-
-    formData.set("base64Image", base64);
-    formData.set("mimeType", file.type || "image/jpeg");
-
     startTransition(async () => {
-      await createRecipeFromOcr(formData);
+      try {
+        // Resize to max 1200px to stay well within Vercel's payload limits
+        const resizedBlob = await resizeImage(file, 1200);
+        const base64 = await blobToBase64(resizedBlob);
+
+        formData.set("base64Image", base64);
+        formData.set("mimeType", "image/jpeg");
+
+        const result = await createRecipeFromOcr(formData);
+        if (result && !result.success) {
+          setError(result.error ?? "Extraction failed. Please try a clearer photo.");
+        }
+      } catch (err) {
+        console.error("OCR submission failed:", err);
+        setError("Could not process the photo. It might be too large or invalid.");
+      }
     });
   };
 
@@ -138,7 +185,11 @@ export default function OcrImportCard() {
         {previewUrl && (
           <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="Recipe photo preview" className="max-h-72 w-full object-cover" />
+            <img
+              src={previewUrl}
+              alt="Recipe photo preview"
+              className="max-h-72 w-full object-cover"
+            />
           </div>
         )}
 

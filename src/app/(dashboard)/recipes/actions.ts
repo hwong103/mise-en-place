@@ -1316,86 +1316,95 @@ export async function createRecipe(formData: FormData) {
   redirect("/recipes");
 }
 
-export async function createRecipeFromOcr(formData: FormData) {
-  const householdId = await getCurrentHouseholdId();
+export async function createRecipeFromOcr(formData: FormData): Promise<{ success: boolean; error?: string } | void> {
+  try {
+    const householdId = await getCurrentHouseholdId();
 
-  const base64Image = toOptionalString(formData.get("base64Image"));
-  const mimeType = toOptionalString(formData.get("mimeType")) ?? "image/jpeg";
-  const titleOverride = toOptionalString(formData.get("title"));
+    const base64Image = toOptionalString(formData.get("base64Image"));
+    const mimeType = toOptionalString(formData.get("mimeType")) ?? "image/jpeg";
+    const titleOverride = toOptionalString(formData.get("title"));
 
-  // Path A: Groq vision (new)
-  if (base64Image) {
-    let groqRecipe = null;
-    try {
-      groqRecipe = await extractRecipeFromImageViaGroq(base64Image, mimeType);
-    } catch (err) {
-      console.error("Groq vision failed, will not fallback:", err);
+    // Path A: Groq vision (new)
+    if (base64Image) {
+      let groqRecipe = null;
+      try {
+        groqRecipe = await extractRecipeFromImageViaGroq(base64Image, mimeType);
+      } catch (err) {
+        console.error("Groq vision failed, will not fallback:", err);
+      }
+
+      if (groqRecipe) {
+        const cleanedIngredients = cleanIngredientLines(groqRecipe.ingredients ?? []);
+        const cleanedInstructions = cleanInstructionLines(groqRecipe.instructions ?? []);
+        const prepGroups = buildPrepGroupsFromInstructions(
+          cleanedIngredients.lines,
+          cleanedInstructions.lines
+        );
+
+        const recipe = await prisma.recipe.create({
+          data: {
+            householdId,
+            title: titleOverride ?? groqRecipe.title ?? "Untitled Recipe",
+            description: groqRecipe.description ?? null,
+            imageUrl: null,
+            sourceUrl: null,
+            servings: groqRecipe.servings ?? null,
+            prepTime: groqRecipe.prepTime ?? null,
+            cookTime: groqRecipe.cookTime ?? null,
+            tags: [],
+            ingredientCount: cleanedIngredients.lines.length,
+            ingredients: cleanedIngredients.lines,
+            instructions: cleanedInstructions.lines,
+            notes: groqRecipe.notes ?? [],
+            prepGroups,
+          },
+        });
+
+        revalidateTag(`recipes-${householdId}`, "max");
+        revalidateTag(`recipe-${recipe.id}`, "max");
+        revalidatePath("/recipes");
+        revalidatePath("/planner");
+        redirect(`/recipes/${recipe.id}`);
+      }
     }
 
-    if (groqRecipe) {
-      const cleanedIngredients = cleanIngredientLines(groqRecipe.ingredients ?? []);
-      const cleanedInstructions = cleanInstructionLines(groqRecipe.instructions ?? []);
-      const prepGroups = buildPrepGroupsFromInstructions(
-        cleanedIngredients.lines,
-        cleanedInstructions.lines
-      );
+    // Path B: legacy text OCR fallback (existing behaviour preserved)
+    const ocrText = toOptionalString(formData.get("ocrText"));
+    if (!ocrText) return;
 
-      const recipe = await prisma.recipe.create({
-        data: {
-          householdId,
-          title: titleOverride ?? groqRecipe.title ?? "Untitled Recipe",
-          description: groqRecipe.description ?? null,
-          imageUrl: null,
-          sourceUrl: null,
-          servings: groqRecipe.servings ?? null,
-          prepTime: groqRecipe.prepTime ?? null,
-          cookTime: groqRecipe.cookTime ?? null,
-          tags: [],
-          ingredientCount: cleanedIngredients.lines.length,
-          ingredients: cleanedIngredients.lines,
-          instructions: cleanedInstructions.lines,
-          notes: groqRecipe.notes ?? [],
-          prepGroups,
-        },
-      });
+    const payload = buildOcrRecipePayload(ocrText);
+    const recipe = await prisma.recipe.create({
+      data: {
+        householdId,
+        title: titleOverride ?? payload.title,
+        description: null,
+        imageUrl: null,
+        sourceUrl: null,
+        servings: payload.servings,
+        prepTime: payload.prepTime,
+        cookTime: payload.cookTime,
+        tags: [],
+        ingredientCount: payload.ingredients.length,
+        ingredients: payload.ingredients,
+        instructions: payload.instructions,
+        notes: payload.notes,
+        prepGroups: payload.prepGroups,
+      },
+    });
 
-      revalidateTag(`recipes-${householdId}`, "max");
-      revalidateTag(`recipe-${recipe.id}`, "max");
-      revalidatePath("/recipes");
-      revalidatePath("/planner");
-      redirect(`/recipes/${recipe.id}`);
+    revalidateTag(`recipes-${householdId}`, "max");
+    revalidateTag(`recipe-${recipe.id}`, "max");
+    revalidatePath("/recipes");
+    revalidatePath("/planner");
+    redirect(`/recipes/${recipe.id}`);
+  } catch (err) {
+    const error = err as any;
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw err;
     }
+    console.error("createRecipeFromOcr failed:", err);
+    return { success: false, error: "A server error occurred. Please try again later." };
   }
-
-  // Path B: legacy text OCR fallback (existing behaviour preserved)
-  const ocrText = toOptionalString(formData.get("ocrText"));
-  if (!ocrText) return;
-
-  const payload = buildOcrRecipePayload(ocrText);
-  const recipe = await prisma.recipe.create({
-    data: {
-      householdId,
-      title: titleOverride ?? payload.title,
-      description: null,
-      imageUrl: null,
-      sourceUrl: null,
-      servings: payload.servings,
-      prepTime: payload.prepTime,
-      cookTime: payload.cookTime,
-      tags: [],
-      ingredientCount: payload.ingredients.length,
-      ingredients: payload.ingredients,
-      instructions: payload.instructions,
-      notes: payload.notes,
-      prepGroups: payload.prepGroups,
-    },
-  });
-
-  revalidateTag(`recipes-${householdId}`, "max");
-  revalidateTag(`recipe-${recipe.id}`, "max");
-  revalidatePath("/recipes");
-  revalidatePath("/planner");
-  redirect(`/recipes/${recipe.id}`);
 }
 
 export async function updateRecipe(formData: FormData) {
