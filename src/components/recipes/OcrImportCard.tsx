@@ -81,6 +81,8 @@ export default function OcrImportCard() {
 
     setError(null);
 
+    const formData = new FormData(e.currentTarget);
+
     let base64: string;
     try {
       base64 = await fileToBase64(file);
@@ -89,7 +91,6 @@ export default function OcrImportCard() {
       return;
     }
 
-    const formData = new FormData(e.currentTarget);
     formData.set("base64Image", base64);
     formData.set("mimeType", file.type || "image/jpeg");
 
