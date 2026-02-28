@@ -362,7 +362,7 @@ export default async function RecipeDetailPage({
                     />
                   </div>
                 ) : (
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-4 grid-cols-1">
                     {miseGroups.length === 0 ? (
                       <p className="col-span-2 py-4 text-center text-sm italic text-slate-500">
                         No prep groups. Edit recipe to add groups.
