@@ -328,8 +328,16 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
   const allDaysForState = useMemo(() => [...pastDays, ...days], [pastDays, days]);
   const [slotState, setSlotState] = useState(() => getInitialSlotState(allDaysForState, slots));
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"this-week" | "last-week">("this-week");
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const lastWeekCookedCount = useMemo(() => {
+    return pastDays.reduce((count, day) => {
+      const daySlots = slotState.get(buildSlotKey(day.dateKey)) ?? [];
+      return count + daySlots.filter((s) => s.cooked).length;
+    }, 0);
+  }, [pastDays, slotState]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -529,7 +537,13 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
                   key={recipe.id}
                   recipe={recipe}
                   isSelected={selectedRecipeId === recipe.id}
-                  onSelect={(id) => setSelectedRecipeId((prev) => (prev === id ? null : id))}
+                  onSelect={(id) => {
+                    setSelectedRecipeId((prev) => {
+                      const next = prev === id ? null : id;
+                      if (next) setActiveTab("this-week");
+                      return next;
+                    });
+                  }}
                 />
               ))
             )}
@@ -537,13 +551,92 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
         </div>
       </aside>
 
-      <div className="space-y-12">
-        {/* Past days */}
-        <div>
-          <p className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400/80">
-            Past 7 days
-          </p>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-5">
+        {/* Tab bar */}
+        <div className="flex items-center gap-1 self-start rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800/60">
+          {(["this-week", "last-week"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab === "last-week") setSelectedRecipeId(null);
+              }}
+              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-all
+                  ${activeTab === tab
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+            >
+              {tab === "this-week" ? (
+                "This Week"
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  Last Week
+                  {lastWeekCookedCount > 0 && (
+                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
+                      {lastWeekCookedCount}✓
+                    </span>
+                  )}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Selection banner — only shown on this-week tab */}
+        {activeTab === "this-week" && selectedRecipeId && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <span>
+              <span className="font-bold">
+                {recipeLookup.get(selectedRecipeId)?.title}
+              </span>
+              {" "}— tap a day to assign
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedRecipeId(null)}
+              className="shrink-0 text-emerald-500 hover:text-emerald-700 dark:text-emerald-400"
+              aria-label="Cancel selection"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* This Week grid */}
+        {activeTab === "this-week" && (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {days.map((day) => {
+              const slotKey = buildSlotKey(day.dateKey);
+              const daySlots = slotState.get(slotKey) ?? [];
+              const assignable = selectedRecipeId !== null && !isDayFull(day.dateKey);
+
+              return (
+                <DayCard
+                  key={slotKey}
+                  label={day.dateKey === todayKey ? `Today, ${day.label.split(', ')[1]}` : day.label}
+                  recipeSlots={daySlots}
+                  isToday={day.dateKey === todayKey}
+                  isAssignable={assignable}
+                  onAssign={() => {
+                    if (!selectedRecipeId) return;
+                    handleAssign(day.dateKey, selectedRecipeId);
+                    setSelectedRecipeId(null);
+                  }}
+                  onClearDay={() => handleClearDay(day.dateKey)}
+                  onRemoveEntry={(planId) => handleRemove(day.dateKey, planId)}
+                  onMarkCooked={(planId) => handleMarkCooked(day.dateKey, planId)}
+                  onUnmarkCooked={(planId) => handleUnmarkCooked(day.dateKey, planId)}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* Last Week grid */}
+        {activeTab === "last-week" && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {pastDays.map((day) => {
               const slotKey = buildSlotKey(day.dateKey);
               const daySlots = slotState.get(slotKey) ?? [];
@@ -559,63 +652,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
               );
             })}
           </div>
-        </div>
-
-        <div className="flex flex-col gap-6">
-          {selectedRecipeId && (
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
-              <span>
-                <span className="font-bold">
-                  {recipeLookup.get(selectedRecipeId)?.title}
-                </span>
-                {" "}— tap a day to assign
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedRecipeId(null)}
-                className="shrink-0 text-emerald-500 hover:text-emerald-700 dark:text-emerald-400"
-                aria-label="Cancel selection"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-              Upcoming Plans
-            </span>
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-          {days.map((day) => {
-            const slotKey = buildSlotKey(day.dateKey);
-            const daySlots = slotState.get(slotKey) ?? [];
-            const assignable = selectedRecipeId !== null && !isDayFull(day.dateKey);
-
-            return (
-              <DayCard
-                key={slotKey}
-                label={day.dateKey === todayKey ? `Today, ${day.label.split(', ')[1]}` : day.label}
-                recipeSlots={daySlots}
-                isToday={day.dateKey === todayKey}
-                isAssignable={assignable}
-                onAssign={() => {
-                  if (!selectedRecipeId) return;
-                  handleAssign(day.dateKey, selectedRecipeId);
-                  setSelectedRecipeId(null);
-                }}
-                onClearDay={() => handleClearDay(day.dateKey)}
-                onRemoveEntry={(planId) => handleRemove(day.dateKey, planId)}
-                onMarkCooked={(planId) => handleMarkCooked(day.dateKey, planId)}
-                onUnmarkCooked={(planId) => handleUnmarkCooked(day.dateKey, planId)}
-              />
-            );
-          })}
-        </div>
+        )}
       </div>
 
 

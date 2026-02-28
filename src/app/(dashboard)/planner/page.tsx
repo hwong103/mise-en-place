@@ -51,7 +51,7 @@ export default async function PlannerPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Planner</h1>
-          <p className="text-slate-500 dark:text-slate-400">Plan items for the next 7 days and track your cooking history.</p>
+          <p className="text-slate-500 dark:text-slate-400">Plan your week and track your cooking history.</p>
         </div>
         <Link
           href="/shopping"
