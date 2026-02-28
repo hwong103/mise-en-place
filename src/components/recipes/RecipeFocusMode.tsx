@@ -321,8 +321,8 @@ export default function RecipeFocusMode({
       {isMounted && mode
         ? createPortal(
           <div className="fixed inset-0 z-[100] bg-slate-950/60 p-3 backdrop-blur-sm md:p-6">
-            <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-3XL border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-              <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+            <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl md:rounded-3xl md:p-5 dark:border-slate-800 dark:bg-slate-950">
+              <div className="mb-4 flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
                 <div className="flex items-center gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#C67B2A] dark:text-[#E2A056]">
@@ -336,7 +336,7 @@ export default function RecipeFocusMode({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => { setMode("mise"); setIsEditing(false); setPendingGroups(null); }}

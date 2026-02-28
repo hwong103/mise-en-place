@@ -225,8 +225,8 @@ function DayCard({
             <div key={slot.id} className="space-y-2">
               <div
                 className={`flex items-center justify-between gap-3 rounded-2xl border p-3 transition-colors ${slot.cooked
-                    ? "border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-950/20"
-                    : "border-slate-200 bg-slate-50 dark:border-slate-700/50 dark:bg-slate-950/30"
+                  ? "border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-950/20"
+                  : "border-slate-200 bg-slate-50 dark:border-slate-700/50 dark:bg-slate-950/30"
                   }`}
               >
                 <div className="flex min-w-0 items-center gap-3">
@@ -240,8 +240,8 @@ function DayCard({
                   <Link
                     href={`/recipes/${slot.recipeId}`}
                     className={`truncate text-sm font-semibold transition-colors hover:underline underline-offset-4 ${slot.cooked
-                        ? "text-green-800 dark:text-green-300 decoration-green-300"
-                        : "text-slate-700 dark:text-slate-200 decoration-slate-400"
+                      ? "text-green-800 dark:text-green-300 decoration-green-300"
+                      : "text-slate-700 dark:text-slate-200 decoration-slate-400"
                       }`}
                   >
                     {slot.recipeTitle}
@@ -480,7 +480,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
   const todayKey = toDateKey(new Date());
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
+    <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[300px_1fr]">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -516,7 +516,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
               className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
 
-            <div className="max-h-[70vh] space-y-2 overflow-auto pr-1">
+            <div className="max-h-[40vh] space-y-2 overflow-auto pr-1 lg:max-h-[70vh]">
               {filteredRecipes.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                   No matching recipes.

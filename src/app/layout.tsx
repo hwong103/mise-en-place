@@ -9,6 +9,7 @@ import NavigationPerfLogger from "@/components/perf/NavigationPerfLogger";
 import HeaderAccessControls from "@/components/layout/HeaderAccessControls";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import BrandLogo from "@/components/layout/BrandLogo";
+import MobileNav from "@/components/layout/MobileNav";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -95,7 +96,10 @@ export default function RootLayout({
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-8 md:py-10">{children}</main>
+          <main className="mx-auto w-full max-w-[1400px] px-4 py-6 pb-24 md:px-8 md:py-10 md:pb-10">
+            {children}
+          </main>
+          <MobileNav />
         </div>
       </body>
     </html>
