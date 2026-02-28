@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Play, GripVertical } from "lucide-react";
 import { createPortal } from "react-dom";
 import { extractIngredientKeywords, type PrepGroup } from "@/lib/recipe-utils";
 import { updatePrepGroupsOrder } from "@/app/(dashboard)/recipes/detail-actions";
+import IngredientGroupsEditor from "@/components/recipes/IngredientGroupsEditor";
 
 type RecipeFocusModeProps = {
   recipeId?: string;
@@ -115,6 +116,8 @@ export default function RecipeFocusMode({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isFabVisible, setIsFabVisible] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [pendingGroups, setPendingGroups] = useState<PrepGroup[] | null>(null);
 
   const transitionTimeoutRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -216,6 +219,34 @@ export default function RecipeFocusMode({
     }
   };
 
+  const handleDoneEditing = async () => {
+    setIsEditing(false);
+    if (!pendingGroups || !recipeId) {
+      setPendingGroups(null);
+      return;
+    }
+
+    // Merge edited mise groups back with sourceGroups (which aren't shown in editor)
+    const sourceGroups = prepGroups.filter((g) => g.sourceGroup);
+    const merged = [...sourceGroups, ...pendingGroups];
+
+    setPrepGroups(merged); // optimistic update
+    setIsSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append("recipeId", recipeId);
+      formData.append("prepGroups", JSON.stringify(merged));
+      await updatePrepGroupsOrder(formData);
+    } catch (err) {
+      console.error("Failed to save prep groups", err);
+      // rollback on error
+      setPrepGroups(initialPrepGroups);
+    } finally {
+      setIsSaving(false);
+      setPendingGroups(null);
+    }
+  };
+
   const misePrepGroups = useMemo(() => {
     return prepGroups.filter(g => !g.sourceGroup);
   }, [prepGroups]);
@@ -304,7 +335,7 @@ export default function RecipeFocusMode({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setMode("mise")}
+                    onClick={() => { setMode("mise"); setIsEditing(false); setPendingGroups(null); }}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "mise"
                       ? "border-[var(--mise-border)] bg-[var(--mise-bg)] text-[var(--mise-text)] dark:bg-amber-950/40"
                       : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--mise-border)] hover:text-[var(--mise-text)] dark:border-slate-700 dark:text-slate-400"
@@ -314,7 +345,7 @@ export default function RecipeFocusMode({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMode("cook")}
+                    onClick={() => { setMode("cook"); setIsEditing(false); setPendingGroups(null); }}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "cook"
                       ? "border-[var(--cook-border)] bg-[var(--cook-bg)] text-[var(--cook-text)] dark:bg-emerald-950/40"
                       : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--cook-border)] hover:text-[var(--cook-text)] dark:border-slate-700 dark:text-slate-400"
@@ -327,7 +358,7 @@ export default function RecipeFocusMode({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMode(null)}
+                    onClick={() => { setMode(null); setIsEditing(false); setPendingGroups(null); }}
                     className="ml-2 rounded-full border border-slate-200 bg-transparent px-4 py-1.5 text-[13px] font-medium text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-600 dark:border-slate-700 dark:text-slate-500"
                   >
                     Close
@@ -340,10 +371,28 @@ export default function RecipeFocusMode({
                 <div className="grid min-h-0 flex-1 gap-6 md:grid-cols-[1fr_1.5fr]">
                   {/* Left Column: Prep Groups with Drag and Drop */}
                   <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50/50 p-5 dark:border-slate-800 dark:bg-slate-900/40">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                      Prep Groups
-                    </h3>
-                    {misePrepGroups.length === 0 ? (
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                        Prep Groups
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={isEditing ? handleDoneEditing : () => setIsEditing(true)}
+                        className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
+                      >
+                        {isEditing ? "Done" : "Edit"}
+                      </button>
+                    </div>
+
+                    {isEditing ? (
+                      <div className="mt-5">
+                        <IngredientGroupsEditor
+                          initialGroups={misePrepGroups}
+                          prefix="miseGroup"
+                          onChange={setPendingGroups}
+                        />
+                      </div>
+                    ) : misePrepGroups.length === 0 ? (
                       <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No mise groups available. (Source ingredients are separate)</p>
                     ) : (
                       <div className="mt-5 space-y-3">

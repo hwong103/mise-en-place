@@ -27,6 +27,7 @@ type IngredientGroupsEditorProps = {
     initialGroups: PrepGroup[];
     prefix?: string;
     showStepBadge?: boolean;
+    onChange?: (groups: PrepGroup[]) => void;
 };
 
 type EditorItem = {
@@ -172,11 +173,12 @@ function DragOverlayItem({ value }: { value: string }) {
 
 // ─── Main Editor ────────────────────────────────────────────────────
 
-export default function IngredientGroupsEditor({
-    initialGroups,
-    prefix = "ingredientGroup",
-    showStepBadge = false,
-}: IngredientGroupsEditorProps) {
+export default function IngredientGroupsEditor(props: IngredientGroupsEditorProps) {
+    const {
+        initialGroups,
+        prefix = "ingredientGroup",
+        showStepBadge = false,
+    } = props;
     const [groups, setGroups] = useState<EditorGroup[]>(() =>
         initialGroups.map((g) => ({
             title: g.title,
@@ -205,6 +207,18 @@ export default function IngredientGroupsEditor({
             }))
         );
     }
+
+    const { onChange } = props;
+    useEffect(() => {
+        onChange?.(
+            groups.map((g) => ({
+                title: g.title,
+                items: g.items.map((i) => i.value),
+                sourceGroup: g.sourceGroup,
+                stepIndex: g.stepIndex,
+            }))
+        );
+    }, [groups, onChange]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
