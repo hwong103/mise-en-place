@@ -201,8 +201,8 @@ export default async function RecipeDetailPage({
                 instructions={instructions}
                 notes={notes}
                 triggerWrapperClassName="contents"
-                miseButtonClassName="rounded-[20px] border-[1.5px] border-white/60 bg-transparent px-[18px] py-2 text-[13px] font-semibold text-white transition-colors hover:border-white hover:bg-white/10"
-                cookButtonClassName="rounded-[20px] border-0 bg-[#C67B2A] px-[18px] py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(198,123,42,0.35)] transition-colors hover:bg-[#B56E24]"
+                miseButtonClassName="btn-mise"
+                cookButtonClassName="btn-cook"
                 showCookPlayIcon
               />
               <details className="group relative">

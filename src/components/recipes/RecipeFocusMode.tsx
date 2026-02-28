@@ -263,7 +263,7 @@ export default function RecipeFocusMode({
           onClick={() => setMode("mise")}
           className={
             miseButtonClassName ??
-            "rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
+            "rounded-xl border-[1.5px] border-[var(--mise-border)] bg-[var(--mise-bg)] px-4 py-2 text-sm font-semibold text-[var(--mise-text)] transition-all hover:bg-[#fef3c7] hover:border-[#b45309] hover:text-[#b45309] dark:bg-amber-950/40"
           }
         >
           Mise
@@ -273,7 +273,7 @@ export default function RecipeFocusMode({
           onClick={() => setMode("cook")}
           className={
             cookButtonClassName ??
-            "rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
+            "rounded-xl border-[1.5px] border-[var(--cook-border)] bg-[var(--cook-bg)] px-4 py-2 text-sm font-semibold text-[var(--cook-text)] transition-all hover:bg-[#dcfce7] hover:border-[#15803d] hover:text-[#15803d] dark:bg-emerald-950/40"
           }
         >
           <span className="inline-flex items-center gap-1.5">
@@ -306,8 +306,8 @@ export default function RecipeFocusMode({
                     type="button"
                     onClick={() => setMode("mise")}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "mise"
-                      ? "border-[#C67B2A] bg-amber-50 text-[#C67B2A] dark:bg-amber-950/40"
-                      : "border-slate-200 bg-transparent text-slate-600 hover:border-[#C67B2A] hover:text-[#C67B2A] dark:border-slate-700 dark:text-slate-400"
+                      ? "border-[var(--mise-border)] bg-[var(--mise-bg)] text-[var(--mise-text)] dark:bg-amber-950/40"
+                      : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--mise-border)] hover:text-[var(--mise-text)] dark:border-slate-700 dark:text-slate-400"
                       }`}
                   >
                     Mise
@@ -316,8 +316,8 @@ export default function RecipeFocusMode({
                     type="button"
                     onClick={() => setMode("cook")}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "cook"
-                      ? "border-emerald-600 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40"
-                      : "border-slate-200 bg-transparent text-slate-600 hover:border-emerald-600 hover:text-emerald-600 dark:border-slate-700 dark:text-slate-400"
+                      ? "border-[var(--cook-border)] bg-[var(--cook-bg)] text-[var(--cook-text)] dark:bg-emerald-950/40"
+                      : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--cook-border)] hover:text-[var(--cook-text)] dark:border-slate-700 dark:text-slate-400"
                       }`}
                   >
                     <span className="inline-flex items-center gap-1.5">

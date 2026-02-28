@@ -7,6 +7,14 @@
   --foreground: #14221a;
   --muted: #58665d;
   --accent: #0f766e;
+
+  /* Mise & Cook button colors */
+  --mise-bg: #fff8ec;
+  --mise-border: #d97706;
+  --mise-text: #d97706;
+  --cook-bg: #f0fdf4;
+  --cook-border: #16a34a;
+  --cook-text: #16a34a;
 }
 
 @theme inline {
@@ -89,42 +97,55 @@ body {
   width: 100%;
 }
 
+/* Button Colour Alignment Styles */
+.btn-mise,
 .fab-mise {
-  background: white;
-  color: #1a1a1a;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08);
-  transition: box-shadow 0.15s, transform 0.15s;
-  width: 100%;
-  text-align: center;
+  background: var(--mise-bg);
+  color: var(--mise-text);
+  border: 1.5px solid var(--mise-border);
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.2);
 }
 
+.btn-cook,
+.fab-cook {
+  background: var(--cook-bg);
+  color: var(--cook-text);
+  border: 1.5px solid var(--cook-border);
+  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.2);
+}
+
+.btn-mise,
+.btn-cook {
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-mise:hover,
 .fab-mise:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  background: #fef3c7;
+  border-color: #b45309;
+  color: #b45309;
   transform: translateY(-2px);
 }
 
+.btn-cook:hover,
+.fab-cook:hover {
+  background: #dcfce7;
+  border-color: #15803d;
+  color: #15803d;
+  transform: translateY(-1px);
+}
+
+.fab-mise,
 .fab-cook {
-  background: #e07b39;
-  color: white;
-  border: none;
   border-radius: 8px;
   padding: 0.45rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(224, 123, 57, 0.5), 0 1px 4px rgba(0, 0, 0, 0.1);
-  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
   width: 100%;
   text-align: center;
-}
-
-.fab-cook:hover {
-  background: #c9652a;
-  transform: translateY(-1px);
 }
