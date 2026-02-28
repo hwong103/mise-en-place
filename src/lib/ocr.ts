@@ -462,3 +462,100 @@ export function buildOcrRecipePayload(text: string) {
     prepGroups,
   };
 }
+
+export type GroqVisionRecipe = {
+  title: string;
+  description?: string;
+  ingredients: string[];
+  instructions: string[];
+  notes: string[];
+  servings?: number;
+  prepTime?: number;
+  cookTime?: number;
+};
+
+const GROQ_VISION_PROMPT = `You are a recipe extraction assistant. The user has photographed a recipe from a cookbook or handwritten card.
+
+Extract the recipe from this image and return ONLY a JSON object with this exact structure — no markdown, no explanation, just raw JSON:
+
+{
+  "title": "Recipe name",
+  "description": "Optional one-sentence description",
+  "ingredients": ["1 cup flour", "2 eggs", ...],
+  "instructions": ["Preheat oven to 180°C", "Mix flour and eggs", ...],
+  "notes": ["Can substitute X for Y", ...],
+  "servings": 4,
+  "prepTime": 15,
+  "cookTime": 30
+}
+
+Rules:
+- ingredients: each item as a single string including quantity and unit
+- instructions: each step as a complete sentence, numbered steps stripped of their numbers
+- notes: tips, substitutions, storage instructions — omit if none
+- servings: number only, omit if not stated
+- prepTime / cookTime: minutes only as a number, omit if not stated
+- If you cannot read part of the image clearly, do your best and omit uncertain values
+- Return ONLY the JSON object, no other text`;
+
+export async function extractRecipeFromImageViaGroq(
+  base64Image: string,
+  mimeType: string
+): Promise<GroqVisionRecipe | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is not set");
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`,
+              },
+            },
+            {
+              type: "text",
+              text: GROQ_VISION_PROMPT,
+            },
+          ],
+        },
+      ],
+      temperature: 0.1, // low temperature for consistent structured output
+      max_tokens: 2048,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Groq API error ${response.status}: ${error}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) {
+    return null;
+  }
+
+  try {
+    // Strip markdown code fences if model wraps the JSON
+    const cleaned = content
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+    return JSON.parse(cleaned) as GroqVisionRecipe;
+  } catch {
+    return null;
+  }
+}

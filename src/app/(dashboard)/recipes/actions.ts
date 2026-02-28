@@ -21,7 +21,7 @@ import {
   parseTags,
   type PrepGroup,
 } from "@/lib/recipe-utils";
-import { buildOcrRecipePayload } from "@/lib/ocr";
+import { buildOcrRecipePayload, extractRecipeFromImageViaGroq } from "@/lib/ocr";
 import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
 import {
   HIGH_CONFIDENCE_INGESTION_SCORE,
@@ -1317,20 +1317,65 @@ export async function createRecipe(formData: FormData) {
 }
 
 export async function createRecipeFromOcr(formData: FormData) {
-  const ocrText = toOptionalString(formData.get("ocrText"));
-  if (!ocrText) {
-    return;
-  }
-
-  const title = toOptionalString(formData.get("title"));
-  const payload = buildOcrRecipePayload(ocrText);
-
   const householdId = await getCurrentHouseholdId();
 
+  const base64Image = toOptionalString(formData.get("base64Image"));
+  const mimeType = toOptionalString(formData.get("mimeType")) ?? "image/jpeg";
+  const titleOverride = toOptionalString(formData.get("title"));
+
+  // Path A: Groq vision (new)
+  if (base64Image) {
+    let groqRecipe = null;
+    try {
+      groqRecipe = await extractRecipeFromImageViaGroq(base64Image, mimeType);
+    } catch (err) {
+      console.error("Groq vision failed, will not fallback:", err);
+    }
+
+    if (groqRecipe) {
+      const cleanedIngredients = cleanIngredientLines(groqRecipe.ingredients ?? []);
+      const cleanedInstructions = cleanInstructionLines(groqRecipe.instructions ?? []);
+      const prepGroups = buildPrepGroupsFromInstructions(
+        cleanedIngredients.lines,
+        cleanedInstructions.lines
+      );
+
+      const recipe = await prisma.recipe.create({
+        data: {
+          householdId,
+          title: titleOverride ?? groqRecipe.title ?? "Untitled Recipe",
+          description: groqRecipe.description ?? null,
+          imageUrl: null,
+          sourceUrl: null,
+          servings: groqRecipe.servings ?? null,
+          prepTime: groqRecipe.prepTime ?? null,
+          cookTime: groqRecipe.cookTime ?? null,
+          tags: [],
+          ingredientCount: cleanedIngredients.lines.length,
+          ingredients: cleanedIngredients.lines,
+          instructions: cleanedInstructions.lines,
+          notes: groqRecipe.notes ?? [],
+          prepGroups,
+        },
+      });
+
+      revalidateTag(`recipes-${householdId}`, "max");
+      revalidateTag(`recipe-${recipe.id}`, "max");
+      revalidatePath("/recipes");
+      revalidatePath("/planner");
+      redirect(`/recipes/${recipe.id}`);
+    }
+  }
+
+  // Path B: legacy text OCR fallback (existing behaviour preserved)
+  const ocrText = toOptionalString(formData.get("ocrText"));
+  if (!ocrText) return;
+
+  const payload = buildOcrRecipePayload(ocrText);
   const recipe = await prisma.recipe.create({
     data: {
       householdId,
-      title: title ?? payload.title,
+      title: titleOverride ?? payload.title,
       description: null,
       imageUrl: null,
       sourceUrl: null,

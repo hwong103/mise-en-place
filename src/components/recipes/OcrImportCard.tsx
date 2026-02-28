@@ -1,23 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createRecipeFromOcr } from "@/app/(dashboard)/recipes/actions";
-import { cleanOcrText } from "@/lib/ocr";
-
-const loadTesseract = async () => {
-  const tesseractModule = await import("tesseract.js");
-  return tesseractModule;
-};
-
-type ProgressState = {
-  status: string;
-  progress: number;
-};
-
-type ToastState = {
-  type: "success" | "error";
-  message: string;
-};
 
 const isHeicFile = (file: File) => {
   const name = file.name.toLowerCase();
@@ -29,40 +13,39 @@ const isHeicFile = (file: File) => {
   );
 };
 
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the data:image/...;base64, prefix
+      resolve(result.split(",")[1] ?? "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 export default function OcrImportCard() {
   const [file, setFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [ocrText, setOcrText] = useState("");
-  const [title, setTitle] = useState("");
-  const [progress, setProgress] = useState<ProgressState | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<ToastState | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const canRun = Boolean(file) && !isConverting;
+  const formRef = useRef<HTMLFormElement>(null);
 
   const previewUrl = useMemo(() => {
-    if (!file) {
-      return null;
-    }
+    if (!file) return null;
     return URL.createObjectURL(file);
   }, [file]);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const nextFile = event.target.files?.[0] ?? null;
-    setOcrText("");
-    setTitle("");
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextFile = e.target.files?.[0] ?? null;
     setError(null);
-    setProgress(null);
-    setToast(null);
 
     if (!nextFile) {
       setFile(null);
@@ -73,24 +56,15 @@ export default function OcrImportCard() {
       setIsConverting(true);
       try {
         const { default: heic2any } = await import("heic2any");
-        const converted = await heic2any({
-          blob: nextFile,
-          toType: "image/jpeg",
-          quality: 0.9,
-        });
-        const convertedBlob = Array.isArray(converted) ? converted[0] : converted;
-        const convertedFile = new File(
-          [convertedBlob],
-          nextFile.name.replace(/\.(heic|heif)$/i, ".jpg"),
-          { type: "image/jpeg", lastModified: Date.now() }
+        const converted = await heic2any({ blob: nextFile, toType: "image/jpeg", quality: 0.9 });
+        const blob = Array.isArray(converted) ? converted[0] : converted;
+        setFile(
+          new File([blob], nextFile.name.replace(/\.(heic|heif)$/i, ".jpg"), {
+            type: "image/jpeg",
+          })
         );
-        setFile(convertedFile);
-        setImageUrl(convertedFile.name);
-        setToast({ type: "success", message: "Converted HEIC to JPG. Ready to import." });
       } catch {
-        const message = "HEIC conversion failed. Please convert to JPG/PNG and try again.";
-        setError(message);
-        setToast({ type: "error", message });
+        setError("HEIC conversion failed. Please convert to JPG or PNG and try again.");
         setFile(null);
       } finally {
         setIsConverting(false);
@@ -99,171 +73,94 @@ export default function OcrImportCard() {
     }
 
     setFile(nextFile);
-    setImageUrl(nextFile.name);
   };
 
-  const handleRunOcr = async () => {
-    if (isConverting) {
-      const message = "Finishing photo conversion. Please wait.";
-      setError(message);
-      setToast({ type: "error", message });
-      return;
-    }
-
-    if (!file) {
-      const message = "Add a photo first.";
-      setError(message);
-      setToast({ type: "error", message });
-      return;
-    }
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!file) return;
 
     setError(null);
-    setProgress({ status: "loading", progress: 0 });
 
+    let base64: string;
     try {
-      const tesseract = await loadTesseract();
-      const result = await tesseract.recognize(file, "eng", {
-        logger: (message: { status: string; progress: number }) => {
-          setProgress({ status: message.status, progress: message.progress });
-        },
-      });
-      const rawText = result.data.text?.trim() ?? "";
-      setOcrText(cleanOcrText(rawText));
-      setProgress({ status: "complete", progress: 1 });
-      setToast({ type: "success", message: "Import complete. Review the text before saving." });
+      base64 = await fileToBase64(file);
     } catch {
-      const message = "Import failed. Please try a clearer JPG or PNG image.";
-      setError(message);
-      setToast({ type: "error", message });
-      setProgress(null);
+      setError("Could not read the photo. Please try again.");
+      return;
     }
-  };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(e.currentTarget);
+    formData.set("base64Image", base64);
+    formData.set("mimeType", file.type || "image/jpeg");
 
     startTransition(async () => {
       await createRecipeFromOcr(formData);
-      setToast({ type: "success", message: "Recipe created from photo." });
     });
   };
 
-  useEffect(() => {
-    if (!toast) {
-      return;
-    }
-    const timer = window.setTimeout(() => setToast(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  const isLoading = isConverting || isPending;
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Take a Photo</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Upload a cookbook photo and we&apos;ll extract the recipe text for you to review.
+          Upload a cookbook photo and we&apos;ll extract the recipe automatically.
         </p>
       </div>
 
-      {toast ? (
-        <div
-          className={
-            "mb-4 rounded-2xl px-4 py-3 text-sm font-semibold " +
-            (toast.type === "success"
-              ? "border border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200"
-              : "border border-rose-100 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200")
-          }
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+        {/* Hidden title override — optional, user can edit on recipe page after */}
+        <input type="hidden" name="title" value="" />
+
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-800 dark:bg-slate-950/60">
+          <input
+            id="photo-upload"
+            type="file"
+            accept="image/*,image/heic,image/heif"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={isLoading}
+          />
+          <label
+            htmlFor="photo-upload"
+            className={`inline-flex cursor-pointer items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-emerald-700"
+              }`}
+          >
+            {file ? "Change Photo" : "Choose Photo"}
+          </label>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            JPG, PNG or HEIC. Use a clear, well-lit photo.
+          </p>
+        </div>
+
+        {previewUrl && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt="Recipe photo preview" className="max-h-72 w-full object-cover" />
+          </div>
+        )}
+
+        {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+
+        {isConverting && (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Converting HEIC photo…</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={!file || isLoading}
+          className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
         >
-          {toast.message}
-        </div>
-      ) : null}
+          {isPending ? "Extracting recipe…" : "Extract Recipe"}
+        </button>
 
-      <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
-            <input
-              id="photo-upload"
-              type="file"
-              accept="image/*,image/heic,image/heif"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <label
-              htmlFor="photo-upload"
-              className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
-            >
-              Add Photo
-            </label>
-            <p className="mt-3">Upload a clear, well-lit photo.</p>
-          </div>
-
-          {previewUrl ? (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={previewUrl} alt="OCR preview" className="h-56 w-full object-cover" />
-            </div>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={handleRunOcr}
-            disabled={!canRun || Boolean(error)}
-            className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
-          >
-            {progress?.status === "complete" ? "Re-import" : "Import"}
-          </button>
-
-          {isConverting ? (
-            <div className="text-xs text-slate-500 dark:text-slate-400">Converting HEIC photo...</div>
-          ) : null}
-
-          {progress ? (
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              {progress.status} {Math.round(progress.progress * 100)}%
-            </div>
-          ) : null}
-
-          {error ? <div className="text-xs text-rose-500 dark:text-rose-300">{error}</div> : null}
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input type="hidden" name="ocrText" value={ocrText} />
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="ocr-title">
-              Recipe Title
-            </label>
-            <input
-              id="ocr-title"
-              name="title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Optional override"
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Extracted Text</label>
-            <textarea
-              value={ocrText}
-              onChange={(event) => setOcrText(event.target.value)}
-              rows={10}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              placeholder="Extracted text will appear here. You can edit before saving."
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isPending || ocrText.length === 0}
-            className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-opacity disabled:opacity-50"
-          >
-            {isPending ? "Saving..." : "Create Recipe"}
-          </button>
-          {imageUrl ? (
-            <p className="text-xs text-slate-400 dark:text-slate-500">Source: {imageUrl}</p>
-          ) : null}
-        </form>
-      </div>
+        {isPending && (
+          <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+            Reading your photo — this takes a few seconds…
+          </p>
+        )}
+      </form>
     </section>
   );
 }
