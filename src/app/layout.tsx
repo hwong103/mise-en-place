@@ -37,6 +37,7 @@ const navItems = [
   { href: "/recipes", label: "Recipes" },
   { href: "/planner", label: "Planner" },
   { href: "/shopping", label: "Shopping" },
+  { href: "/cellar", label: "Cellar" },
 ];
 
 export default function RootLayout({

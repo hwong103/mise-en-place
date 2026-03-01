@@ -22,6 +22,7 @@ model Household {
   mealPlans         MealPlan[]
   recipes           Recipe[]
   shoppingListItems ShoppingListItem[]
+  wines             Wine[]
 }
 
 model User {
@@ -115,6 +116,57 @@ enum Role {
 enum MealType {
   BREAKFAST
   LUNCH
-  DINNER
   SNACK
+  DINNER
+}
+
+model Wine {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id])
+
+  // Core identity
+  name        String
+  producer    String?
+  vintage     Int?               // year e.g. 2021
+  grapes      String[]           // e.g. ["Shiraz", "Cabernet"]
+  region      String?            // e.g. "Barossa Valley"
+  country     String?
+  type        WineType           @default(RED)
+
+  // Personal
+  rating      Int?               // 1–10
+  tastingNotes String?
+  triedAt     DateTime?          // when you had it
+
+  // Location (where you tried it)
+  locationName    String?        // e.g. "Icebergs Dining Room"
+  locationAddress String?
+  locationLat     Float?
+  locationLng     Float?
+
+  // Photo / image
+  imageUrl    String?
+
+  // Dan Murphy's pricing
+  danMurphysProductId  String?
+  danMurphysUrl        String?
+  danMurphysPrice      Float?
+  danMurphysPriceAt    DateTime?  // when price was last fetched
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([householdId, type])
+  @@index([householdId, createdAt])
+}
+
+enum WineType {
+  RED
+  WHITE
+  SPARKLING
+  ROSE
+  DESSERT
+  FORTIFIED
+  OTHER
 }
