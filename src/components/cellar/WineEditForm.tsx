@@ -82,24 +82,41 @@ export default function WineEditForm({
         if (googleKey) {
             try {
                 const res = await fetch(
-                    `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
-                    `?input=${encodeURIComponent(query)}` +
-                    `&types=establishment` +
-                    `&language=en` +
-                    `&key=${googleKey}`,
-                    { headers: { Accept: "application/json" } }
+                    "https://places.googleapis.com/v1/places:autocomplete",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Goog-Api-Key": googleKey,
+                        },
+                        body: JSON.stringify({
+                            input: query,
+                            includedPrimaryTypes: ["restaurant", "bar", "food", "establishment"],
+                            languageCode: "en",
+                        }),
+                    }
                 );
                 const data = await res.json();
 
-                if (data.status === "OK" && data.predictions?.length > 0) {
-                    const googleSuggestions: NominatimResult[] = data.predictions
+                type GooglePrediction = {
+                    placeId?: string;
+                    text?: { text?: string };
+                    structuredFormat?: { mainText?: { text?: string } };
+                };
+
+                const predictions: GooglePrediction[] = data.suggestions
+                    ?.map((s: { placePrediction?: GooglePrediction }) => s.placePrediction)
+                    .filter(Boolean) ?? [];
+
+                if (predictions.length > 0) {
+                    const googleSuggestions: NominatimResult[] = predictions
                         .slice(0, 5)
-                        .map((p: { description: string; place_id: string; structured_formatting?: { main_text?: string } }) => ({
-                            display_name: p.description,
+                        .map((p) => ({
+                            display_name: p.text?.text ?? "",
                             lat: "",
                             lon: "",
-                            name: p.structured_formatting?.main_text ?? p.description.split(",")[0],
-                            place_id: p.place_id,
+                            name: p.structuredFormat?.mainText?.text ?? p.text?.text?.split(",")[0] ?? "",
+                            place_id: p.placeId,
                         }));
                     setSuggestions(googleSuggestions);
                     setShowSuggestions(true);
@@ -108,7 +125,7 @@ export default function WineEditForm({
             } catch { /* fall through to Nominatim */ }
         }
 
-        // Fallback: Nominatim for plain addresses
+        // Fallback: Nominatim for plain addresses when no Google key or Google returns nothing
         try {
             const res = await fetch(
                 `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
@@ -144,21 +161,25 @@ export default function WineEditForm({
         if (result.place_id && googleKey) {
             try {
                 const res = await fetch(
-                    `https://maps.googleapis.com/maps/api/place/details/json` +
-                    `?place_id=${result.place_id}` +
-                    `&fields=geometry` +
-                    `&key=${googleKey}`
+                    `https://places.googleapis.com/v1/places/${result.place_id}`,
+                    {
+                        headers: {
+                            "X-Goog-Api-Key": googleKey,
+                            "X-Goog-FieldMask": "location",
+                        },
+                    }
                 );
                 const data = await res.json();
-                const loc = data.result?.geometry?.location;
+                const loc = data.location;
                 if (loc) {
-                    setLat(loc.lat);
-                    setLng(loc.lng);
+                    setLat(loc.latitude);   // new API: "latitude" not "lat"
+                    setLng(loc.longitude);  // new API: "longitude" not "lng"
                     return;
                 }
             } catch { /* fall through */ }
         }
 
+        // Fallback: use Nominatim lat/lng if available (non-Google path)
         if (result.lat && result.lon) {
             setLat(Number(result.lat));
             setLng(Number(result.lon));
