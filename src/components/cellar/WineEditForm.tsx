@@ -8,9 +8,11 @@ const WINE_TYPES = ["RED", "WHITE", "SPARKLING", "ROSE", "DESSERT", "FORTIFIED",
 export default function WineEditForm({
     wine,
     updateAction,
+    mode = "edit",
 }: {
     wine: Wine;
     updateAction: (fd: FormData) => Promise<void>;
+    mode?: "photo" | "url" | "manual" | "edit";
 }) {
     const [locationAddress, setLocationAddress] = useState(wine.locationAddress ?? "");
     const [lat, setLat] = useState<number | null>(wine.locationLat ?? null);
@@ -35,9 +37,14 @@ export default function WineEditForm({
     return (
         <div className="mx-auto max-w-2xl space-y-6">
             <div>
-                <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">Review Wine</h1>
+                <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
+                    {mode === "manual" ? "Log a Wine" : "Review Wine"}
+                </h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Groq read your label — review and fill in the rest.
+                    {mode === "photo" && "Groq read your label — review and fill in the rest."}
+                    {mode === "url" && "Groq extracted details from the URL — review and fill in the rest."}
+                    {mode === "manual" && "Fill in what you know. You can always edit later."}
+                    {mode === "edit" && "Edit wine details."}
                 </p>
             </div>
 

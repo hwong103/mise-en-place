@@ -114,3 +114,75 @@ export async function fetchDanMurphysPrice(wineName: string, producer?: string):
         return null;
     }
 }
+
+export async function extractWineFromUrlViaGroq(url: string): Promise<WineVisionResult | null> {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new Error("GROQ_API_KEY is not set");
+
+    // Fetch the page text
+    let pageText = "";
+    try {
+        const response = await fetch(url, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            signal: AbortSignal.timeout(8000),
+        });
+        if (!response.ok) return null;
+        const html = await response.text();
+        // Strip tags, collapse whitespace, truncate to ~4000 chars for the prompt
+        pageText = html
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 4000);
+    } catch {
+        return null;
+    }
+
+    if (!pageText) return null;
+
+    const prompt = `Extract wine details from this webpage text and return ONLY a JSON object — no markdown, no explanation:
+
+{
+  "name": "Wine name",
+  "producer": "Producer or winery",
+  "vintage": 2021,
+  "grapes": ["Shiraz"],
+  "region": "Barossa Valley",
+  "country": "Australia",
+  "type": "RED"
+}
+
+type must be one of: RED, WHITE, SPARKLING, ROSE, DESSERT, FORTIFIED, OTHER
+Omit any field you cannot find. Return ONLY the JSON.
+
+Webpage text:
+${pageText}`;
+
+    try {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "llama-3.3-70b-versatile", // text model — faster + cheaper than vision for URL extraction
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.1,
+                max_tokens: 512,
+            }),
+        });
+
+        if (!response.ok) return null;
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (!content) return null;
+
+        const cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+        return JSON.parse(cleaned) as WineVisionResult;
+    } catch {
+        return null;
+    }
+}

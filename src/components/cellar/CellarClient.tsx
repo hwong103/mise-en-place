@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { createWineFromPhoto } from "@/app/(dashboard)/cellar/actions";
+import { Wine } from "@prisma/client";
+import { createWineFromPhoto, createWineFromUrl, createWineManually } from "@/app/(dashboard)/cellar/actions";
+
+// Types
+type WineSummary = {
+    id: string; name: string; producer?: string | null;
+    vintage?: number | null; grapes: string[];
+    region?: string | null; country?: string | null;
+    type: string; rating?: number | null;
+    imageUrl?: string | null; locationName?: string | null;
+    danMurphysPrice?: number | null; danMurphysPriceAt?: Date | null;
+};
 
 const WINE_TYPE_LABELS: Record<string, string> = {
     RED: "Red", WHITE: "White", SPARKLING: "Sparkling",
@@ -19,15 +30,6 @@ const WINE_TYPE_COLORS: Record<string, string> = {
     OTHER: "bg-slate-200 dark:bg-slate-700",
 };
 
-type WineSummary = {
-    id: string; name: string; producer?: string | null;
-    vintage?: number | null; grapes: string[];
-    region?: string | null; country?: string | null;
-    type: string; rating?: number | null;
-    imageUrl?: string | null; locationName?: string | null;
-    danMurphysPrice?: number | null; danMurphysPriceAt?: Date | null;
-};
-
 const fileToBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -39,7 +41,77 @@ const fileToBase64 = (file: File): Promise<string> =>
 export default function CellarClient({ wines }: { wines: WineSummary[] }) {
     const [query, setQuery] = useState("");
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [urlInput, setUrlInput] = useState("");
+    const [urlError, setUrlError] = useState<string | null>(null);
+    const [pendingMode, setPendingMode] = useState<"photo" | "url" | "manual" | null>(null);
     const [isPending, startTransition] = useTransition();
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const pickerRef = useRef<HTMLDivElement>(null);
+
+    const isLoading = isPending;
+
+    // Click outside handler
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+                setPickerOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setPickerOpen(false);
+        setPendingMode("photo");
+        const base64 = await fileToBase64(file);
+        const formData = new FormData();
+        formData.set("base64Image", base64);
+        formData.set("mimeType", file.type || "image/jpeg");
+        startTransition(async () => {
+            const result = await createWineFromPhoto(formData);
+            if (result?.error) {
+                setUrlError(result.error);
+                setPendingMode(null);
+                setPickerOpen(true);
+            }
+        });
+    };
+
+    const handleUrlSubmit = () => {
+        if (!urlInput.trim()) return;
+        setUrlError(null);
+        setPendingMode("url");
+        setPickerOpen(false);
+        const formData = new FormData();
+        formData.set("url", urlInput.trim());
+        startTransition(async () => {
+            const result = await createWineFromUrl(formData);
+            if (result?.error) {
+                setUrlError(result.error);
+                setPendingMode(null);
+                setPickerOpen(true);
+            }
+        });
+    };
+
+    const handleManual = () => {
+        setPickerOpen(false);
+        setPendingMode("manual");
+        startTransition(async () => {
+            await createWineManually();
+        });
+    };
+
+    // Picker loading label
+    const loadingLabel =
+        pendingMode === "photo" ? "Reading label…" :
+            pendingMode === "url" ? "Fetching URL…" :
+                pendingMode === "manual" ? "Opening form…" : "";
 
     const filtered = wines.filter((w) => {
         const q = query.toLowerCase();
@@ -52,24 +124,11 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
         return matchesQuery && matchesType;
     });
 
-    // Group by type
     const grouped = filtered.reduce<Record<string, WineSummary[]>>((acc, wine) => {
         if (!acc[wine.type]) acc[wine.type] = [];
         acc[wine.type].push(wine);
         return acc;
     }, {});
-
-    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const base64 = await fileToBase64(file);
-        const formData = new FormData();
-        formData.set("base64Image", base64);
-        formData.set("mimeType", file.type || "image/jpeg");
-        startTransition(async () => {
-            await createWineFromPhoto(formData);
-        });
-    };
 
     const types = Object.keys(WINE_TYPE_LABELS);
 
@@ -86,11 +145,93 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                     </p>
                 </div>
 
-                {/* Photo import button */}
-                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:bg-emerald-700 ${isPending ? "opacity-60 cursor-not-allowed" : ""}`}>
-                    <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={isPending} />
-                    {isPending ? "Reading label…" : "📷 Log a Wine"}
-                </label>
+                {/* Log a Wine button + picker */}
+                <div className="relative" ref={pickerRef}>
+                    <button
+                        type="button"
+                        onClick={() => setPickerOpen((o) => !o)}
+                        disabled={isLoading}
+                        className={`inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 ${isLoading ? "opacity-60 cursor-not-allowed" : ""}`}
+                    >
+                        {isLoading ? (
+                            <span className="flex items-center gap-2">
+                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                {loadingLabel}
+                            </span>
+                        ) : (
+                            <>
+                                🍷 Log a Wine
+                                <span className={`text-[10px] transition-transform ${pickerOpen ? "rotate-180" : ""}`}>▼</span>
+                            </>
+                        )}
+                    </button>
+
+                    {pickerOpen && (
+                        <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                            {/* Photo option */}
+                            <label className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handlePhotoUpload}
+                                    className="hidden"
+                                />
+                                <span className="text-xl">📷</span>
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Photo</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Snap the label, Groq fills in the details</p>
+                                </div>
+                            </label>
+
+                            <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+
+                            {/* URL option */}
+                            <div className="px-3 py-2.5">
+                                <div className="mb-2 flex items-center gap-3">
+                                    <span className="text-xl">🔗</span>
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">URL</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">Vivino, Wine Searcher, winery page</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        value={urlInput}
+                                        onChange={(e) => setUrlInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
+                                        placeholder="Paste link..."
+                                        className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleUrlSubmit}
+                                        disabled={!urlInput.trim()}
+                                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                                    >
+                                        Go
+                                    </button>
+                                </div>
+                                {urlError && <p className="mt-1.5 text-[10px] leading-tight text-rose-500">{urlError}</p>}
+                            </div>
+
+                            <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+
+                            {/* Manual option */}
+                            <button
+                                type="button"
+                                onClick={handleManual}
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                                <span className="text-xl">✏️</span>
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Manual</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Type in the details yourself</p>
+                                </div>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Search + type filters */}

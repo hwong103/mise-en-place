@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
-import { extractWineFromImageViaGroq, fetchDanMurphysPrice } from "@/lib/wine";
+import { extractWineFromImageViaGroq, extractWineFromUrlViaGroq, fetchDanMurphysPrice } from "@/lib/wine";
 import type { WineType } from "@prisma/client";
 
 // ─── Create wine from photo ──────────────────────────────────────────────────
@@ -40,7 +40,58 @@ export async function createWineFromPhoto(formData: FormData) {
     });
 
     revalidatePath("/cellar");
-    redirect(`/cellar/${wine.id}/edit`);
+    redirect(`/cellar/${wine.id}/edit?mode=photo`);
+}
+
+// ─── Create blank wine for manual entry ──────────────────────────────────────
+
+export async function createWineManually() {
+    const householdId = await getCurrentHouseholdId();
+
+    const wine = await prisma.wine.create({
+        data: {
+            householdId,
+            name: "New Wine",
+            grapes: [],
+            type: "RED",
+        },
+    });
+
+    revalidatePath("/cellar");
+    redirect(`/cellar/${wine.id}/edit?mode=manual`);
+}
+
+// ─── Create wine from URL ─────────────────────────────────────────────────────
+
+export async function createWineFromUrl(formData: FormData) {
+    const householdId = await getCurrentHouseholdId();
+    const url = formData.get("url")?.toString().trim();
+    if (!url) return { error: "No URL provided" };
+
+    const vision = await extractWineFromUrlViaGroq(url);
+    if (!vision) return { error: "Could not extract wine details from that URL." };
+
+    const dmPrice = await fetchDanMurphysPrice(vision.name, vision.producer);
+
+    const wine = await prisma.wine.create({
+        data: {
+            householdId,
+            name: vision.name,
+            producer: vision.producer ?? null,
+            vintage: vision.vintage ?? null,
+            grapes: vision.grapes ?? [],
+            region: vision.region ?? null,
+            country: vision.country ?? null,
+            type: (vision.type as WineType) ?? "RED",
+            danMurphysProductId: dmPrice?.productId ?? null,
+            danMurphysUrl: dmPrice?.url ?? null,
+            danMurphysPrice: dmPrice?.price ?? null,
+            danMurphysPriceAt: dmPrice ? new Date() : null,
+        },
+    });
+
+    revalidatePath("/cellar");
+    redirect(`/cellar/${wine.id}/edit?mode=url`);
 }
 
 // ─── Update wine (after photo import or manual edit) ─────────────────────────
