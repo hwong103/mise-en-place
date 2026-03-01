@@ -1,9 +1,27 @@
 "use client";
 
 import { Wine } from "@prisma/client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const WINE_TYPES = ["RED", "WHITE", "SPARKLING", "ROSE", "DESSERT", "FORTIFIED", "OTHER"];
+
+const todayString = () => new Date().toISOString().split("T")[0];
+
+type NominatimResult = {
+    display_name: string;
+    lat: string;
+    lon: string;
+    name?: string;
+    address?: {
+        amenity?: string;
+        road?: string;
+        suburb?: string;
+        city?: string;
+        town?: string;
+        country?: string;
+    };
+};
 
 export default function WineEditForm({
     wine,
@@ -14,58 +32,136 @@ export default function WineEditForm({
     updateAction: (fd: FormData) => Promise<void>;
     mode?: "photo" | "url" | "manual" | "edit";
 }) {
+    const router = useRouter();
+
+    // Fix 2: controlled type state so badges highlight reliably
+    const [selectedType, setSelectedType] = useState<string>(wine.type ?? "RED");
+
+    // Fix 3: controlled rating so we can show the live number
+    const [rating, setRating] = useState<number>(wine.rating ?? 7);
+
+    // Fix 4: location autocomplete state
+    const [locationQuery, setLocationQuery] = useState(
+        wine.locationName
+            ? wine.locationAddress
+                ? `${wine.locationName}, ${wine.locationAddress}`
+                : wine.locationName
+            : ""
+    );
+    const [locationName, setLocationName] = useState(wine.locationName ?? "");
     const [locationAddress, setLocationAddress] = useState(wine.locationAddress ?? "");
     const [lat, setLat] = useState<number | null>(wine.locationLat ?? null);
     const [lng, setLng] = useState<number | null>(wine.locationLng ?? null);
+    const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null);
 
-    // Geocode address on blur using browser Geocoding API (free, no key)
-    const geocodeAddress = async (address: string) => {
-        if (!address) return;
+    // Fix 5: default date to today if no value
+    const defaultDate = wine.triedAt
+        ? new Date(wine.triedAt).toISOString().split("T")[0]
+        : todayString();
+
+    // Close suggestions on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const searchLocation = async (query: string) => {
+        if (query.length < 3) { setSuggestions([]); return; }
         try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
                 { headers: { "Accept-Language": "en" } }
             );
-            const data = await response.json();
-            if (data[0]) {
-                setLat(Number(data[0].lat));
-                setLng(Number(data[0].lon));
-            }
+            const data: NominatimResult[] = await res.json();
+            setSuggestions(data);
+            setShowSuggestions(true);
         } catch { /* silent fail */ }
+    };
+
+    const handleLocationInput = (value: string) => {
+        setLocationQuery(value);
+        // Clear resolved values while user is still typing
+        setLocationName("");
+        setLocationAddress("");
+        setLat(null);
+        setLng(null);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => searchLocation(value), 350);
+    };
+
+    const handleSelectSuggestion = (result: NominatimResult) => {
+        // Use the amenity/place name if available, otherwise first part of display_name
+        const name = result.address?.amenity ?? result.name ?? result.display_name.split(",")[0];
+        const address = result.display_name;
+        setLocationName(name);
+        setLocationAddress(address);
+        setLocationQuery(result.display_name);
+        setLat(Number(result.lat));
+        setLng(Number(result.lon));
+        setSuggestions([]);
+        setShowSuggestions(false);
     };
 
     return (
         <div className="mx-auto max-w-2xl space-y-6">
-            <div>
-                <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
-                    {mode === "manual" ? "Log a Wine" : "Review Wine"}
-                </h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {mode === "photo" && "Groq read your label — review and fill in the rest."}
-                    {mode === "url" && "Groq extracted details from the URL — review and fill in the rest."}
-                    {mode === "manual" && "Fill in what you know. You can always edit later."}
-                    {mode === "edit" && "Edit wine details."}
-                </p>
+            {/* Fix 1: header with Cancel button */}
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
+                        {mode === "manual" ? "Log a Wine" : "Review Wine"}
+                    </h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {mode === "photo" && "Groq read your label — review and fill in the rest."}
+                        {mode === "url" && "Groq extracted details from the URL — review and fill in the rest."}
+                        {mode === "manual" && "Fill in what you know. You can always edit later."}
+                        {mode === "edit" && "Edit wine details."}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="shrink-0 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                    Cancel
+                </button>
             </div>
 
             <form action={updateAction} className="space-y-5">
                 <input type="hidden" name="id" value={wine.id} />
+                <input type="hidden" name="locationName" value={locationName} />
+                <input type="hidden" name="locationAddress" value={locationAddress} />
                 <input type="hidden" name="locationLat" value={lat ?? ""} />
                 <input type="hidden" name="locationLng" value={lng ?? ""} />
 
-                {/* Type selector */}
+                {/* Fix 2: controlled type badges */}
                 <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Type</label>
                     <div className="flex flex-wrap gap-2">
                         {WINE_TYPES.map((t) => (
-                            <label key={t} className="cursor-pointer">
-                                <input type="radio" name="type" value={t} defaultChecked={wine.type === t} className="sr-only" />
-                                <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition-colors has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50 has-[:checked]:text-emerald-700 dark:border-slate-700 dark:text-slate-300 dark:has-[:checked]:border-emerald-500 dark:has-[:checked]:bg-emerald-950/40 dark:has-[:checked]:text-emerald-300">
-                                    {t.charAt(0) + t.slice(1).toLowerCase()}
-                                </span>
-                            </label>
+                            <button
+                                key={t}
+                                type="button"
+                                onClick={() => setSelectedType(t)}
+                                className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors
+                  ${selectedType === t
+                                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                        : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                    }`}
+                            >
+                                {t.charAt(0) + t.slice(1).toLowerCase()}
+                            </button>
                         ))}
                     </div>
+                    {/* Hidden input carries the value to the server action */}
+                    <input type="hidden" name="type" value={selectedType} />
                 </div>
 
                 {/* Name + Vintage */}
@@ -79,7 +175,7 @@ export default function WineEditForm({
                 <Field
                     label="Grapes (comma separated)"
                     name="grapes"
-                    defaultValue={wine.grapes?.join(", ") ?? ""}
+                    defaultValue={(wine.grapes as string[] | undefined)?.join(", ") ?? ""}
                     placeholder="Shiraz, Grenache"
                 />
 
@@ -88,49 +184,84 @@ export default function WineEditForm({
                     <Field label="Country" name="country" defaultValue={wine.country ?? ""} />
                 </div>
 
-                {/* Rating */}
-                <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Your Rating (1–10)
-                    </label>
+                {/* Fix 3: rating slider with live number */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            Your Rating
+                        </label>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-sm font-black text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            {rating}
+                        </span>
+                    </div>
                     <input
-                        type="range" name="rating" min={1} max={10}
-                        defaultValue={wine.rating ?? 7}
+                        type="range"
+                        name="rating"
+                        min={1}
+                        max={10}
+                        value={rating}
+                        onChange={(e) => setRating(Number(e.target.value))}
                         className="w-full accent-emerald-600"
                     />
+                    <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>1</span>
+                        <span>5</span>
+                        <span>10</span>
+                    </div>
                 </div>
 
                 <Field label="Tasting Notes" name="tastingNotes" defaultValue={wine.tastingNotes ?? ""} multiline />
 
-                {/* Date tried */}
-                <Field label="Date Tried" name="triedAt" type="date"
-                    defaultValue={wine.triedAt ? wine.triedAt.toISOString().split("T")[0] : ""} />
+                {/* Fix 5: default date to today */}
+                <Field label="Date Tried" name="triedAt" type="date" defaultValue={defaultDate} />
 
-                {/* Location */}
+                {/* Fix 4: location autocomplete */}
                 <div className="space-y-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Where did you try it?</p>
-                    <Field label="Venue Name" name="locationName" defaultValue={wine.locationName ?? ""} placeholder="Icebergs Dining Room" />
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Address</label>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Where did you try it?
+                    </p>
+                    <div className="relative" ref={suggestionsRef}>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-400">
+                            Search venue or address
+                        </label>
                         <input
-                            name="locationAddress"
-                            value={locationAddress}
-                            onChange={(e) => setLocationAddress(e.target.value)}
-                            onBlur={(e) => geocodeAddress(e.target.value)}
-                            placeholder="1 Notts Ave, Bondi Beach NSW 2026"
+                            type="text"
+                            value={locationQuery}
+                            onChange={(e) => handleLocationInput(e.target.value)}
+                            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                            placeholder="Icebergs Dining Room, Bondi Beach…"
                             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         />
-                        {lat && lng ? (
-                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                📍 Located: {lat.toFixed(4)}, {lng.toFixed(4)}
+                        {showSuggestions && suggestions.length > 0 && (
+                            <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                                {suggestions.map((s, i) => {
+                                    const name = s.address?.amenity ?? s.name ?? s.display_name.split(",")[0];
+                                    const sub = s.display_name.split(",").slice(1, 3).join(",").trim();
+                                    return (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => handleSelectSuggestion(s)}
+                                            className="flex w-full flex-col px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{name}</span>
+                                            {sub && <span className="text-xs text-slate-400">{sub}</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        {lat && lng && locationName && (
+                            <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                                📍 {locationName}
                             </p>
-                        ) : null}
+                        )}
                     </div>
                 </div>
 
                 <button
                     type="submit"
-                    className="w-full rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
+                    className="w-full rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700"
                 >
                     Save to Cellar
                 </button>
