@@ -66,7 +66,9 @@ export default function WineDetail({
             <div className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Dan Murphy&apos;s Price</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                            {wine.danMurphysSource ?? "Best Price Found"}
+                        </p>
                         {wine.danMurphysPrice ? (
                             <p className="mt-0.5 text-2xl font-black text-emerald-600 dark:text-emerald-400">
                                 ${wine.danMurphysPrice.toFixed(2)}

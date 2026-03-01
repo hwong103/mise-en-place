@@ -30,14 +30,15 @@ export default async function CellarPage() {
     if (staleWines.length > 0) {
         void Promise.all(
             staleWines.slice(0, 5).map(async (w) => {  // max 5 at a time
-                const { fetchDanMurphysPrice } = await import("@/lib/wine");
-                const result = await fetchDanMurphysPrice(w.name, w.producer ?? undefined);
+                const { fetchBottlePrice } = await import("@/lib/wine");
+                const result = await fetchBottlePrice(w.name, w.producer ?? undefined, w.vintage ?? undefined);
                 if (!result) return;
                 await prisma.wine.update({
                     where: { id: w.id },
                     data: {
                         danMurphysPrice: result.price,
                         danMurphysUrl: result.url,
+                        danMurphysSource: result.source,
                         danMurphysPriceAt: new Date(),
                     },
                 });

@@ -13,6 +13,7 @@ type NominatimResult = {
     lat: string;
     lon: string;
     name?: string;
+    place_id?: string;
     address?: {
         amenity?: string;
         road?: string;
@@ -75,6 +76,39 @@ export default function WineEditForm({
 
     const searchLocation = async (query: string) => {
         if (query.length < 3) { setSuggestions([]); return; }
+
+        const googleKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_KEY;
+
+        if (googleKey) {
+            try {
+                const res = await fetch(
+                    `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
+                    `?input=${encodeURIComponent(query)}` +
+                    `&types=establishment` +
+                    `&language=en` +
+                    `&key=${googleKey}`,
+                    { headers: { Accept: "application/json" } }
+                );
+                const data = await res.json();
+
+                if (data.status === "OK" && data.predictions?.length > 0) {
+                    const googleSuggestions: NominatimResult[] = data.predictions
+                        .slice(0, 5)
+                        .map((p: { description: string; place_id: string; structured_formatting?: { main_text?: string } }) => ({
+                            display_name: p.description,
+                            lat: "",
+                            lon: "",
+                            name: p.structured_formatting?.main_text ?? p.description.split(",")[0],
+                            place_id: p.place_id,
+                        }));
+                    setSuggestions(googleSuggestions);
+                    setShowSuggestions(true);
+                    return;
+                }
+            } catch { /* fall through to Nominatim */ }
+        }
+
+        // Fallback: Nominatim for plain addresses
         try {
             const res = await fetch(
                 `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
@@ -97,17 +131,38 @@ export default function WineEditForm({
         debounceRef.current = setTimeout(() => searchLocation(value), 350);
     };
 
-    const handleSelectSuggestion = (result: NominatimResult) => {
-        // Use the amenity/place name if available, otherwise first part of display_name
+    const handleSelectSuggestion = async (result: NominatimResult) => {
         const name = result.address?.amenity ?? result.name ?? result.display_name.split(",")[0];
-        const address = result.display_name;
         setLocationName(name);
-        setLocationAddress(address);
+        setLocationAddress(result.display_name);
         setLocationQuery(result.display_name);
-        setLat(Number(result.lat));
-        setLng(Number(result.lon));
         setSuggestions([]);
         setShowSuggestions(false);
+
+        const googleKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_KEY;
+
+        if (result.place_id && googleKey) {
+            try {
+                const res = await fetch(
+                    `https://maps.googleapis.com/maps/api/place/details/json` +
+                    `?place_id=${result.place_id}` +
+                    `&fields=geometry` +
+                    `&key=${googleKey}`
+                );
+                const data = await res.json();
+                const loc = data.result?.geometry?.location;
+                if (loc) {
+                    setLat(loc.lat);
+                    setLng(loc.lng);
+                    return;
+                }
+            } catch { /* fall through */ }
+        }
+
+        if (result.lat && result.lon) {
+            setLat(Number(result.lat));
+            setLng(Number(result.lon));
+        }
     };
 
     return (

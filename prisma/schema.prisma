@@ -152,6 +152,7 @@ model Wine {
   danMurphysProductId  String?
   danMurphysUrl        String?
   danMurphysPrice      Float?
+  danMurphysSource     String?
   danMurphysPriceAt    DateTime?  // when price was last fetched
 
   createdAt   DateTime  @default(now())

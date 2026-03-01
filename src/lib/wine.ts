@@ -6,6 +6,7 @@ export type WineVisionResult = {
     region?: string;
     country?: string;
     type?: "RED" | "WHITE" | "SPARKLING" | "ROSE" | "DESSERT" | "FORTIFIED" | "OTHER";
+    imageUrl?: string;
 };
 
 const WINE_VISION_PROMPT = `You are a wine label reading assistant. Extract wine details from this label photo and return ONLY a JSON object — no markdown, no explanation, just raw JSON:
@@ -70,46 +71,65 @@ export async function extractWineFromImageViaGroq(
     }
 }
 
-type DanMurphysResult = {
+type BottlePriceResult = {
     productId: string;
     url: string;
     price: number;
+    source: string;
 } | null;
 
-export async function fetchDanMurphysPrice(wineName: string, producer?: string): Promise<DanMurphysResult> {
-    const query = encodeURIComponent([producer, wineName].filter(Boolean).join(" "));
+export async function fetchBottlePrice(
+    wineName: string,
+    producer?: string,
+    vintage?: number
+): Promise<BottlePriceResult> {
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) return null;
+
+    const query = [producer, wineName, vintage?.toString()]
+        .filter(Boolean)
+        .join(" ");
 
     try {
-        // Dan Murphy's search API (public endpoint, no auth required)
-        const response = await fetch(
-            `https://api.danmurphys.com.au/apis/ui/v1/product/search?q=${query}&pageSize=1`,
-            {
-                headers: {
-                    "User-Agent": "Mozilla/5.0",
-                    Accept: "application/json",
-                },
-                next: { revalidate: 0 },
-            }
-        );
+        const url = new URL("https://serpapi.com/search");
+        url.searchParams.set("engine", "google_shopping");
+        url.searchParams.set("q", query);
+        url.searchParams.set("gl", "au");
+        url.searchParams.set("hl", "en");
+        url.searchParams.set("num", "5");
+        url.searchParams.set("api_key", apiKey);
+
+        const response = await fetch(url.toString(), {
+            next: { revalidate: 0 },
+        });
 
         if (!response.ok) return null;
 
         const data = await response.json();
-        const product = data?.hits?.[0];
-        if (!product) return null;
+        const results: Array<{
+            title: string;
+            price: string;
+            link: string;
+            source: string;
+            product_id?: string;
+        }> = data.shopping_results ?? [];
 
-        const price =
-            product.priceValue ??
-            product.prices?.promoPriceValue ??
-            product.prices?.retailerPriceValue;
+        if (results.length === 0) return null;
 
-        if (!price) return null;
+        for (const result of results) {
+            const priceMatch = result.price?.replace(/[^0-9.]/g, "");
+            const price = priceMatch ? Number(priceMatch) : NaN;
+            if (!isNaN(price) && price > 0) {
+                return {
+                    productId: result.product_id ?? result.link,
+                    url: result.link,
+                    price,
+                    source: result.source ?? "Unknown",
+                };
+            }
+        }
 
-        return {
-            productId: String(product.id ?? product.productId ?? ""),
-            url: `https://www.danmurphys.com.au/product/${product.id}`,
-            price: Number(price),
-        };
+        return null;
     } catch {
         return null;
     }
@@ -121,6 +141,8 @@ export async function extractWineFromUrlViaGroq(url: string): Promise<WineVision
 
     // Fetch the page text
     let pageText = "";
+    let scrapedImageUrl: string | undefined;
+
     try {
         const response = await fetch(url, {
             headers: { "User-Agent": "Mozilla/5.0" },
@@ -128,6 +150,38 @@ export async function extractWineFromUrlViaGroq(url: string): Promise<WineVision
         });
         if (!response.ok) return null;
         const html = await response.text();
+
+        // Extract the best image URL from the page
+        try {
+            const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+            if (ogMatch?.[1]) {
+                scrapedImageUrl = ogMatch[1];
+            }
+
+            if (!scrapedImageUrl) {
+                const imgMatches = [...html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+                for (const match of imgMatches) {
+                    const src = match[1];
+                    if (
+                        src.startsWith("http") &&
+                        (src.includes("product") || src.includes("wine") || src.includes("bottle")) &&
+                        !src.includes("icon") &&
+                        !src.includes("logo") &&
+                        !src.includes("badge")
+                    ) {
+                        scrapedImageUrl = src;
+                        break;
+                    }
+                }
+            }
+
+            if (scrapedImageUrl && !scrapedImageUrl.startsWith("http")) {
+                const base = new URL(url);
+                scrapedImageUrl = new URL(scrapedImageUrl, base.origin).toString();
+            }
+        } catch { /* silent fail */ }
+
         // Strip tags, collapse whitespace, truncate to ~4000 chars for the prompt
         pageText = html
             .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -181,7 +235,9 @@ ${pageText}`;
         if (!content) return null;
 
         const cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-        return JSON.parse(cleaned) as WineVisionResult;
+        const result = JSON.parse(cleaned) as WineVisionResult;
+        if (scrapedImageUrl) result.imageUrl = scrapedImageUrl;
+        return result;
     } catch {
         return null;
     }
