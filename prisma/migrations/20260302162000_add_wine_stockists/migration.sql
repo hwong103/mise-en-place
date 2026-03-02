@@ -1,0 +1,2 @@
+ALTER TABLE "Wine"
+ADD COLUMN IF NOT EXISTS "stockists" JSONB;

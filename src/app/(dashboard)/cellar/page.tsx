@@ -2,6 +2,25 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import CellarClient from "@/components/cellar/CellarClient";
+import type { StockistResult } from "@/lib/wine";
+
+const parseStockists = (value: unknown): StockistResult[] => {
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is StockistResult =>
+        Boolean(
+            entry
+            && typeof entry === "object"
+            && "source" in entry
+            && "price" in entry
+            && "url" in entry
+            && "fetchedAt" in entry
+            && typeof entry.source === "string"
+            && typeof entry.price === "number"
+            && typeof entry.url === "string"
+            && typeof entry.fetchedAt === "string"
+        )
+    );
+};
 
 export default async function CellarPage() {
     const householdId = await getCurrentHouseholdId();
@@ -14,7 +33,7 @@ export default async function CellarPage() {
             grapes: true, region: true, country: true, type: true,
             rating: true, imageUrl: true, locationName: true,
             danMurphysPrice: true, danMurphysPriceAt: true,
-            danMurphysProductId: true,
+            danMurphysProductId: true, stockists: true,
         },
     });
 
@@ -30,15 +49,17 @@ export default async function CellarPage() {
     if (staleWines.length > 0) {
         void Promise.all(
             staleWines.slice(0, 5).map(async (w) => {  // max 5 at a time
-                const { fetchBottlePrice } = await import("@/lib/wine");
-                const result = await fetchBottlePrice(w.name, w.producer ?? undefined, w.vintage ?? undefined);
-                if (!result) return;
+                const { fetchAllStockists } = await import("@/lib/wine");
+                const stockists = await fetchAllStockists(w.name, w.producer ?? undefined, w.vintage ?? undefined);
+                if (!stockists.length) return;
+                const cheapest = stockists[0];
                 await prisma.wine.update({
                     where: { id: w.id },
                     data: {
-                        danMurphysPrice: result.price,
-                        danMurphysUrl: result.url,
-                        danMurphysSource: result.source,
+                        stockists,
+                        danMurphysPrice: cheapest.price,
+                        danMurphysUrl: cheapest.url,
+                        danMurphysSource: cheapest.source,
                         danMurphysPriceAt: new Date(),
                     },
                 });
@@ -46,5 +67,10 @@ export default async function CellarPage() {
         );
     }
 
-    return <CellarClient wines={wines} />;
+    const winesForClient = wines.map((wine) => ({
+        ...wine,
+        stockists: parseStockists(wine.stockists),
+    }));
+
+    return <CellarClient wines={winesForClient} />;
 }

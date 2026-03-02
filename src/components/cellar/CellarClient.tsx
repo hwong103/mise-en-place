@@ -13,6 +13,7 @@ type WineSummary = {
     type: string; rating?: number | null;
     imageUrl?: string | null; locationName?: string | null;
     danMurphysPrice?: number | null; danMurphysPriceAt?: Date | null;
+    stockists?: Array<{ source: string; price: number; url: string; fetchedAt: string }> | null;
 };
 
 const WINE_TYPE_LABELS: Record<string, string> = {
@@ -304,11 +305,18 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                                         {wine.locationName}
                                                     </span>
                                                 ) : null}
-                                                {wine.danMurphysPrice ? (
-                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                                                        ${wine.danMurphysPrice.toFixed(2)}
-                                                    </span>
-                                                ) : null}
+                                                {(() => {
+                                                    const stockists = Array.isArray(wine.stockists) ? wine.stockists : [];
+                                                    const cheapest = stockists.length > 0
+                                                        ? stockists.reduce((a, b) => (a.price < b.price ? a : b))
+                                                        : null;
+                                                    const price = cheapest?.price ?? wine.danMurphysPrice;
+                                                    return price ? (
+                                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                            from ${price.toFixed(2)}
+                                                        </span>
+                                                    ) : null;
+                                                })()}
                                             </div>
                                         </div>
 

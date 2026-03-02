@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Wine } from "@prisma/client";
 import PriceCard from "@/components/cellar/PriceCard";
+import type { StockistResult } from "@/lib/wine";
 
 const WINE_TYPE_COLORS: Record<string, string> = {
     RED: "bg-rose-900", WHITE: "bg-amber-100 dark:bg-amber-900",
@@ -12,15 +13,16 @@ const WINE_TYPE_COLORS: Record<string, string> = {
 
 export default function WineDetail({
     wine,
+    stockists,
     deleteAction,
     refreshPriceAction,
 }: {
     wine: Wine;
+    stockists: StockistResult[];
     deleteAction: (fd: FormData) => Promise<void>;
     refreshPriceAction: (fd: FormData) => Promise<{
         success?: boolean;
-        source?: string;
-        price?: number;
+        stockists?: StockistResult[];
         error?: string;
     } | undefined>;
 }) {
@@ -66,10 +68,11 @@ export default function WineDetail({
             {/* Price */}
             <PriceCard
                 wineId={wine.id}
-                initialPrice={wine.danMurphysPrice}
-                initialUrl={wine.danMurphysUrl}
-                initialSource={wine.danMurphysSource ?? null}
-                initialPriceAt={wine.danMurphysPriceAt}
+                initialStockists={stockists}
+                legacyPrice={wine.danMurphysPrice}
+                legacyUrl={wine.danMurphysUrl}
+                legacySource={wine.danMurphysSource ?? null}
+                legacyPriceAt={wine.danMurphysPriceAt}
                 refreshAction={refreshPriceAction}
             />
 

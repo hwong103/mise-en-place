@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
-import { extractWineFromImageViaGroq, extractWineFromUrlViaGroq, fetchBottlePrice } from "@/lib/wine";
+import { extractWineFromImageViaGroq, extractWineFromUrlViaGroq, fetchAllStockists } from "@/lib/wine";
 import type { WineType } from "@prisma/client";
 
 const isNextRedirectError = (error: unknown): error is { digest: string } =>
@@ -27,8 +27,8 @@ export async function createWineFromPhoto(formData: FormData) {
         const vision = await extractWineFromImageViaGroq(base64Image, mimeType);
         if (!vision) return { error: "Could not read label. Try a clearer photo." };
 
-        // Try to fetch Dan Murphy's price in the same request
-        const dmPrice = await fetchBottlePrice(vision.name, vision.producer, vision.vintage);
+        const stockists = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
+        const dmPrice = stockists[0];
 
         const wine = await prisma.wine.create({
             data: {
@@ -40,11 +40,12 @@ export async function createWineFromPhoto(formData: FormData) {
                 region: vision.region ?? null,
                 country: vision.country ?? null,
                 type: (vision.type as WineType) ?? "RED",
-                danMurphysProductId: dmPrice?.productId ?? null,
+                danMurphysProductId: dmPrice?.url ?? null,
                 danMurphysUrl: dmPrice?.url ?? null,
                 danMurphysPrice: dmPrice?.price ?? null,
                 danMurphysSource: dmPrice?.source ?? null,
                 danMurphysPriceAt: dmPrice ? new Date() : null,
+                stockists: stockists.length > 0 ? stockists : undefined,
             },
         });
 
@@ -86,7 +87,8 @@ export async function createWineFromUrl(formData: FormData) {
         const vision = await extractWineFromUrlViaGroq(url);
         if (!vision) return { error: "Could not extract wine details from that URL." };
 
-        const dmPrice = await fetchBottlePrice(vision.name, vision.producer, vision.vintage);
+        const stockists = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
+        const dmPrice = stockists[0];
 
         const wine = await prisma.wine.create({
             data: {
@@ -100,11 +102,12 @@ export async function createWineFromUrl(formData: FormData) {
                 type: (vision.type as WineType) ?? "RED",
                 imageUrl: vision.imageUrl ?? null,
                 tastingNotes: vision.tastingNotes ?? null,
-                danMurphysProductId: dmPrice?.productId ?? null,
+                danMurphysProductId: dmPrice?.url ?? null,
                 danMurphysUrl: dmPrice?.url ?? null,
                 danMurphysPrice: dmPrice?.price ?? null,
                 danMurphysSource: dmPrice?.source ?? null,
                 danMurphysPriceAt: dmPrice ? new Date() : null,
+                stockists: stockists.length > 0 ? stockists : undefined,
             },
         });
 
@@ -174,23 +177,23 @@ export async function refreshWinePrice(formData: FormData) {
     const wine = await prisma.wine.findFirst({ where: { id, householdId } });
     if (!wine) return { error: "Wine not found" };
 
-    const dmPrice = await fetchBottlePrice(wine.name, wine.producer ?? undefined, wine.vintage ?? undefined);
-    if (!dmPrice) {
-        console.info(`[cellar] No price found for wine ${wine.id} (${wine.name})`);
-        return { error: "No price found across all sources" };
-    }
+    const stockists = await fetchAllStockists(wine.name, wine.producer ?? undefined, wine.vintage ?? undefined);
+    if (!stockists.length) return { error: "No prices found across all sources" };
+
+    const cheapest = stockists[0];
 
     await prisma.wine.update({
         where: { id },
         data: {
-            danMurphysPrice: dmPrice.price,
-            danMurphysUrl: dmPrice.url,
-            danMurphysProductId: dmPrice.productId,
-            danMurphysSource: dmPrice.source,
+            stockists,
+            danMurphysPrice: cheapest.price,
+            danMurphysUrl: cheapest.url,
+            danMurphysProductId: cheapest.url,
+            danMurphysSource: cheapest.source,
             danMurphysPriceAt: new Date(),
         },
     });
 
     revalidatePath(`/cellar/${id}`);
-    return { success: true, source: dmPrice.source, price: dmPrice.price };
+    return { success: true, stockists };
 }
