@@ -958,13 +958,70 @@ const fetchBwsStockist = async (
     }
 };
 
+const fetchLegacySerpBestStockist = async (
+    wineName: string,
+    producer?: string,
+    vintage?: number
+): Promise<StockistResult[]> => {
+    const serpKey = process.env.SERPAPI_KEY;
+    if (!hasUsableApiKey(serpKey)) return [];
+
+    try {
+        const baseQuery = [producer, wineName, vintage?.toString()].filter(Boolean).join(" ");
+        const url = new URL("https://serpapi.com/search");
+        url.searchParams.set("engine", "google_shopping");
+        url.searchParams.set("q", `${baseQuery} wine Australia`);
+        url.searchParams.set("gl", "au");
+        url.searchParams.set("hl", "en");
+        url.searchParams.set("num", "8");
+        url.searchParams.set("api_key", serpKey);
+
+        const response = await fetch(url.toString(), {
+            signal: AbortSignal.timeout(8000),
+            next: { revalidate: 0 },
+        });
+        if (!response.ok) return [];
+
+        const data = await response.json();
+        const results: Array<{
+            price?: string;
+            extracted_price?: number;
+            link?: string;
+            source?: string;
+        }> = data.shopping_results ?? [];
+
+        const sorted = [...results].sort((a, b) => {
+            const aDm = /dan\s*murphy/i.test(a.source ?? "");
+            const bDm = /dan\s*murphy/i.test(b.source ?? "");
+            return Number(bDm) - Number(aDm);
+        });
+
+        const fetchedAt = new Date().toISOString();
+        for (const result of sorted) {
+            const price = result.extracted_price ?? parsePrice(result.price);
+            if (Number.isNaN(price) || price <= 0 || !result.link) continue;
+            return [{
+                source: result.source ?? "Google Shopping",
+                price,
+                url: result.link,
+                fetchedAt,
+            }];
+        }
+
+        return [];
+    } catch {
+        return [];
+    }
+};
+
 export async function fetchAllStockists(
     wineName: string,
     producer?: string,
     vintage?: number
 ): Promise<StockistResult[]> {
     const queryVariants = buildQueryVariants(wineName, producer, vintage);
-    const [serpShopping, serpOrganic, vivino, danMurphys, bws] = await Promise.all([
+    const [legacyBest, serpShopping, serpOrganic, vivino, danMurphys, bws] = await Promise.all([
+        fetchLegacySerpBestStockist(wineName, producer, vintage),
         fetchSerpShopping(wineName, producer, vintage),
         fetchSerpOrganic(wineName, producer, vintage),
         fetchVivinoStockists(wineName, producer, vintage),
@@ -972,7 +1029,7 @@ export async function fetchAllStockists(
         fetchBwsStockist(wineName, producer, vintage),
     ]);
 
-    const all = [...serpShopping, ...serpOrganic, ...vivino, ...danMurphys, ...bws];
+    const all = [...legacyBest, ...serpShopping, ...serpOrganic, ...vivino, ...danMurphys, ...bws];
     const bySource = new Map<string, StockistResult>();
     for (const result of all) {
         const key = result.source.toLowerCase().trim();
@@ -985,7 +1042,8 @@ export async function fetchAllStockists(
     const deduped = Array.from(bySource.values()).sort((a, b) => a.price - b.price);
     console.info(
         `[wine] stockist results for "${wineName}" (${producer ?? "unknown producer"}, ${vintage ?? "nv"}): `
-        + `shopping=${serpShopping.length} organic=${serpOrganic.length} vivino=${vivino.length} dm=${danMurphys.length} bws=${bws.length} total=${deduped.length}`
+        + `legacy=${legacyBest.length} shopping=${serpShopping.length} organic=${serpOrganic.length} `
+        + `vivino=${vivino.length} dm=${danMurphys.length} bws=${bws.length} total=${deduped.length}`
     );
     if (deduped.length === 0) {
         console.info(`[wine] query variants tried: ${queryVariants.join(" | ")}`);
