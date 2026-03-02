@@ -318,7 +318,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                                     const cheapest = stockists.length > 0
                                                         ? stockists.reduce((a, b) => (a.price < b.price ? a : b))
                                                         : null;
-                                                    const price = cheapest?.price ?? wine.danMurphysPrice;
+                                                    const price = wine.danMurphysPrice ?? cheapest?.price;
                                                     return price ? (
                                                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                                                             from ${price.toFixed(2)}

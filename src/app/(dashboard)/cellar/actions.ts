@@ -7,6 +7,7 @@ import { getCurrentHouseholdId } from "@/lib/household";
 import { extractWineFromImageViaGroq, extractWineFromUrlViaGroq, fetchAllStockists } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
 import type { WineType } from "@prisma/client";
+import type { StockistResult } from "@/lib/wine";
 
 const isNextRedirectError = (error: unknown): error is { digest: string } =>
     typeof error === "object"
@@ -14,6 +15,36 @@ const isNextRedirectError = (error: unknown): error is { digest: string } =>
     && "digest" in error
     && typeof (error as { digest: unknown }).digest === "string"
     && (error as { digest: string }).digest.startsWith("NEXT_REDIRECT");
+
+const parseStockists = (value: unknown): StockistResult[] => {
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is StockistResult =>
+        Boolean(
+            entry
+            && typeof entry === "object"
+            && "source" in entry
+            && "price" in entry
+            && "url" in entry
+            && "fetchedAt" in entry
+            && typeof entry.source === "string"
+            && typeof entry.price === "number"
+            && typeof entry.url === "string"
+            && typeof entry.fetchedAt === "string"
+            && (!("productName" in entry) || typeof entry.productName === "string" || typeof entry.productName === "undefined")
+        )
+    );
+};
+
+const stockistsMatch = (entry: StockistResult, target: {
+    source: string;
+    url: string;
+    fetchedAt: string;
+    price: number;
+}) =>
+    entry.source === target.source
+    && entry.url === target.url
+    && entry.fetchedAt === target.fetchedAt
+    && Math.abs(entry.price - target.price) < 0.0001;
 
 // ─── Create wine from photo ──────────────────────────────────────────────────
 
@@ -253,4 +284,122 @@ export async function refreshWinePrice(formData: FormData) {
 
     revalidatePath(`/cellar/${id}`);
     return { success: true, stockists, bottleImageUrl: imageUrlUpdate.imageUrl ?? null };
+}
+
+export async function confirmWineStockist(formData: FormData) {
+    const householdId = await getCurrentHouseholdId();
+    const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
+    const id = formData.get("id")?.toString();
+    const source = formData.get("source")?.toString();
+    const url = formData.get("url")?.toString();
+    const fetchedAt = formData.get("fetchedAt")?.toString();
+    const rawPrice = formData.get("price")?.toString();
+    const price = rawPrice ? Number(rawPrice) : NaN;
+    const productName = formData.get("productName")?.toString() || undefined;
+
+    if (!id || !source || !url || !fetchedAt || !Number.isFinite(price)) {
+        return { error: "Missing stockist fields" };
+    }
+
+    if (!supportsStockists) {
+        await prisma.wine.updateMany({
+            where: { id, householdId },
+            data: {
+                danMurphysPrice: price,
+                danMurphysUrl: url,
+                danMurphysProductId: url,
+                danMurphysSource: source,
+                danMurphysPriceAt: new Date(),
+            },
+        });
+        revalidatePath("/cellar");
+        revalidatePath(`/cellar/${id}`);
+        return {
+            success: true,
+            stockists: [] as StockistResult[],
+            selectedUrl: url,
+            selectedProductName: productName ?? null,
+        };
+    }
+
+    const wine = await prisma.wine.findFirst({
+        where: { id, householdId },
+        select: { stockists: true },
+    });
+    if (!wine) return { error: "Wine not found" };
+
+    const current = parseStockists(wine.stockists);
+    const selectedIndex = current.findIndex((entry) => stockistsMatch(entry, { source, url, fetchedAt, price }));
+    if (selectedIndex < 0) return { error: "Stockist not found" };
+
+    const selected = current[selectedIndex];
+    const curated = [selected, ...current.filter((_, idx) => idx !== selectedIndex)];
+
+    await prisma.wine.updateMany({
+        where: { id, householdId },
+        data: {
+            stockists: curated,
+            danMurphysPrice: selected.price,
+            danMurphysUrl: selected.url,
+            danMurphysProductId: selected.url,
+            danMurphysSource: selected.source,
+            danMurphysPriceAt: new Date(),
+        },
+    });
+
+    revalidatePath("/cellar");
+    revalidatePath(`/cellar/${id}`);
+    return {
+        success: true,
+        stockists: curated,
+        selectedUrl: selected.url,
+        selectedProductName: selected.productName ?? null,
+    };
+}
+
+export async function removeWineStockist(formData: FormData) {
+    const householdId = await getCurrentHouseholdId();
+    const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
+    const id = formData.get("id")?.toString();
+    const source = formData.get("source")?.toString();
+    const url = formData.get("url")?.toString();
+    const fetchedAt = formData.get("fetchedAt")?.toString();
+    const rawPrice = formData.get("price")?.toString();
+    const price = rawPrice ? Number(rawPrice) : NaN;
+
+    if (!id || !source || !url || !fetchedAt || !Number.isFinite(price)) {
+        return { error: "Missing stockist fields" };
+    }
+    if (!supportsStockists) {
+        return { error: "Stockist curation is unavailable until stockists migration is applied." };
+    }
+
+    const wine = await prisma.wine.findFirst({
+        where: { id, householdId },
+        select: { stockists: true },
+    });
+    if (!wine) return { error: "Wine not found" };
+
+    const current = parseStockists(wine.stockists);
+    const filtered = current.filter((entry) => !stockistsMatch(entry, { source, url, fetchedAt, price }));
+    if (filtered.length === current.length) {
+        return { error: "Stockist not found" };
+    }
+
+    const selected = filtered[0];
+    await prisma.wine.updateMany({
+        where: { id, householdId },
+        data: {
+            stockists: filtered,
+            danMurphysPrice: selected?.price ?? null,
+            danMurphysUrl: selected?.url ?? null,
+            danMurphysProductId: selected?.url ?? null,
+            danMurphysSource: selected?.source ?? null,
+            danMurphysPriceAt: selected ? new Date() : null,
+        },
+    });
+
+    revalidatePath("/cellar");
+    revalidatePath(`/cellar/${id}`);
+    return { success: true, stockists: filtered, selectedUrl: selected?.url ?? null };
 }

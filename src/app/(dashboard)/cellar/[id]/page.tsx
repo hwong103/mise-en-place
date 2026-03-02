@@ -4,7 +4,7 @@ import { getCurrentHouseholdId } from "@/lib/household";
 import WineDetail from "@/components/cellar/WineDetail";
 import type { StockistResult } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
-import { deleteWine, refreshWinePrice } from "../actions";
+import { confirmWineStockist, deleteWine, refreshWinePrice, removeWineStockist } from "../actions";
 
 export default async function WineDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -88,8 +88,11 @@ export default async function WineDetailPage({ params }: { params: Promise<{ id:
         <WineDetail
             wine={wine}
             stockists={stockists}
+            supportsStockistsPersistence={supportsStockists}
             deleteAction={deleteWine}
             refreshPriceAction={refreshWinePrice}
+            confirmStockistAction={confirmWineStockist}
+            removeStockistAction={removeWineStockist}
         />
     );
 }

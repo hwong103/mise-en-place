@@ -82,6 +82,12 @@ const decodeHtml = (value: string) =>
 
 const normalizeText = (value: string) => decodeHtml(value).replace(/\s+/g, " ").trim();
 
+const titleFromHandle = (handle: string) =>
+    decodeURIComponent(handle)
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
 const stripHtml = (value: string) =>
     normalizeText(
         value
@@ -1237,7 +1243,7 @@ const fetchWineCollectiveStockist = async (
                     price: precise.price,
                     url: precise.url,
                     fetchedAt,
-                    productName: best.title,
+                    productName: best.title ?? titleFromHandle(best.handle),
                 }];
             }
 
@@ -1246,7 +1252,7 @@ const fetchWineCollectiveStockist = async (
                 price: best.price,
                 url: best.url,
                 fetchedAt,
-                productName: best.title,
+                productName: best.title ?? titleFromHandle(best.handle),
             }];
         }
 

@@ -35,16 +35,32 @@ type WineDetailModel = {
 export default function WineDetail({
     wine,
     stockists,
+    supportsStockistsPersistence,
     deleteAction,
     refreshPriceAction,
+    confirmStockistAction,
+    removeStockistAction,
 }: {
     wine: WineDetailModel;
     stockists: StockistResult[];
+    supportsStockistsPersistence: boolean;
     deleteAction: (fd: FormData) => Promise<void>;
     refreshPriceAction: (fd: FormData) => Promise<{
         success?: boolean;
         stockists?: StockistResult[];
         bottleImageUrl?: string | null;
+        error?: string;
+    } | undefined>;
+    confirmStockistAction: (fd: FormData) => Promise<{
+        success?: boolean;
+        stockists?: StockistResult[];
+        selectedUrl?: string | null;
+        error?: string;
+    } | undefined>;
+    removeStockistAction: (fd: FormData) => Promise<{
+        success?: boolean;
+        stockists?: StockistResult[];
+        selectedUrl?: string | null;
         error?: string;
     } | undefined>;
 }) {
@@ -99,11 +115,14 @@ export default function WineDetail({
             <PriceCard
                 wineId={wine.id}
                 initialStockists={stockists}
+                supportsStockistsPersistence={supportsStockistsPersistence}
                 legacyPrice={wine.danMurphysPrice}
                 legacyUrl={wine.danMurphysUrl}
                 legacySource={wine.danMurphysSource ?? null}
                 legacyPriceAt={wine.danMurphysPriceAt}
                 refreshAction={refreshPriceAction}
+                confirmAction={confirmStockistAction}
+                removeAction={removeStockistAction}
             />
 
             {/* Location */}
