@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { ShoppingCategory } from "@/lib/shopping";
+import { CATEGORY_ORDER, type ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@prisma/client";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
 import {
@@ -277,10 +277,8 @@ export default function ShoppingList({
   }, [activeLocation, mergedLocations]);
 
   const categoryOptions = useMemo(() => {
-    const names = new Set<string>(categories.map((category) => category.name));
-    names.add("Other");
-    return Array.from(names);
-  }, [categories]);
+    return [...CATEGORY_ORDER];
+  }, []);
 
   const handleToggle = (item: { key: string; line: string; manual: boolean; category: string; location: string }) => {
     const current = persistedLookup.get(item.key);
@@ -599,8 +597,13 @@ export default function ShoppingList({
                                         Amount: {item.amountSummary}
                                       </div>
                                     ) : null}
-                                    {item.recipes.length > 0 ? (
+                                    {item.manual || item.recipes.length > 0 ? (
                                       <div className="mt-2 flex flex-wrap gap-1">
+                                        {item.manual ? (
+                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                            Manual
+                                          </span>
+                                        ) : null}
                                         {item.recipes.map((recipe) => (
                                           <span
                                             key={`${item.key}-${recipe}`}

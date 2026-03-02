@@ -17,7 +17,7 @@ export type ShoppingCategory = {
   items: ShoppingItem[];
 };
 
-const CATEGORY_ORDER: IngredientCategory[] = [
+export const CATEGORY_ORDER: IngredientCategory[] = [
   "Produce",
   "Dairy",
   "Meat",
