@@ -7,6 +7,8 @@ export type WineVisionResult = {
     country?: string;
     type?: "RED" | "WHITE" | "SPARKLING" | "ROSE" | "DESSERT" | "FORTIFIED" | "OTHER";
     imageUrl?: string;
+    tastingNotes?: string;
+    tasteProfile?: string[];
 };
 
 type WineType = "RED" | "WHITE" | "SPARKLING" | "ROSE" | "DESSERT" | "FORTIFIED" | "OTHER";
@@ -23,6 +25,99 @@ const parsePrice = (value: string | undefined) => {
     if (!value) return NaN;
     const numeric = value.replace(/[^0-9.,]/g, "").replace(/,/g, "");
     return numeric ? Number(numeric) : NaN;
+};
+
+const MARKDOWN_TOOL_URL = "https://markdown.new/";
+
+const COUNTRY_TAGS = new Set([
+    "argentina", "australia", "austria", "chile", "france", "germany", "greece", "hungary", "italy",
+    "new zealand", "portugal", "south africa", "spain", "united states", "usa", "uruguay", "georgia",
+]);
+
+const REGION_TAGS = new Set([
+    "barossa", "barossa valley", "beaujolais", "bordeaux", "burgundy", "chablis", "chianti", "douro",
+    "fleurie", "languedoc", "loire", "margaret river", "marlborough", "mclaren vale", "mendoza", "mosel",
+    "napa", "napa valley", "provence", "rhone", "rioja", "sonoma", "tuscany", "willamette valley", "yarra valley",
+]);
+
+const GRAPE_CANONICAL: Array<{ pattern: RegExp; name: string }> = [
+    { pattern: /\bgamay(?:\s*noir)?\b/i, name: "Gamay" },
+    { pattern: /\bpinot\s*noir\b/i, name: "Pinot Noir" },
+    { pattern: /\bpinot\s*gris\b/i, name: "Pinot Gris" },
+    { pattern: /\bpinot\s*grigio\b/i, name: "Pinot Grigio" },
+    { pattern: /\bshiraz\b/i, name: "Shiraz" },
+    { pattern: /\bsyrah\b/i, name: "Syrah" },
+    { pattern: /\bcabernet\s*sauvignon\b/i, name: "Cabernet Sauvignon" },
+    { pattern: /\bmerlot\b/i, name: "Merlot" },
+    { pattern: /\bchardonnay\b/i, name: "Chardonnay" },
+    { pattern: /\bsauvignon\s*blanc\b/i, name: "Sauvignon Blanc" },
+    { pattern: /\briesling\b/i, name: "Riesling" },
+    { pattern: /\bgrenache\b/i, name: "Grenache" },
+    { pattern: /\bmalbec\b/i, name: "Malbec" },
+    { pattern: /\btempranillo\b/i, name: "Tempranillo" },
+    { pattern: /\bsangiovese\b/i, name: "Sangiovese" },
+    { pattern: /\bnebbiolo\b/i, name: "Nebbiolo" },
+];
+
+const decodeHtml = (value: string) =>
+    value
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, "\"")
+        .replace(/&#39;/g, "'")
+        .replace(/&#x27;/g, "'")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&nbsp;/g, " ");
+
+const normalizeText = (value: string) => decodeHtml(value).replace(/\s+/g, " ").trim();
+
+const stripHtml = (value: string) =>
+    normalizeText(
+        value
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/(p|li|div|tr|h\d)>/gi, "\n")
+            .replace(/<li[^>]*>/gi, "- ")
+            .replace(/<[^>]+>/g, " ")
+    );
+
+const uniqueStrings = (values: Array<string | undefined | null>) => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const value of values) {
+        if (!value) continue;
+        const cleaned = normalizeText(value);
+        if (!cleaned) continue;
+        const key = cleaned.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push(cleaned);
+    }
+    return result;
+};
+
+const toAbsoluteUrl = (value: string | undefined, pageUrl: string) => {
+    if (!value) return undefined;
+    try {
+        return new URL(value, pageUrl).toString();
+    } catch {
+        return value;
+    }
+};
+
+const firstNonEmpty = (...values: Array<string | undefined | null>) => {
+    for (const value of values) {
+        const normalized = typeof value === "string" ? normalizeText(value) : "";
+        if (normalized) return normalized;
+    }
+    return undefined;
+};
+
+const parseJsonSafely = <T>(value: string): T | undefined => {
+    try {
+        return JSON.parse(value) as T;
+    } catch {
+        return undefined;
+    }
 };
 
 const getMetaContent = (html: string, name: string) => {
@@ -53,45 +148,414 @@ const inferWineType = (text: string): WineType | undefined => {
 
 const inferProducerFromTitle = (title: string) => {
     const producerMatch = title.match(/^([A-Za-zÀ-ÿ0-9&.'\-\s]{3,50}?)(?:\s+(?:beaujolais|bordeaux|bourgogne|burgundy|chablis|shiraz|syrah|cabernet|merlot|pinot|chardonnay|riesling|sauvignon|prosecco|champagne)\b)/i);
-    return producerMatch?.[1]?.trim();
+    return producerMatch?.[1]?.replace(/[\s\-–—]+$/, "").trim();
+};
+
+const parseWineType = (value: string | undefined): WineType | undefined => {
+    if (!value) return undefined;
+    const normalized = normalizeText(value).toUpperCase();
+    if (normalized in { RED: 1, WHITE: 1, SPARKLING: 1, ROSE: 1, DESSERT: 1, FORTIFIED: 1, OTHER: 1 }) {
+        return normalized as WineType;
+    }
+    return inferWineType(value);
+};
+
+const extractYearFromText = (value: string | undefined) => {
+    if (!value) return undefined;
+    const match = value.match(/\b(19|20)\d{2}\b/);
+    return match ? Number(match[0]) : undefined;
+};
+
+const extractGrapesFromText = (value: string | undefined) => {
+    if (!value) return [];
+    const output: string[] = [];
+    for (const grape of GRAPE_CANONICAL) {
+        if (grape.pattern.test(value)) {
+            output.push(grape.name);
+        }
+    }
+    return uniqueStrings(output);
+};
+
+const splitGrapes = (value: string | undefined) =>
+    uniqueStrings(
+        (value ?? "")
+            .split(/[,&/]|(?:\band\b)/i)
+            .map((entry) => entry.trim())
+            .filter(Boolean)
+            .flatMap((entry) => extractGrapesFromText(entry).length > 0 ? extractGrapesFromText(entry) : [entry])
+    );
+
+const extractShopifyProductJson = (html: string) => {
+    const match = html.match(
+        /<script[^>]+id=["'][^"']*ProductJson[^"']*["'][^>]*>([\s\S]*?)<\/script>/i
+    );
+    const raw = match?.[1]?.trim();
+    if (!raw) return undefined;
+    return parseJsonSafely<{
+        title?: string;
+        vendor?: string;
+        type?: string;
+        tags?: string[];
+        description?: string;
+        content?: string;
+        featured_image?: string;
+        images?: string[];
+    }>(raw);
+};
+
+const extractJsonLdProducts = (html: string) => {
+    const regex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    const results: Array<Record<string, unknown>> = [];
+    let match = regex.exec(html);
+    while (match) {
+        const raw = match[1]?.trim();
+        if (!raw) {
+            match = regex.exec(html);
+            continue;
+        }
+        const block = parseJsonSafely<unknown>(raw);
+        if (!block) {
+            match = regex.exec(html);
+            continue;
+        }
+        const queue: unknown[] = [block];
+        while (queue.length > 0) {
+            const current = queue.shift();
+            if (Array.isArray(current)) {
+                queue.push(...current);
+                continue;
+            }
+            if (!current || typeof current !== "object") continue;
+            const record = current as Record<string, unknown>;
+            const type = record["@type"];
+            if (
+                (typeof type === "string" && /product|wine/i.test(type))
+                || (Array.isArray(type) && type.some((entry) => typeof entry === "string" && /product|wine/i.test(entry)))
+            ) {
+                results.push(record);
+            }
+            if (record["@graph"]) queue.push(record["@graph"]);
+        }
+        match = regex.exec(html);
+    }
+    return results;
+};
+
+const extractInfoMap = (html: string) => {
+    const info = new Map<string, string>();
+    const setInfo = (key: string, value: string) => {
+        const normalizedKey = normalizeText(key).toLowerCase().replace(/:\s*$/, "");
+        const normalizedValue = stripHtml(value);
+        if (!normalizedKey || !normalizedValue) return;
+        if (!info.has(normalizedKey)) {
+            info.set(normalizedKey, normalizedValue);
+        }
+    };
+
+    const infoParagraphRegex = /<p[^>]*class=["'][^"']*weboost_info_p[^"']*["'][^>]*>([\s\S]*?)<\/p>/gi;
+    let paragraphMatch = infoParagraphRegex.exec(html);
+    while (paragraphMatch) {
+        const block = paragraphMatch[1];
+        const labelMatch = block.match(/<span[^>]*class=["'][^"']*weboost_info_span[^"']*["'][^>]*>([\s\S]*?)<\/span>/i);
+        if (labelMatch) {
+            const label = stripHtml(labelMatch[1]);
+            const value = stripHtml(block.replace(labelMatch[0], "").replace(/<\/?span[^>]*>/gi, " "));
+            setInfo(label, value);
+        }
+        paragraphMatch = infoParagraphRegex.exec(html);
+    }
+
+    const tableRegex = /<tr[^>]*>\s*(?:<th[^>]*>([\s\S]*?)<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>|<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>)\s*<\/tr>/gi;
+    let tableMatch = tableRegex.exec(html);
+    while (tableMatch) {
+        const key = stripHtml(tableMatch[1] ?? tableMatch[3] ?? "");
+        const value = stripHtml(tableMatch[2] ?? tableMatch[4] ?? "");
+        if (key && value) setInfo(key, value);
+        tableMatch = tableRegex.exec(html);
+    }
+
+    return info;
+};
+
+type TasteProfileEntry = {
+    labels: string[];
+    percent: number;
+};
+
+const extractTasteProfileEntries = (html: string): TasteProfileEntry[] => {
+    const entries: TasteProfileEntry[] = [];
+    const regex = /<div[^>]*class=["'][^"']*weboost_process_title_section[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<div[^>]*class=["'][^"']*process[^"']*["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*process-bar[^"']*["'][^>]*style=["'][^"']*width:\s*([0-9.]+)%[^"']*["'][^>]*>/gi;
+    let match = regex.exec(html);
+    while (match) {
+        const labelsBlock = match[1] ?? "";
+        const labels = [...labelsBlock.matchAll(/<p[^>]*class=["'][^"']*weboost_process_title[^"']*["'][^>]*>([\s\S]*?)<\/p>/gi)]
+            .map((entry) => stripHtml(entry[1] ?? ""))
+            .filter(Boolean);
+        const percent = Number(match[2]);
+        if (labels.length > 0 && Number.isFinite(percent)) {
+            entries.push({ labels, percent: Math.max(0, Math.min(100, percent)) });
+        }
+        match = regex.exec(html);
+    }
+    return entries;
+};
+
+const describeTasteProfile = (entries: TasteProfileEntry[]) => {
+    const lines: string[] = [];
+    for (const entry of entries) {
+        const percent = Math.round(entry.percent);
+        if (entry.labels.length === 1) {
+            lines.push(`${entry.labels[0]}: ${percent}%`);
+            continue;
+        }
+        const [left, right] = entry.labels;
+        const key = `${left.toLowerCase()}|${right.toLowerCase()}`;
+        const dimension =
+            key.includes("light|full") ? "Body"
+                : key.includes("dry|sweet") ? "Sweetness"
+                    : key.includes("fruity|savoury") ? "Fruit vs Savoury"
+                        : `${left} vs ${right}`;
+        const dominant = percent > 50 ? right : left;
+        const descriptor = percent === 50 ? "Balanced" : dominant;
+        lines.push(`${dimension}: ${descriptor} (${percent}%)`);
+    }
+    return uniqueStrings(lines);
+};
+
+const extractTastingNotesFromHtml = (html: string) => {
+    const fromOverview = html.match(
+        /<[^>]*class=["'][^"']*weboost_product_overview[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
+    )?.[1];
+    const fromMeta = getMetaContent(html, "og:description") ?? getMetaContent(html, "description");
+    return firstNonEmpty(stripHtml(fromOverview ?? ""), fromMeta);
+};
+
+const extractBestCountryFromTags = (tags: string[]) => {
+    for (const tag of tags) {
+        const normalized = normalizeText(tag).toLowerCase();
+        if (COUNTRY_TAGS.has(normalized)) {
+            return tag;
+        }
+    }
+    return undefined;
+};
+
+const extractBestRegionFromTags = (tags: string[]) => {
+    for (const tag of tags) {
+        const normalized = normalizeText(tag).toLowerCase();
+        if (REGION_TAGS.has(normalized)) {
+            return tag;
+        }
+    }
+    return undefined;
+};
+
+const renderTastingNotes = (notes: string | undefined, tasteProfile: string[]) => {
+    const cleanNotes = firstNonEmpty(notes);
+    if (tasteProfile.length === 0) {
+        return cleanNotes;
+    }
+    const tasteProfileBlock = `Taste Profile:\n${tasteProfile.map((line) => `- ${line}`).join("\n")}`;
+    if (!cleanNotes) {
+        return tasteProfileBlock;
+    }
+    if (cleanNotes.toLowerCase().includes("taste profile")) {
+        return cleanNotes;
+    }
+    return `${cleanNotes}\n\n${tasteProfileBlock}`;
+};
+
+const scoreWineCandidate = (candidate: WineVisionResult | null) => {
+    if (!candidate) return 0;
+    return [
+        candidate.name ? 2 : 0,
+        candidate.producer ? 1 : 0,
+        candidate.vintage ? 1 : 0,
+        candidate.grapes?.length ? 1 : 0,
+        candidate.region ? 1 : 0,
+        candidate.country ? 1 : 0,
+        candidate.type ? 1 : 0,
+        candidate.tastingNotes ? 1 : 0,
+    ].reduce((sum, value) => sum + value, 0);
+};
+
+const selectBestWineCandidate = (candidates: Array<WineVisionResult | null>) =>
+    candidates
+        .filter((candidate): candidate is WineVisionResult => Boolean(candidate?.name))
+        .sort((a, b) => scoreWineCandidate(b) - scoreWineCandidate(a))[0] ?? null;
+
+type MarkdownFetchResponse = {
+    success?: boolean;
+    title?: string;
+    content?: string;
+};
+
+const fetchMarkdownFromUrl = async (sourceUrl: string) => {
+    try {
+        const response = await fetch(MARKDOWN_TOOL_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({ url: sourceUrl }),
+        });
+        if (!response.ok) return null;
+        const payload = (await response.json()) as MarkdownFetchResponse;
+        if (!payload.success || typeof payload.content !== "string") return null;
+        return {
+            title: typeof payload.title === "string" ? normalizeText(payload.title) : undefined,
+            content: payload.content,
+        };
+    } catch {
+        return null;
+    }
+};
+
+const extractWineCandidateFromMarkdown = (markdown: string, fallbackTitle?: string): WineVisionResult | null => {
+    const normalized = markdown.replace(/\r\n/g, "\n");
+    const headingTitle = normalized.match(/^\s*#\s+(.+)$/m)?.[1];
+    const title = firstNonEmpty(headingTitle, fallbackTitle);
+    if (!title) return null;
+
+    const kvMatches = [...normalized.matchAll(/^\s*(Type|Varietal(?: Blend)?|Grapes?|Region|Country(?: of Origin)?|Producer|Brand)\s*:\s*(.+)$/gim)];
+    const kv = new Map<string, string>();
+    for (const match of kvMatches) {
+        kv.set(match[1].toLowerCase(), normalizeText(match[2]));
+    }
+
+    const notesMatch = normalized.match(/(?:^|\n)#{1,6}\s*Tasting Notes?\s*\n([\s\S]*?)(?=\n#{1,6}\s+|$)/i);
+    const tastingNotes = notesMatch ? normalizeText(notesMatch[1]) : undefined;
+    const type = parseWineType(kv.get("type") ?? title);
+    const grapes = uniqueStrings([
+        ...splitGrapes(kv.get("varietal")),
+        ...splitGrapes(kv.get("varietal blend")),
+        ...splitGrapes(kv.get("grape")),
+        ...splitGrapes(kv.get("grapes")),
+        ...extractGrapesFromText(normalized),
+    ]);
+
+    return {
+        name: title,
+        producer: firstNonEmpty(kv.get("producer"), kv.get("brand"), inferProducerFromTitle(title)),
+        vintage: extractYearFromText(title),
+        grapes,
+        region: firstNonEmpty(kv.get("region")),
+        country: firstNonEmpty(kv.get("country"), kv.get("country of origin")),
+        type,
+        tastingNotes,
+    };
+};
+
+const buildPromptPageText = (html: string, markdownContent?: string) => {
+    const htmlWithoutScript = html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ");
+    const lower = htmlWithoutScript.toLowerCase();
+    const keywords = ["tasting notes", "taste profile", "technical info", "varietal", "region", "country", "productjson"];
+    const snippets: string[] = [];
+    snippets.push(stripHtml(htmlWithoutScript.slice(0, 2500)));
+    for (const keyword of keywords) {
+        const index = lower.indexOf(keyword);
+        if (index === -1) continue;
+        const start = Math.max(0, index - 1200);
+        const end = Math.min(htmlWithoutScript.length, index + 2200);
+        snippets.push(stripHtml(htmlWithoutScript.slice(start, end)));
+    }
+    if (markdownContent) {
+        snippets.push(stripHtml(markdownContent));
+    }
+    return uniqueStrings(snippets).join("\n\n").slice(0, 10000);
 };
 
 const buildFallbackWineFromHtml = (html: string, pageUrl: string): WineVisionResult | null => {
-    const rawTitle = getMetaContent(html, "og:title")
-        ?? html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
-    const siteName = getMetaContent(html, "og:site_name");
+    const productJson = extractShopifyProductJson(html);
+    const jsonLdProduct = extractJsonLdProducts(html)[0];
+    const info = extractInfoMap(html);
+    const productTags = Array.isArray(productJson?.tags) ? productJson.tags : [];
+    const tasteProfile = describeTasteProfile(extractTasteProfileEntries(html));
+
+    const rawTitle = firstNonEmpty(
+        productJson?.title,
+        typeof jsonLdProduct?.name === "string" ? jsonLdProduct.name : undefined,
+        getMetaContent(html, "og:title"),
+        html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]
+    );
     if (!rawTitle) return null;
 
     const title = rawTitle
         .replace(/\s*[\-|\u2022]\s*(buy|shop|online).*/i, "")
-        .replace(/\s*[\-|\u2022]\s*(world wine|dan murphy'?s|vivino).*/i, "")
+        .replace(/\s*[\-|\u2022]\s*(world wine|dan murphy'?s|vivino|drink fab).*/i, "")
         .trim();
     if (!title) return null;
 
-    const yearMatch = title.match(/\b(19|20)\d{2}\b/);
-    const type = inferWineType(
-        [title, getMetaContent(html, "description"), getMetaContent(html, "og:description")].filter(Boolean).join(" ")
+    const inferredProducer = inferProducerFromTitle(title);
+    const brandedProducer = firstNonEmpty(
+        info.get("brand"),
+        info.get("producer"),
+        productJson?.vendor,
+        typeof jsonLdProduct?.brand === "string" ? jsonLdProduct.brand : undefined
     );
-    const producer = inferProducerFromTitle(title);
-    const image = getMetaContent(html, "og:image:secure_url") ?? getMetaContent(html, "og:image");
+    const producer = brandedProducer && /^(world wine|drink fab|fab)$/i.test(brandedProducer)
+        ? inferredProducer
+        : firstNonEmpty(brandedProducer, inferredProducer);
+    const type = parseWineType(
+        firstNonEmpty(
+            info.get("type"),
+            productJson?.type,
+            typeof jsonLdProduct?.category === "string" ? jsonLdProduct.category : undefined,
+            title
+        )
+    ) ?? inferWineType(
+        [
+            title,
+            getMetaContent(html, "description"),
+            getMetaContent(html, "og:description"),
+            productJson?.description ? stripHtml(productJson.description) : undefined,
+            productJson?.content ? stripHtml(productJson.content) : undefined,
+        ].filter(Boolean).join(" ")
+    );
+    const grapes = uniqueStrings([
+        ...splitGrapes(info.get("varietal")),
+        ...splitGrapes(info.get("varietal blend")),
+        ...splitGrapes(info.get("grape")),
+        ...splitGrapes(info.get("grapes")),
+        ...productTags.flatMap((tag) => extractGrapesFromText(tag)),
+        ...extractGrapesFromText(title),
+    ]);
+    const tastingNotes = renderTastingNotes(
+        firstNonEmpty(
+            extractTastingNotesFromHtml(html),
+            productJson?.description ? stripHtml(productJson.description) : undefined,
+            productJson?.content ? stripHtml(productJson.content) : undefined,
+            typeof jsonLdProduct?.description === "string" ? stripHtml(jsonLdProduct.description) : undefined
+        ),
+        tasteProfile
+    );
 
-    const result: WineVisionResult = {
+    return {
         name: title,
-        ...(producer ? { producer } : {}),
-        ...(yearMatch ? { vintage: Number(yearMatch[0]) } : {}),
-        ...(type ? { type } : {}),
-        ...(siteName && !/world wine/i.test(siteName) ? { producer: producer ?? siteName } : {}),
+        producer,
+        vintage: extractYearFromText(title),
+        grapes,
+        region: firstNonEmpty(info.get("region"), extractBestRegionFromTags(productTags)),
+        country: firstNonEmpty(
+            info.get("country"),
+            info.get("country of origin"),
+            extractBestCountryFromTags(productTags)
+        ),
+        type,
+        imageUrl: toAbsoluteUrl(
+            firstNonEmpty(
+                getMetaContent(html, "og:image:secure_url"),
+                getMetaContent(html, "og:image"),
+                productJson?.featured_image,
+                productJson?.images?.[0]
+            ),
+            pageUrl
+        ),
+        tastingNotes,
+        tasteProfile,
     };
-
-    if (image) {
-        try {
-            result.imageUrl = new URL(image, pageUrl).toString();
-        } catch {
-            result.imageUrl = image;
-        }
-    }
-
-    return result;
 };
 
 const WINE_VISION_PROMPT = `You are a wine label reading assistant. Extract wine details from this label photo and return ONLY a JSON object — no markdown, no explanation, just raw JSON:
@@ -245,46 +709,52 @@ export async function fetchBottlePrice(
 
 export async function extractWineFromUrlViaGroq(url: string): Promise<WineVisionResult | null> {
     const apiKey = process.env.GROQ_API_KEY;
-
-    // Fetch the page text
-    let pageText = "";
     let html = "";
+    let markdownContent: string | undefined;
+    let markdownTitle: string | undefined;
 
     try {
-        const response = await fetch(url, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-                Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-AU,en;q=0.9",
-            },
-            signal: AbortSignal.timeout(8000),
-        });
-        if (!response.ok) {
-            console.warn("[wine] URL fetch failed:", response.status, response.statusText, url);
-            return null;
-        }
-        html = await response.text();
+        const [markdownResult, htmlResult] = await Promise.all([
+            fetchMarkdownFromUrl(url),
+            fetch(url, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+                    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-AU,en;q=0.9",
+                },
+                cache: "no-store",
+                signal: AbortSignal.timeout(10000),
+            }),
+        ]);
 
-        // Strip tags, collapse whitespace, truncate to ~4000 chars for the prompt
-        pageText = html
-            .replace(/<script[\s\S]*?<\/script>/gi, "")
-            .replace(/<style[\s\S]*?<\/style>/gi, "")
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 4000);
+        if (markdownResult?.content) {
+            markdownContent = markdownResult.content;
+            markdownTitle = markdownResult.title;
+        }
+
+        if (!htmlResult.ok) {
+            console.warn("[wine] URL fetch failed:", htmlResult.status, htmlResult.statusText, url);
+            return extractWineCandidateFromMarkdown(markdownContent ?? "", markdownTitle);
+        }
+        html = await htmlResult.text();
     } catch (error) {
         console.warn("[wine] URL fetch threw an error:", error);
-        return null;
+        return extractWineCandidateFromMarkdown(markdownContent ?? "", markdownTitle);
     }
 
-    const fallback = buildFallbackWineFromHtml(html, url);
-    if (!pageText) return fallback;
+    const markdownCandidate = markdownContent
+        ? extractWineCandidateFromMarkdown(markdownContent, markdownTitle)
+        : null;
+    const htmlCandidate = buildFallbackWineFromHtml(html, url);
+    const bestDeterministicCandidate = selectBestWineCandidate([markdownCandidate, htmlCandidate]);
+
+    const pageText = buildPromptPageText(html, markdownContent);
+    if (!pageText) return bestDeterministicCandidate;
     if (!hasUsableApiKey(apiKey)) {
-        if (!fallback) {
+        if (!bestDeterministicCandidate) {
             console.warn("[wine] GROQ_API_KEY is not configured and fallback extraction did not find wine metadata.");
         }
-        return fallback;
+        return bestDeterministicCandidate;
     }
 
     const prompt = `Extract wine details from this webpage text and return ONLY a JSON object — no markdown, no explanation:
@@ -296,11 +766,14 @@ export async function extractWineFromUrlViaGroq(url: string): Promise<WineVision
   "grapes": ["Shiraz"],
   "region": "Barossa Valley",
   "country": "Australia",
-  "type": "RED"
+  "type": "RED",
+  "tastingNotes": "Short tasting notes from the page",
+  "tasteProfile": ["Body: Light (25%)", "Acidity: 75%"]
 }
 
 type must be one of: RED, WHITE, SPARKLING, ROSE, DESSERT, FORTIFIED, OTHER
-Omit any field you cannot find. Return ONLY the JSON.
+Only include fields present in the page context. Do not hallucinate.
+Return ONLY the JSON.
 
 Webpage text:
 ${pageText}`;
@@ -322,23 +795,35 @@ ${pageText}`;
 
         if (!response.ok) {
             console.warn("[wine] Groq URL extraction failed:", response.status, response.statusText);
-            return fallback;
+            return bestDeterministicCandidate;
         }
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content?.trim();
-        if (!content) return fallback;
+        if (!content) return bestDeterministicCandidate;
 
         const cleaned = cleanJsonBlock(content);
         const result = JSON.parse(cleaned) as WineVisionResult;
-        const merged = {
-            ...fallback,
+        const normalizedTasteProfile = uniqueStrings(result.tasteProfile ?? []);
+        const merged: WineVisionResult = {
+            ...bestDeterministicCandidate,
             ...result,
-            imageUrl: result.imageUrl ?? fallback?.imageUrl,
-            name: result.name?.trim() || fallback?.name || "",
+            grapes: uniqueStrings([...(bestDeterministicCandidate?.grapes ?? []), ...(result.grapes ?? [])]),
+            tasteProfile: uniqueStrings([...(bestDeterministicCandidate?.tasteProfile ?? []), ...normalizedTasteProfile]),
+            tastingNotes: renderTastingNotes(
+                firstNonEmpty(result.tastingNotes, bestDeterministicCandidate?.tastingNotes),
+                uniqueStrings([...(bestDeterministicCandidate?.tasteProfile ?? []), ...normalizedTasteProfile])
+            ),
+            imageUrl: toAbsoluteUrl(result.imageUrl ?? bestDeterministicCandidate?.imageUrl, url),
+            name: firstNonEmpty(result.name, bestDeterministicCandidate?.name) ?? "",
+            type: parseWineType(result.type) ?? bestDeterministicCandidate?.type,
+            vintage: result.vintage ?? bestDeterministicCandidate?.vintage,
+            producer: firstNonEmpty(result.producer, bestDeterministicCandidate?.producer),
+            region: firstNonEmpty(result.region, bestDeterministicCandidate?.region),
+            country: firstNonEmpty(result.country, bestDeterministicCandidate?.country),
         };
-        return merged.name ? merged : fallback;
+        return merged.name ? merged : bestDeterministicCandidate;
     } catch (error) {
         console.warn("[wine] Groq URL extraction response parse failed:", error);
-        return fallback;
+        return bestDeterministicCandidate;
     }
 }

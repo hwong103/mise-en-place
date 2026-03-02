@@ -99,6 +99,7 @@ export async function createWineFromUrl(formData: FormData) {
                 country: vision.country ?? null,
                 type: (vision.type as WineType) ?? "RED",
                 imageUrl: vision.imageUrl ?? null,
+                tastingNotes: vision.tastingNotes ?? null,
                 danMurphysProductId: dmPrice?.productId ?? null,
                 danMurphysUrl: dmPrice?.url ?? null,
                 danMurphysPrice: dmPrice?.price ?? null,
