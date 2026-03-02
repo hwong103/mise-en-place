@@ -966,46 +966,58 @@ const fetchLegacySerpBestStockist = async (
     const serpKey = process.env.SERPAPI_KEY;
     if (!hasUsableApiKey(serpKey)) return [];
 
+    const queries = buildQueryVariants(wineName, producer, vintage)
+        .slice(0, 8)
+        .map((query) => `${query} wine Australia`);
+
     try {
-        const baseQuery = [producer, wineName, vintage?.toString()].filter(Boolean).join(" ");
-        const url = new URL("https://serpapi.com/search");
-        url.searchParams.set("engine", "google_shopping");
-        url.searchParams.set("q", `${baseQuery} wine Australia`);
-        url.searchParams.set("gl", "au");
-        url.searchParams.set("hl", "en");
-        url.searchParams.set("num", "8");
-        url.searchParams.set("api_key", serpKey);
+        for (const query of queries) {
+            const url = new URL("https://serpapi.com/search");
+            url.searchParams.set("engine", "google_shopping");
+            url.searchParams.set("q", query);
+            url.searchParams.set("gl", "au");
+            url.searchParams.set("hl", "en");
+            url.searchParams.set("num", "8");
+            url.searchParams.set("api_key", serpKey);
 
-        const response = await fetch(url.toString(), {
-            signal: AbortSignal.timeout(8000),
-            next: { revalidate: 0 },
-        });
-        if (!response.ok) return [];
+            const response = await fetch(url.toString(), {
+                signal: AbortSignal.timeout(8000),
+                next: { revalidate: 0 },
+            });
+            if (!response.ok) {
+                console.warn(`[wine] legacy SerpAPI HTTP ${response.status} for query="${query}"`);
+                continue;
+            }
 
-        const data = await response.json();
-        const results: Array<{
-            price?: string;
-            extracted_price?: number;
-            link?: string;
-            source?: string;
-        }> = data.shopping_results ?? [];
+            const data = await response.json();
+            if (typeof data?.error === "string") {
+                console.warn(`[wine] legacy SerpAPI error for query="${query}": ${data.error}`);
+                continue;
+            }
+            const results: Array<{
+                price?: string;
+                extracted_price?: number;
+                link?: string;
+                source?: string;
+            }> = data.shopping_results ?? [];
 
-        const sorted = [...results].sort((a, b) => {
-            const aDm = /dan\s*murphy/i.test(a.source ?? "");
-            const bDm = /dan\s*murphy/i.test(b.source ?? "");
-            return Number(bDm) - Number(aDm);
-        });
+            const sorted = [...results].sort((a, b) => {
+                const aDm = /dan\s*murphy/i.test(a.source ?? "");
+                const bDm = /dan\s*murphy/i.test(b.source ?? "");
+                return Number(bDm) - Number(aDm);
+            });
 
-        const fetchedAt = new Date().toISOString();
-        for (const result of sorted) {
-            const price = result.extracted_price ?? parsePrice(result.price);
-            if (Number.isNaN(price) || price <= 0 || !result.link) continue;
-            return [{
-                source: result.source ?? "Google Shopping",
-                price,
-                url: result.link,
-                fetchedAt,
-            }];
+            const fetchedAt = new Date().toISOString();
+            for (const result of sorted) {
+                const price = result.extracted_price ?? parsePrice(result.price);
+                if (Number.isNaN(price) || price <= 0 || !result.link) continue;
+                return [{
+                    source: result.source ?? "Google Shopping",
+                    price,
+                    url: result.link,
+                    fetchedAt,
+                }];
+            }
         }
 
         return [];
