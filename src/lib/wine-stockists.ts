@@ -3,6 +3,13 @@ const hasStockistsText = (value: unknown) =>
 
 let wineStockistsColumnAvailable: boolean | null = null;
 
+const parseDbBoolean = (value: unknown) =>
+    value === true
+    || value === 1
+    || value === "1"
+    || value === "t"
+    || value === "true";
+
 const readErrorLike = (error: unknown) => {
     if (!error || typeof error !== "object") return undefined;
     return error as {
@@ -43,16 +50,16 @@ export const hasWineStockistsColumn = async (
 ) => {
     if (wineStockistsColumnAvailable !== null) return wineStockistsColumnAvailable;
     try {
-        const rows = await queryFn<Array<{ exists: boolean }>>`
+        const rows = await queryFn<Array<{ exists: boolean | string | number }>>`
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
-                  AND table_name = 'Wine'
-                  AND column_name = 'stockists'
+                  AND lower(table_name) = lower('Wine')
+                  AND lower(column_name) = lower('stockists')
             ) AS "exists"
         `;
-        wineStockistsColumnAvailable = Boolean(rows?.[0]?.exists);
+        wineStockistsColumnAvailable = parseDbBoolean(rows?.[0]?.exists);
         return wineStockistsColumnAvailable;
     } catch {
         wineStockistsColumnAvailable = false;
