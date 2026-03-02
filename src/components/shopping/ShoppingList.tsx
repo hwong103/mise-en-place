@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { ShoppingCategory } from "@/lib/shopping";
+import { CATEGORY_ORDER, type ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@prisma/client";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
 import {
@@ -277,10 +277,8 @@ export default function ShoppingList({
   }, [activeLocation, mergedLocations]);
 
   const categoryOptions = useMemo(() => {
-    const names = new Set<string>(categories.map((category) => category.name));
-    names.add("Other");
-    return Array.from(names);
-  }, [categories]);
+    return [...CATEGORY_ORDER];
+  }, []);
 
   const handleToggle = (item: { key: string; line: string; manual: boolean; category: string; location: string }) => {
     const current = persistedLookup.get(item.key);
