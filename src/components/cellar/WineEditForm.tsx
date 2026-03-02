@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFormStatus } from "react-dom";
 import { MapPin } from "lucide-react";
 
 const WINE_TYPES = ["RED", "WHITE", "SPARKLING", "ROSE", "DESSERT", "FORTIFIED", "OTHER"];
@@ -353,14 +354,23 @@ export default function WineEditForm({
                     </div>
                 </div>
 
-                <button
-                    type="submit"
-                    className="w-full rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700"
-                >
-                    Save to Cellar
-                </button>
+                <SaveButton />
             </form>
         </div>
+    );
+}
+
+function SaveButton() {
+    const { pending } = useFormStatus();
+    return (
+        <button
+            type="submit"
+            disabled={pending}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+            {pending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+            {pending ? "Saving…" : "Save to Cellar"}
+        </button>
     );
 }
 
