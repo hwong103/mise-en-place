@@ -1,6 +1,5 @@
 "use client";
 
-import { Wine } from "@prisma/client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin } from "lucide-react";
@@ -30,7 +29,23 @@ export default function WineEditForm({
     updateAction,
     mode = "edit",
 }: {
-    wine: Wine;
+    wine: {
+        id: string;
+        name: string;
+        producer: string | null;
+        vintage: number | null;
+        grapes: string[];
+        region: string | null;
+        country: string | null;
+        type: string;
+        rating: number | null;
+        tastingNotes: string | null;
+        triedAt: Date | null;
+        locationName: string | null;
+        locationAddress: string | null;
+        locationLat: number | null;
+        locationLng: number | null;
+    };
     updateAction: (fd: FormData) => Promise<void>;
     mode?: "photo" | "url" | "manual" | "edit";
 }) {

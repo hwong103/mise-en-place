@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Wine } from "@prisma/client";
 import PriceCard from "@/components/cellar/PriceCard";
 import type { StockistResult } from "@/lib/wine";
 
@@ -11,13 +10,34 @@ const WINE_TYPE_COLORS: Record<string, string> = {
     FORTIFIED: "bg-amber-800", OTHER: "bg-slate-200 dark:bg-slate-700",
 };
 
+type WineDetailModel = {
+    id: string;
+    name: string;
+    producer: string | null;
+    vintage: number | null;
+    grapes: string[];
+    region: string | null;
+    country: string | null;
+    type: string;
+    rating: number | null;
+    tastingNotes: string | null;
+    danMurphysPrice: number | null;
+    danMurphysUrl: string | null;
+    danMurphysSource: string | null;
+    danMurphysPriceAt: Date | null;
+    locationName: string | null;
+    locationAddress: string | null;
+    locationLat: number | null;
+    locationLng: number | null;
+};
+
 export default function WineDetail({
     wine,
     stockists,
     deleteAction,
     refreshPriceAction,
 }: {
-    wine: Wine;
+    wine: WineDetailModel;
     stockists: StockistResult[];
     deleteAction: (fd: FormData) => Promise<void>;
     refreshPriceAction: (fd: FormData) => Promise<{

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { extractWineFromImageViaGroq, extractWineFromUrlViaGroq, fetchAllStockists } from "@/lib/wine";
+import { isMissingStockistsColumnError } from "@/lib/wine-stockists";
 import type { WineType } from "@prisma/client";
 
 const isNextRedirectError = (error: unknown): error is { digest: string } =>
@@ -30,23 +31,27 @@ export async function createWineFromPhoto(formData: FormData) {
         const stockists = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
         const dmPrice = stockists[0];
 
-        const wine = await prisma.wine.create({
-            data: {
-                householdId,
-                name: vision.name,
-                producer: vision.producer ?? null,
-                vintage: vision.vintage ?? null,
-                grapes: vision.grapes ?? [],
-                region: vision.region ?? null,
-                country: vision.country ?? null,
-                type: (vision.type as WineType) ?? "RED",
-                danMurphysProductId: dmPrice?.url ?? null,
-                danMurphysUrl: dmPrice?.url ?? null,
-                danMurphysPrice: dmPrice?.price ?? null,
-                danMurphysSource: dmPrice?.source ?? null,
-                danMurphysPriceAt: dmPrice ? new Date() : null,
-                stockists: stockists.length > 0 ? stockists : undefined,
-            },
+        const createData = {
+            householdId,
+            name: vision.name,
+            producer: vision.producer ?? null,
+            vintage: vision.vintage ?? null,
+            grapes: vision.grapes ?? [],
+            region: vision.region ?? null,
+            country: vision.country ?? null,
+            type: (vision.type as WineType) ?? "RED",
+            danMurphysProductId: dmPrice?.url ?? null,
+            danMurphysUrl: dmPrice?.url ?? null,
+            danMurphysPrice: dmPrice?.price ?? null,
+            danMurphysSource: dmPrice?.source ?? null,
+            danMurphysPriceAt: dmPrice ? new Date() : null,
+            stockists: stockists.length > 0 ? stockists : undefined,
+        };
+
+        const wine = await prisma.wine.create({ data: createData }).catch(async (error) => {
+            if (!isMissingStockistsColumnError(error)) throw error;
+            const { stockists: _stockists, ...fallbackData } = createData;
+            return prisma.wine.create({ data: fallbackData });
         });
 
         revalidatePath("/cellar");
@@ -90,25 +95,29 @@ export async function createWineFromUrl(formData: FormData) {
         const stockists = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
         const dmPrice = stockists[0];
 
-        const wine = await prisma.wine.create({
-            data: {
-                householdId,
-                name: vision.name,
-                producer: vision.producer ?? null,
-                vintage: vision.vintage ?? null,
-                grapes: vision.grapes ?? [],
-                region: vision.region ?? null,
-                country: vision.country ?? null,
-                type: (vision.type as WineType) ?? "RED",
-                imageUrl: vision.imageUrl ?? null,
-                tastingNotes: vision.tastingNotes ?? null,
-                danMurphysProductId: dmPrice?.url ?? null,
-                danMurphysUrl: dmPrice?.url ?? null,
-                danMurphysPrice: dmPrice?.price ?? null,
-                danMurphysSource: dmPrice?.source ?? null,
-                danMurphysPriceAt: dmPrice ? new Date() : null,
-                stockists: stockists.length > 0 ? stockists : undefined,
-            },
+        const createData = {
+            householdId,
+            name: vision.name,
+            producer: vision.producer ?? null,
+            vintage: vision.vintage ?? null,
+            grapes: vision.grapes ?? [],
+            region: vision.region ?? null,
+            country: vision.country ?? null,
+            type: (vision.type as WineType) ?? "RED",
+            imageUrl: vision.imageUrl ?? null,
+            tastingNotes: vision.tastingNotes ?? null,
+            danMurphysProductId: dmPrice?.url ?? null,
+            danMurphysUrl: dmPrice?.url ?? null,
+            danMurphysPrice: dmPrice?.price ?? null,
+            danMurphysSource: dmPrice?.source ?? null,
+            danMurphysPriceAt: dmPrice ? new Date() : null,
+            stockists: stockists.length > 0 ? stockists : undefined,
+        };
+
+        const wine = await prisma.wine.create({ data: createData }).catch(async (error) => {
+            if (!isMissingStockistsColumnError(error)) throw error;
+            const { stockists: _stockists, ...fallbackData } = createData;
+            return prisma.wine.create({ data: fallbackData });
         });
 
         revalidatePath("/cellar");
@@ -174,7 +183,10 @@ export async function refreshWinePrice(formData: FormData) {
     const id = formData.get("id")?.toString();
     if (!id) return { error: "Missing wine ID" };
 
-    const wine = await prisma.wine.findFirst({ where: { id, householdId } });
+    const wine = await prisma.wine.findFirst({
+        where: { id, householdId },
+        select: { id: true, name: true, producer: true, vintage: true },
+    });
     if (!wine) return { error: "Wine not found" };
 
     const stockists = await fetchAllStockists(wine.name, wine.producer ?? undefined, wine.vintage ?? undefined);
@@ -182,16 +194,25 @@ export async function refreshWinePrice(formData: FormData) {
 
     const cheapest = stockists[0];
 
+    const updateData = {
+        stockists,
+        danMurphysPrice: cheapest.price,
+        danMurphysUrl: cheapest.url,
+        danMurphysProductId: cheapest.url,
+        danMurphysSource: cheapest.source,
+        danMurphysPriceAt: new Date(),
+    };
+
     await prisma.wine.update({
         where: { id },
-        data: {
-            stockists,
-            danMurphysPrice: cheapest.price,
-            danMurphysUrl: cheapest.url,
-            danMurphysProductId: cheapest.url,
-            danMurphysSource: cheapest.source,
-            danMurphysPriceAt: new Date(),
-        },
+        data: updateData,
+    }).catch(async (error) => {
+        if (!isMissingStockistsColumnError(error)) throw error;
+        const { stockists: _stockists, ...fallbackData } = updateData;
+        await prisma.wine.update({
+            where: { id },
+            data: fallbackData,
+        });
     });
 
     revalidatePath(`/cellar/${id}`);
