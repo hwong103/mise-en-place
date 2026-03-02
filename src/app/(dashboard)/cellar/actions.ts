@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
-import { extractWineFromImageViaGroq, extractWineFromUrlViaGroq, fetchAllStockists } from "@/lib/wine";
+import { extractWineFromImageViaGroq, extractWineFromNameViaGroq, extractWineFromUrlViaGroq, fetchAllStockists } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
 import type { WineType } from "@prisma/client";
-import type { StockistResult } from "@/lib/wine";
+import type { StockistResult, WineVisionResult } from "@/lib/wine";
 
 const isNextRedirectError = (error: unknown): error is { digest: string } =>
     typeof error === "object"
@@ -181,6 +181,82 @@ export async function createWineFromUrl(formData: FormData) {
         if (isNextRedirectError(error)) throw error;
         console.error("[cellar] Failed to create wine from URL:", error);
         return { error: "URL import failed. Check server logs and API key configuration." };
+    }
+}
+
+export async function createWineFromName(formData: FormData) {
+    try {
+        const householdId = await getCurrentHouseholdId();
+        const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
+        const rawName = formData.get("name")?.toString().trim();
+        if (!rawName) return { error: "No wine name provided" };
+
+        const vintageMatch = rawName.match(/\b(19|20)\d{2}\b/);
+        const vintage = vintageMatch ? Number(vintageMatch[0]) : undefined;
+
+        const { stockists, bottleImageUrl } = await fetchAllStockists(rawName, undefined, vintage);
+        const cheapest = stockists[0];
+
+        const pickMetadataUrl = (results: typeof stockists): string | null => {
+            const priority = [
+                /thewinecollective\.com\.au/i,
+                /vivino\.com/i,
+                /danmurphys\.com\.au/i,
+            ];
+            for (const pattern of priority) {
+                const match = results.find((entry) => pattern.test(entry.url));
+                if (match) return match.url;
+            }
+            return results[0]?.url ?? null;
+        };
+
+        const metadataUrl = pickMetadataUrl(stockists);
+
+        let vision: WineVisionResult | null = null;
+        if (metadataUrl) {
+            vision = await extractWineFromUrlViaGroq(metadataUrl);
+        }
+        if (!vision?.name) {
+            vision = await extractWineFromNameViaGroq(rawName);
+        }
+
+        const imageUrl = vision?.imageUrl ?? bottleImageUrl ?? null;
+
+        const createData = {
+            householdId,
+            name: rawName,
+            producer: vision?.producer ?? null,
+            vintage: vision?.vintage ?? vintage ?? null,
+            grapes: vision?.grapes ?? [],
+            region: vision?.region ?? null,
+            country: vision?.country ?? null,
+            type: (vision?.type as WineType) ?? "RED",
+            imageUrl,
+            tastingNotes: vision?.tastingNotes ?? null,
+            danMurphysProductId: cheapest?.url ?? null,
+            danMurphysUrl: cheapest?.url ?? null,
+            danMurphysPrice: cheapest?.price ?? null,
+            danMurphysSource: cheapest?.source ?? null,
+            danMurphysPriceAt: cheapest ? new Date() : null,
+            ...(supportsStockists ? { stockists: stockists.length > 0 ? stockists : undefined } : {}),
+        };
+
+        let wine;
+        try {
+            wine = await prisma.wine.create({ data: createData, select: { id: true } });
+        } catch (error) {
+            if (!isMissingStockistsColumnError(error)) throw error;
+            markWineStockistsColumnMissing();
+            const { stockists: _stockists, ...fallbackData } = createData;
+            wine = await prisma.wine.create({ data: fallbackData, select: { id: true } });
+        }
+
+        revalidatePath("/cellar");
+        redirect(`/cellar/${wine.id}/edit?mode=name`);
+    } catch (error) {
+        if (isNextRedirectError(error)) throw error;
+        console.error("[cellar] Failed to create wine from name:", error);
+        return { error: "Search failed. Try a more specific name, or use manual entry." };
     }
 }
 

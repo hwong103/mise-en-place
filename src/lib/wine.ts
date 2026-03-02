@@ -1439,3 +1439,54 @@ ${pageText}`;
         return bestDeterministicCandidate;
     }
 }
+
+export async function extractWineFromNameViaGroq(name: string): Promise<WineVisionResult | null> {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!hasUsableApiKey(apiKey)) return null;
+
+    const prompt = `Given only the wine name "${name}", infer what you can about this wine and return ONLY a JSON object — no markdown, no explanation:
+
+{
+  "name": "Cleaned wine name without vintage",
+  "producer": "Producer or winery name",
+  "vintage": 2022,
+  "grapes": ["Gamay"],
+  "region": "Beaujolais",
+  "country": "France",
+  "type": "RED"
+}
+
+Rules:
+- type must be one of: RED, WHITE, SPARKLING, ROSE, DESSERT, FORTIFIED, OTHER
+- vintage is a 4-digit year number, omit if not in the name
+- Only include fields you're reasonably confident about from the name alone
+- Do not hallucinate obscure details — omit rather than guess
+- Return ONLY the JSON object`;
+
+    try {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.1,
+                max_tokens: 256,
+            }),
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (!content) return null;
+
+        const cleaned = cleanJsonBlock(content);
+        return JSON.parse(cleaned) as WineVisionResult;
+    } catch {
+        return null;
+    }
+}
