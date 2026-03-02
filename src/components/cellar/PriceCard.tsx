@@ -209,7 +209,12 @@ export default function PriceCard({
                                     : "border-slate-100 dark:border-slate-800"
                             }`}
                         >
-                            <div className="flex items-start justify-between gap-3">
+                            <a
+                                href={stockist.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-start justify-between gap-3 rounded-xl px-1 py-1 hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
+                            >
                                 <div className="min-w-0">
                                     <div className="mb-1 flex flex-wrap items-center gap-2">
                                         {stockist.url === cheapestUrl && displayStockists.length > 1 ? (
@@ -240,16 +245,9 @@ export default function PriceCard({
                                     >
                                         ${stockist.price.toFixed(2)}
                                     </span>
-                                    <a
-                                        href={stockist.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs font-semibold text-slate-400 hover:text-slate-500 dark:hover:text-slate-300"
-                                    >
-                                        Open
-                                    </a>
+                                    <span className="text-xs text-slate-400">→</span>
                                 </div>
-                            </div>
+                            </a>
                             {stockists.length > 0 ? (
                                 <div className="mt-2 flex items-center justify-end gap-2">
                                     <button
