@@ -48,11 +48,14 @@ export async function createWineFromPhoto(formData: FormData) {
             stockists: stockists.length > 0 ? stockists : undefined,
         };
 
-        const wine = await prisma.wine.create({ data: createData }).catch(async (error) => {
+        let wine;
+        try {
+            wine = await prisma.wine.create({ data: createData });
+        } catch (error) {
             if (!isMissingStockistsColumnError(error)) throw error;
             const { stockists: _stockists, ...fallbackData } = createData;
-            return prisma.wine.create({ data: fallbackData });
-        });
+            wine = await prisma.wine.create({ data: fallbackData });
+        }
 
         revalidatePath("/cellar");
         redirect(`/cellar/${wine.id}/edit?mode=photo`);
@@ -114,11 +117,14 @@ export async function createWineFromUrl(formData: FormData) {
             stockists: stockists.length > 0 ? stockists : undefined,
         };
 
-        const wine = await prisma.wine.create({ data: createData }).catch(async (error) => {
+        let wine;
+        try {
+            wine = await prisma.wine.create({ data: createData });
+        } catch (error) {
             if (!isMissingStockistsColumnError(error)) throw error;
             const { stockists: _stockists, ...fallbackData } = createData;
-            return prisma.wine.create({ data: fallbackData });
-        });
+            wine = await prisma.wine.create({ data: fallbackData });
+        }
 
         revalidatePath("/cellar");
         redirect(`/cellar/${wine.id}/edit?mode=url`);
@@ -203,17 +209,19 @@ export async function refreshWinePrice(formData: FormData) {
         danMurphysPriceAt: new Date(),
     };
 
-    await prisma.wine.update({
-        where: { id },
-        data: updateData,
-    }).catch(async (error) => {
+    try {
+        await prisma.wine.update({
+            where: { id },
+            data: updateData,
+        });
+    } catch (error) {
         if (!isMissingStockistsColumnError(error)) throw error;
         const { stockists: _stockists, ...fallbackData } = updateData;
         await prisma.wine.update({
             where: { id },
             data: fallbackData,
         });
-    });
+    }
 
     revalidatePath(`/cellar/${id}`);
     return { success: true, stockists };

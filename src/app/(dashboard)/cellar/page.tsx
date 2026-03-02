@@ -26,17 +26,20 @@ const parseStockists = (value: unknown): StockistResult[] => {
 export default async function CellarPage() {
     const householdId = await getCurrentHouseholdId();
 
-    const wines = await prisma.wine.findMany({
-        where: { householdId },
-        orderBy: [{ type: "asc" }, { rating: "desc" }, { createdAt: "desc" }],
-        select: {
-            id: true, name: true, producer: true, vintage: true,
-            grapes: true, region: true, country: true, type: true,
-            rating: true, imageUrl: true, locationName: true,
-            danMurphysPrice: true, danMurphysPriceAt: true,
-            danMurphysProductId: true, stockists: true,
-        },
-    }).catch(async (error) => {
+    let wines;
+    try {
+        wines = await prisma.wine.findMany({
+            where: { householdId },
+            orderBy: [{ type: "asc" }, { rating: "desc" }, { createdAt: "desc" }],
+            select: {
+                id: true, name: true, producer: true, vintage: true,
+                grapes: true, region: true, country: true, type: true,
+                rating: true, imageUrl: true, locationName: true,
+                danMurphysPrice: true, danMurphysPriceAt: true,
+                danMurphysProductId: true, stockists: true,
+            },
+        });
+    } catch (error) {
         if (!isMissingStockistsColumnError(error)) throw error;
         const fallback = await prisma.wine.findMany({
             where: { householdId },
@@ -49,8 +52,8 @@ export default async function CellarPage() {
                 danMurphysProductId: true,
             },
         });
-        return fallback.map((wine) => ({ ...wine, stockists: null }));
-    });
+        wines = fallback.map((wine) => ({ ...wine, stockists: null }));
+    }
 
     // Refresh prices older than 24h in the background (non-blocking)
     const staleWines = wines.filter((w) => {
@@ -75,17 +78,19 @@ export default async function CellarPage() {
                     danMurphysSource: cheapest.source,
                     danMurphysPriceAt: new Date(),
                 };
-                await prisma.wine.update({
-                    where: { id: w.id },
-                    data: updateData,
-                }).catch(async (error) => {
+                try {
+                    await prisma.wine.update({
+                        where: { id: w.id },
+                        data: updateData,
+                    });
+                } catch (error) {
                     if (!isMissingStockistsColumnError(error)) throw error;
                     const { stockists: _stockists, ...fallbackData } = updateData;
                     await prisma.wine.update({
                         where: { id: w.id },
                         data: fallbackData,
                     });
-                });
+                }
             })
         );
     }
