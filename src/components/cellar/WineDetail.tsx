@@ -21,6 +21,7 @@ type WineDetailModel = {
     type: string;
     rating: number | null;
     tastingNotes: string | null;
+    imageUrl: string | null;
     danMurphysPrice: number | null;
     danMurphysUrl: string | null;
     danMurphysSource: string | null;
@@ -43,6 +44,7 @@ export default function WineDetail({
     refreshPriceAction: (fd: FormData) => Promise<{
         success?: boolean;
         stockists?: StockistResult[];
+        bottleImageUrl?: string | null;
         error?: string;
     } | undefined>;
 }) {
@@ -50,7 +52,15 @@ export default function WineDetail({
         <div className="mx-auto max-w-2xl space-y-8">
             {/* Hero */}
             <div className="flex items-start gap-5">
-                <div className={`mt-1 h-16 w-2 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
+                {wine.imageUrl ? (
+                    <img
+                        src={wine.imageUrl}
+                        alt={wine.name}
+                        className="mt-1 h-24 w-16 shrink-0 rounded-xl object-contain"
+                    />
+                ) : (
+                    <div className={`mt-1 h-16 w-2 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
+                )}
                 <div className="flex-1 min-w-0">
                     <h1 className="text-3xl font-extrabold leading-tight text-slate-900 dark:text-slate-100">
                         {wine.name}

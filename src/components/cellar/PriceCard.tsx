@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { StockistResult } from "@/lib/wine";
 
 type PriceCardProps = {
@@ -12,7 +13,12 @@ type PriceCardProps = {
     legacyPriceAt?: Date | null;
     refreshAction: (
         fd: FormData
-    ) => Promise<{ success?: boolean; stockists?: StockistResult[]; error?: string } | undefined>;
+    ) => Promise<{
+        success?: boolean;
+        stockists?: StockistResult[];
+        bottleImageUrl?: string | null;
+        error?: string;
+    } | undefined>;
 };
 
 export default function PriceCard({
@@ -24,6 +30,7 @@ export default function PriceCard({
     legacyPriceAt,
     refreshAction,
 }: PriceCardProps) {
+    const router = useRouter();
     const [stockists, setStockists] = useState<StockistResult[]>(initialStockists);
     const [error, setError] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
@@ -56,6 +63,9 @@ export default function PriceCard({
             }
             if (result?.stockists?.length) {
                 setStockists(result.stockists);
+            }
+            if (result?.bottleImageUrl) {
+                router.refresh();
             }
         });
     };

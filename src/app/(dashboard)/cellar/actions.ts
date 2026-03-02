@@ -29,7 +29,7 @@ export async function createWineFromPhoto(formData: FormData) {
         const vision = await extractWineFromImageViaGroq(base64Image, mimeType);
         if (!vision) return { error: "Could not read label. Try a clearer photo." };
 
-        const stockists = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
+        const { stockists, bottleImageUrl } = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
         const dmPrice = stockists[0];
 
         const createData = {
@@ -41,6 +41,7 @@ export async function createWineFromPhoto(formData: FormData) {
             region: vision.region ?? null,
             country: vision.country ?? null,
             type: (vision.type as WineType) ?? "RED",
+            imageUrl: bottleImageUrl ?? null,
             danMurphysProductId: dmPrice?.url ?? null,
             danMurphysUrl: dmPrice?.url ?? null,
             danMurphysPrice: dmPrice?.price ?? null,
@@ -105,7 +106,7 @@ export async function createWineFromUrl(formData: FormData) {
         const vision = await extractWineFromUrlViaGroq(url);
         if (!vision) return { error: "Could not extract wine details from that URL." };
 
-        const stockists = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
+        const { stockists, bottleImageUrl } = await fetchAllStockists(vision.name, vision.producer, vision.vintage);
         const dmPrice = stockists[0];
 
         const createData = {
@@ -117,7 +118,7 @@ export async function createWineFromUrl(formData: FormData) {
             region: vision.region ?? null,
             country: vision.country ?? null,
             type: (vision.type as WineType) ?? "RED",
-            imageUrl: vision.imageUrl ?? null,
+            imageUrl: vision.imageUrl ?? bottleImageUrl ?? null,
             tastingNotes: vision.tastingNotes ?? null,
             danMurphysProductId: dmPrice?.url ?? null,
             danMurphysUrl: dmPrice?.url ?? null,
@@ -209,17 +210,25 @@ export async function refreshWinePrice(formData: FormData) {
 
     const wine = await prisma.wine.findFirst({
         where: { id, householdId },
-        select: { id: true, name: true, producer: true, vintage: true },
+        select: { id: true, name: true, producer: true, vintage: true, imageUrl: true },
     });
     if (!wine) return { error: "Wine not found" };
 
-    const stockists = await fetchAllStockists(wine.name, wine.producer ?? undefined, wine.vintage ?? undefined);
+    const { stockists, bottleImageUrl } = await fetchAllStockists(
+        wine.name,
+        wine.producer ?? undefined,
+        wine.vintage ?? undefined
+    );
     if (!stockists.length) return { error: "No prices found across all sources" };
 
     const cheapest = stockists[0];
+    const imageUrlUpdate = !wine.imageUrl && bottleImageUrl
+        ? { imageUrl: bottleImageUrl }
+        : {};
 
     const updateData = {
         ...(supportsStockists ? { stockists } : {}),
+        ...imageUrlUpdate,
         danMurphysPrice: cheapest.price,
         danMurphysUrl: cheapest.url,
         danMurphysProductId: cheapest.url,
@@ -243,5 +252,5 @@ export async function refreshWinePrice(formData: FormData) {
     }
 
     revalidatePath(`/cellar/${id}`);
-    return { success: true, stockists };
+    return { success: true, stockists, bottleImageUrl: imageUrlUpdate.imageUrl ?? null };
 }

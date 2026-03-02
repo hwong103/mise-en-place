@@ -73,11 +73,16 @@ export default async function CellarPage() {
         void Promise.all(
             staleWines.slice(0, 5).map(async (w) => {  // max 5 at a time
                 const { fetchAllStockists } = await import("@/lib/wine");
-                const stockists = await fetchAllStockists(w.name, w.producer ?? undefined, w.vintage ?? undefined);
+                const { stockists, bottleImageUrl } = await fetchAllStockists(
+                    w.name,
+                    w.producer ?? undefined,
+                    w.vintage ?? undefined
+                );
                 if (!stockists.length) return;
                 const cheapest = stockists[0];
                 const updateData = {
                     ...(supportsStockists ? { stockists } : {}),
+                    ...(!w.imageUrl && bottleImageUrl ? { imageUrl: bottleImageUrl } : {}),
                     danMurphysPrice: cheapest.price,
                     danMurphysUrl: cheapest.url,
                     danMurphysSource: cheapest.source,
