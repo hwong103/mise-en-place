@@ -675,6 +675,7 @@ const buildQueryVariants = (wineName: string, producer?: string, vintage?: numbe
         const words = wineNoYear.split(/\s+/).filter(Boolean);
         wineCore = words.slice(producerWordCount).join(" ").trim() || wineNoYear;
     }
+    wineCore = wineCore.replace(/^[\s\-\u2013\u2014·•,;:'"]+/, "").trim() || wineNoYear;
 
     const producerAscii = normalizeSearchText(producerRaw);
     const wineAscii = normalizeSearchText(wineCore || wineNoYear || wineRaw);
@@ -929,9 +930,13 @@ const fetchDanMurphysStockist = async (
     ];
     try {
         for (const query of queries) {
+            const sanitisedQuery = query
+                .replace(/['\u2018\u2019\u201C\u201D"]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
             for (const endpoint of endpoints) {
                 const response = await fetch(
-                    `${endpoint}?searchTerm=${encodeURIComponent(query)}&pageNumber=1&pageSize=5`,
+                    `${endpoint}?searchTerm=${encodeURIComponent(sanitisedQuery)}&pageNumber=1&pageSize=5`,
                     {
                         headers: {
                             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -979,8 +984,12 @@ const fetchBwsStockist = async (
     const queries = buildQueryVariants(wineName, producer, vintage);
     try {
         for (const query of queries) {
+            const sanitisedQuery = query
+                .replace(/['\u2018\u2019\u201C\u201D"]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
             const response = await fetch(
-                `https://api.bws.com.au/apis/ui/product/Search?searchTerm=${encodeURIComponent(query)}&pageSize=5`,
+                `https://api.bws.com.au/apis/ui/product/Search?searchTerm=${encodeURIComponent(sanitisedQuery)}&pageSize=5`,
                 {
                     headers: {
                         "User-Agent": "Mozilla/5.0",
@@ -1132,8 +1141,12 @@ const fetchWineCollectiveStockist = async (
 
     try {
         for (const query of queryVariants) {
+            const shopifyQuery = query
+                .replace(/['\u2018\u2019\u201C\u201D"]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
             const suggestUrl = new URL(`${wineCollectiveOrigin}/search/suggest.json`);
-            suggestUrl.searchParams.set("q", query);
+            suggestUrl.searchParams.set("q", shopifyQuery);
             suggestUrl.searchParams.set("resources[type]", "product");
             suggestUrl.searchParams.set("resources[limit]", "8");
             suggestUrl.searchParams.set("resources[options][unavailable_products]", "last");
