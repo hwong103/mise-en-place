@@ -649,6 +649,7 @@ export type StockistResult = {
     price: number;
     url: string;
     fetchedAt: string;
+    productName?: string;
 };
 
 type SerpShoppingResult = {
@@ -754,6 +755,7 @@ const fetchSerpShopping = async (
                 seller?: string;
                 merchant?: string;
                 store?: string;
+                title?: string;
                 thumbnail?: string;
                 serpapi_thumbnail?: string;
             }> = data.shopping_results ?? [];
@@ -780,9 +782,16 @@ const fetchSerpShopping = async (
                         }
                     }
 
-                    return { source, price, url, fetchedAt } satisfies StockistResult;
+                    const productName = typeof result.title === "string" ? normalizeText(result.title) : undefined;
+                    return {
+                        source,
+                        price,
+                        url,
+                        fetchedAt,
+                        ...(productName ? { productName } : {}),
+                    } satisfies StockistResult;
                 })
-                .filter((result): result is StockistResult => result !== null);
+                .filter((result) => result !== null);
 
             console.info(`[wine] SerpAPI shopping query="${query}" → ${stockists.length} parsed stockists`);
 
@@ -854,6 +863,7 @@ const fetchSerpOrganic = async (
                 extracted_price?: number;
                 link?: string;
                 source?: string;
+                title?: string;
             }> = data.inline_shopping?.items ?? data.shopping_results ?? [];
             const organicResults: Array<{ link?: string; snippet?: string }> = data.organic_results ?? [];
             const fetchedAt = new Date().toISOString();
@@ -861,7 +871,13 @@ const fetchSerpOrganic = async (
             for (const result of inlineProducts) {
                 const price = result.extracted_price ?? parsePrice(result.price);
                 if (Number.isNaN(price) || price <= 0 || !result.link || !result.source) continue;
-                stockists.push({ source: result.source, price, url: result.link, fetchedAt });
+                stockists.push({
+                    source: result.source,
+                    price,
+                    url: result.link,
+                    fetchedAt,
+                    productName: typeof result.title === "string" ? normalizeText(result.title) : undefined,
+                });
             }
 
             for (const result of organicResults) {
@@ -988,6 +1004,9 @@ const fetchDanMurphysStockist = async (
                     price: Number(price),
                     url: `https://www.danmurphys.com.au/product/${slug}`,
                     fetchedAt: new Date().toISOString(),
+                    productName: typeof (best as { name?: unknown }).name === "string"
+                        ? normalizeText((best as { name: string }).name)
+                        : undefined,
                 }];
             }
         }
@@ -1036,6 +1055,9 @@ const fetchBwsStockist = async (
                 price: Number(price),
                 url: `https://bws.com.au/product/${best.stockCode ?? ""}`,
                 fetchedAt: new Date().toISOString(),
+                productName: typeof (best as { name?: unknown }).name === "string"
+                    ? normalizeText((best as { name: string }).name)
+                    : undefined,
             }];
         }
         return [];
@@ -1130,6 +1152,7 @@ const fetchWineCollectiveStockist = async (
                 url: string;
                 price: number;
                 score: number;
+                title?: string;
             }
             | undefined;
 
@@ -1153,7 +1176,13 @@ const fetchWineCollectiveStockist = async (
             score += desiredTokens.reduce((acc, token) => acc + (titleTokens.has(token) ? 1 : 0), 0);
 
             if (!best || score > best.score) {
-                best = { handle, url, price, score };
+                best = {
+                    handle,
+                    url,
+                    price,
+                    score,
+                    title: product.title ? normalizeText(product.title) : undefined,
+                };
             }
         }
 
@@ -1208,6 +1237,7 @@ const fetchWineCollectiveStockist = async (
                     price: precise.price,
                     url: precise.url,
                     fetchedAt,
+                    productName: best.title,
                 }];
             }
 
@@ -1216,6 +1246,7 @@ const fetchWineCollectiveStockist = async (
                 price: best.price,
                 url: best.url,
                 fetchedAt,
+                productName: best.title,
             }];
         }
 

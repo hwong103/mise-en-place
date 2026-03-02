@@ -114,9 +114,16 @@ export default function PriceCard({
                                         CHEAPEST
                                     </span>
                                 ) : null}
-                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                    {stockist.source}
-                                </span>
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                        {stockist.source}
+                                    </p>
+                                    {stockist.productName ? (
+                                        <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+                                            {stockist.productName}
+                                        </p>
+                                    ) : null}
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span

@@ -13,7 +13,7 @@ type WineSummary = {
     type: string; rating?: number | null;
     imageUrl?: string | null; locationName?: string | null;
     danMurphysPrice?: number | null; danMurphysPriceAt?: Date | null;
-    stockists?: Array<{ source: string; price: number; url: string; fetchedAt: string }> | null;
+    stockists?: Array<{ source: string; price: number; url: string; fetchedAt: string; productName?: string }> | null;
 };
 
 const WINE_TYPE_LABELS: Record<string, string> = {
@@ -282,8 +282,16 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                         href={`/cellar/${wine.id}`}
                                         className="group flex gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500"
                                     >
-                                        {/* Wine colour swatch */}
-                                        <div className={`h-14 w-1.5 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
+                                        {/* Bottle image (fallback to colour swatch) */}
+                                        {wine.imageUrl ? (
+                                            <img
+                                                src={wine.imageUrl}
+                                                alt={wine.name}
+                                                className="h-14 w-10 shrink-0 rounded-lg object-contain"
+                                            />
+                                        ) : (
+                                            <div className={`h-14 w-1.5 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
+                                        )}
 
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate font-bold text-slate-900 dark:text-slate-100">
