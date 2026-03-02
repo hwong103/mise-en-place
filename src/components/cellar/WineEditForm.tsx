@@ -3,6 +3,7 @@
 import { Wine } from "@prisma/client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { MapPin } from "lucide-react";
 
 const WINE_TYPES = ["RED", "WHITE", "SPARKLING", "ROSE", "DESSERT", "FORTIFIED", "OTHER"];
 
@@ -328,8 +329,9 @@ export default function WineEditForm({
                             </div>
                         )}
                         {lat && lng && locationName && (
-                            <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                                📍 {locationName}
+                            <p className="mt-1.5 inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                                {locationName}
                             </p>
                         )}
                     </div>

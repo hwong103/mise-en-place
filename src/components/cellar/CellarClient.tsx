@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Wine } from "@prisma/client";
+import { Camera, Link2, MapPin, PencilLine, Wine as WineIcon } from "lucide-react";
 import { createWineFromPhoto, createWineFromUrl, createWineManually } from "@/app/(dashboard)/cellar/actions";
 
 // Types
@@ -160,7 +160,8 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                             </span>
                         ) : (
                             <>
-                                🍷 Log a Wine
+                                <WineIcon className="h-4 w-4" aria-hidden="true" />
+                                <span>Log a Wine</span>
                                 <span className={`text-[10px] transition-transform ${pickerOpen ? "rotate-180" : ""}`}>▼</span>
                             </>
                         )}
@@ -177,7 +178,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                     onChange={handlePhotoUpload}
                                     className="hidden"
                                 />
-                                <span className="text-xl">📷</span>
+                                <Camera className="h-5 w-5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                                 <div>
                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Photo</p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">Snap the label, Groq fills in the details</p>
@@ -189,7 +190,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                             {/* URL option */}
                             <div className="px-3 py-2.5">
                                 <div className="mb-2 flex items-center gap-3">
-                                    <span className="text-xl">🔗</span>
+                                    <Link2 className="h-5 w-5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                                     <div>
                                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">URL</p>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">Vivino, Wine Searcher, winery page</p>
@@ -223,7 +224,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                 onClick={handleManual}
                                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
-                                <span className="text-xl">✏️</span>
+                                <PencilLine className="h-5 w-5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                                 <div>
                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Manual</p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">Type in the details yourself</p>
@@ -297,7 +298,12 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                                 </p>
                                             ) : null}
                                             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                                                {wine.locationName ? <span>📍 {wine.locationName}</span> : null}
+                                                {wine.locationName ? (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                                                        {wine.locationName}
+                                                    </span>
+                                                ) : null}
                                                 {wine.danMurphysPrice ? (
                                                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                                                         ${wine.danMurphysPrice.toFixed(2)}
