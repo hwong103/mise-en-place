@@ -15,7 +15,26 @@ export default async function WineEditPage({
     const { mode } = await searchParams;
     const householdId = await getCurrentHouseholdId();
 
-    const wine = await prisma.wine.findFirst({ where: { id, householdId } });
+    const wine = await prisma.wine.findFirst({
+        where: { id, householdId },
+        select: {
+            id: true,
+            name: true,
+            producer: true,
+            vintage: true,
+            grapes: true,
+            region: true,
+            country: true,
+            type: true,
+            rating: true,
+            tastingNotes: true,
+            triedAt: true,
+            locationName: true,
+            locationAddress: true,
+            locationLat: true,
+            locationLng: true,
+        },
+    });
     if (!wine) notFound();
 
     return (

@@ -13,6 +13,7 @@ type WineSummary = {
     type: string; rating?: number | null;
     imageUrl?: string | null; locationName?: string | null;
     danMurphysPrice?: number | null; danMurphysPriceAt?: Date | null;
+    stockists?: Array<{ source: string; price: number; url: string; fetchedAt: string; productName?: string }> | null;
 };
 
 const WINE_TYPE_LABELS: Record<string, string> = {
@@ -281,8 +282,16 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                         href={`/cellar/${wine.id}`}
                                         className="group flex gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500"
                                     >
-                                        {/* Wine colour swatch */}
-                                        <div className={`h-14 w-1.5 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
+                                        {/* Bottle image (fallback to colour swatch) */}
+                                        {wine.imageUrl ? (
+                                            <img
+                                                src={wine.imageUrl}
+                                                alt={wine.name}
+                                                className="h-14 w-10 shrink-0 rounded-lg object-contain"
+                                            />
+                                        ) : (
+                                            <div className={`h-14 w-1.5 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
+                                        )}
 
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate font-bold text-slate-900 dark:text-slate-100">
@@ -304,11 +313,18 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                                         {wine.locationName}
                                                     </span>
                                                 ) : null}
-                                                {wine.danMurphysPrice ? (
-                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                                                        ${wine.danMurphysPrice.toFixed(2)}
-                                                    </span>
-                                                ) : null}
+                                                {(() => {
+                                                    const stockists = Array.isArray(wine.stockists) ? wine.stockists : [];
+                                                    const cheapest = stockists.length > 0
+                                                        ? stockists.reduce((a, b) => (a.price < b.price ? a : b))
+                                                        : null;
+                                                    const price = wine.danMurphysPrice ?? cheapest?.price;
+                                                    return price ? (
+                                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                            from ${price.toFixed(2)}
+                                                        </span>
+                                                    ) : null;
+                                                })()}
                                             </div>
                                         </div>
 

@@ -154,6 +154,7 @@ model Wine {
   danMurphysPrice      Float?
   danMurphysSource     String?
   danMurphysPriceAt    DateTime?  // when price was last fetched
+  stockists            Json?      // Array of { source, price, url, fetchedAt }
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

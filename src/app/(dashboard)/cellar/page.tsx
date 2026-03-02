@@ -2,21 +2,63 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import CellarClient from "@/components/cellar/CellarClient";
+import type { StockistResult } from "@/lib/wine";
+import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
+
+const parseStockists = (value: unknown): StockistResult[] => {
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is StockistResult =>
+        Boolean(
+            entry
+            && typeof entry === "object"
+            && "source" in entry
+            && "price" in entry
+            && "url" in entry
+            && "fetchedAt" in entry
+            && typeof entry.source === "string"
+            && typeof entry.price === "number"
+            && typeof entry.url === "string"
+            && typeof entry.fetchedAt === "string"
+        )
+    );
+};
 
 export default async function CellarPage() {
     const householdId = await getCurrentHouseholdId();
+    const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
 
-    const wines = await prisma.wine.findMany({
-        where: { householdId },
-        orderBy: [{ type: "asc" }, { rating: "desc" }, { createdAt: "desc" }],
-        select: {
-            id: true, name: true, producer: true, vintage: true,
-            grapes: true, region: true, country: true, type: true,
-            rating: true, imageUrl: true, locationName: true,
-            danMurphysPrice: true, danMurphysPriceAt: true,
-            danMurphysProductId: true,
-        },
-    });
+    let wines;
+    try {
+        wines = await prisma.wine.findMany({
+            where: { householdId },
+            orderBy: [{ type: "asc" }, { rating: "desc" }, { createdAt: "desc" }],
+            select: {
+                id: true, name: true, producer: true, vintage: true,
+                grapes: true, region: true, country: true, type: true,
+                rating: true, imageUrl: true, locationName: true,
+                danMurphysPrice: true, danMurphysPriceAt: true,
+                danMurphysProductId: true, ...(supportsStockists ? { stockists: true } : {}),
+            },
+        });
+        if (!supportsStockists) {
+            wines = wines.map((wine) => ({ ...wine, stockists: null }));
+        }
+    } catch (error) {
+        if (!isMissingStockistsColumnError(error)) throw error;
+        markWineStockistsColumnMissing();
+        const fallback = await prisma.wine.findMany({
+            where: { householdId },
+            orderBy: [{ type: "asc" }, { rating: "desc" }, { createdAt: "desc" }],
+            select: {
+                id: true, name: true, producer: true, vintage: true,
+                grapes: true, region: true, country: true, type: true,
+                rating: true, imageUrl: true, locationName: true,
+                danMurphysPrice: true, danMurphysPriceAt: true,
+                danMurphysProductId: true,
+            },
+        });
+        wines = fallback.map((wine) => ({ ...wine, stockists: null }));
+    }
 
     // Refresh prices older than 24h in the background (non-blocking)
     const staleWines = wines.filter((w) => {
@@ -30,21 +72,44 @@ export default async function CellarPage() {
     if (staleWines.length > 0) {
         void Promise.all(
             staleWines.slice(0, 5).map(async (w) => {  // max 5 at a time
-                const { fetchBottlePrice } = await import("@/lib/wine");
-                const result = await fetchBottlePrice(w.name, w.producer ?? undefined, w.vintage ?? undefined);
-                if (!result) return;
-                await prisma.wine.update({
-                    where: { id: w.id },
-                    data: {
-                        danMurphysPrice: result.price,
-                        danMurphysUrl: result.url,
-                        danMurphysSource: result.source,
-                        danMurphysPriceAt: new Date(),
-                    },
-                });
+                const { fetchAllStockists } = await import("@/lib/wine");
+                const { stockists, bottleImageUrl } = await fetchAllStockists(
+                    w.name,
+                    w.producer ?? undefined,
+                    w.vintage ?? undefined
+                );
+                if (!stockists.length) return;
+                const cheapest = stockists[0];
+                const updateData = {
+                    ...(supportsStockists ? { stockists } : {}),
+                    ...(!w.imageUrl && bottleImageUrl ? { imageUrl: bottleImageUrl } : {}),
+                    danMurphysPrice: cheapest.price,
+                    danMurphysUrl: cheapest.url,
+                    danMurphysSource: cheapest.source,
+                    danMurphysPriceAt: new Date(),
+                };
+                try {
+                    await prisma.wine.updateMany({
+                        where: { id: w.id },
+                        data: updateData,
+                    });
+                } catch (error) {
+                    if (!isMissingStockistsColumnError(error)) throw error;
+                    markWineStockistsColumnMissing();
+                    const { stockists: _stockists, ...fallbackData } = updateData;
+                    await prisma.wine.updateMany({
+                        where: { id: w.id },
+                        data: fallbackData,
+                    });
+                }
             })
         );
     }
 
-    return <CellarClient wines={wines} />;
+    const winesForClient = wines.map((wine) => ({
+        ...wine,
+        stockists: parseStockists(wine.stockists),
+    }));
+
+    return <CellarClient wines={winesForClient} />;
 }
