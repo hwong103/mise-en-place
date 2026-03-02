@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wine } from "@prisma/client";
+import PriceCard from "@/components/cellar/PriceCard";
 
 const WINE_TYPE_COLORS: Record<string, string> = {
     RED: "bg-rose-900", WHITE: "bg-amber-100 dark:bg-amber-900",
@@ -16,13 +17,13 @@ export default function WineDetail({
 }: {
     wine: Wine;
     deleteAction: (fd: FormData) => Promise<void>;
-    refreshPriceAction: (fd: FormData) => Promise<void>;
+    refreshPriceAction: (fd: FormData) => Promise<{
+        success?: boolean;
+        source?: string;
+        price?: number;
+        error?: string;
+    } | undefined>;
 }) {
-    const now = new Date().getTime();
-    const priceAge = wine.danMurphysPriceAt
-        ? Math.round((now - new Date(wine.danMurphysPriceAt).getTime()) / 1000 / 60 / 60)
-        : null;
-
     return (
         <div className="mx-auto max-w-2xl space-y-8">
             {/* Hero */}
@@ -62,46 +63,15 @@ export default function WineDetail({
                 </div>
             ) : null}
 
-            {/* Dan Murphy's price */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                            {wine.danMurphysSource ?? "Best Price Found"}
-                        </p>
-                        {wine.danMurphysPrice ? (
-                            <p className="mt-0.5 text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                                ${wine.danMurphysPrice.toFixed(2)}
-                            </p>
-                        ) : (
-                            <p className="mt-0.5 text-sm text-slate-400">Not found</p>
-                        )}
-                        {priceAge !== null ? (
-                            <p className="text-xs text-slate-400">
-                                Updated {priceAge < 1 ? "just now" : `${priceAge}h ago`}
-                            </p>
-                        ) : null}
-                    </div>
-                    <div className="flex gap-2">
-                        {wine.danMurphysUrl ? (
-                            <a
-                                href={wine.danMurphysUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
-                            >
-                                View →
-                            </a>
-                        ) : null}
-                        <form action={refreshPriceAction}>
-                            <input type="hidden" name="id" value={wine.id} />
-                            <button type="submit" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300">
-                                Refresh
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
+            {/* Price */}
+            <PriceCard
+                wineId={wine.id}
+                initialPrice={wine.danMurphysPrice}
+                initialUrl={wine.danMurphysUrl}
+                initialSource={wine.danMurphysSource ?? null}
+                initialPriceAt={wine.danMurphysPriceAt}
+                refreshAction={refreshPriceAction}
+            />
 
             {/* Location */}
             {wine.locationName ? (

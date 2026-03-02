@@ -169,15 +169,15 @@ export async function deleteWine(formData: FormData) {
 export async function refreshWinePrice(formData: FormData) {
     const householdId = await getCurrentHouseholdId();
     const id = formData.get("id")?.toString();
-    if (!id) return;
+    if (!id) return { error: "Missing wine ID" };
 
     const wine = await prisma.wine.findFirst({ where: { id, householdId } });
-    if (!wine) return;
+    if (!wine) return { error: "Wine not found" };
 
     const dmPrice = await fetchBottlePrice(wine.name, wine.producer ?? undefined, wine.vintage ?? undefined);
     if (!dmPrice) {
         console.info(`[cellar] No price found for wine ${wine.id} (${wine.name})`);
-        return;
+        return { error: "No price found across all sources" };
     }
 
     await prisma.wine.update({
@@ -192,4 +192,5 @@ export async function refreshWinePrice(formData: FormData) {
     });
 
     revalidatePath(`/cellar/${id}`);
+    return { success: true, source: dmPrice.source, price: dmPrice.price };
 }
