@@ -700,12 +700,20 @@ const fetchSerpShopping = async (
     const apiKey = process.env.SERPAPI_KEY;
     if (!hasUsableApiKey(apiKey)) return [];
 
-    const queries = buildQueryVariants(wineName, producer, vintage).map((q) => `${q} Australia wine`);
+    const allVariants = buildQueryVariants(wineName, producer, vintage);
+    const queries = [
+        wineName,
+        ...allVariants.slice(7),
+        ...allVariants.slice(2, 7),
+    ];
+
     const stockists: StockistResult[] = [];
     try {
         for (const query of queries) {
             const url = new URL("https://serpapi.com/search");
             url.searchParams.set("engine", "google_shopping");
+            url.searchParams.set("google_domain", "google.com.au");
+            url.searchParams.set("location", "Sydney, New South Wales, Australia");
             url.searchParams.set("q", query);
             url.searchParams.set("gl", "au");
             url.searchParams.set("hl", "en");
@@ -716,15 +724,25 @@ const fetchSerpShopping = async (
                 signal: AbortSignal.timeout(8000),
                 next: { revalidate: 0 },
             });
-            if (!response.ok) continue;
+            if (!response.ok) {
+                console.warn(`[wine] SerpAPI shopping HTTP ${response.status} for query="${query}"`);
+                continue;
+            }
 
             const data = await response.json();
+            if (typeof data?.error === "string") {
+                console.warn(`[wine] SerpAPI shopping error: ${data.error}`);
+                continue;
+            }
+
             const results: Array<{
                 price?: string;
                 extracted_price?: number;
                 link?: string;
                 source?: string;
             }> = data.shopping_results ?? [];
+
+            console.info(`[wine] SerpAPI shopping query="${query}" → ${results.length} raw results`);
 
             const fetchedAt = new Date().toISOString();
             stockists.push(
@@ -739,7 +757,8 @@ const fetchSerpShopping = async (
             if (stockists.length > 0) break;
         }
         return stockists;
-    } catch {
+    } catch (error) {
+        console.warn("[wine] SerpAPI shopping threw:", error);
         return [];
     }
 };
@@ -752,7 +771,13 @@ const fetchSerpOrganic = async (
     const apiKey = process.env.SERPAPI_KEY;
     if (!hasUsableApiKey(apiKey)) return [];
 
-    const queries = buildQueryVariants(wineName, producer, vintage).map((q) => `${q} buy Australia`);
+    const allVariants = buildQueryVariants(wineName, producer, vintage);
+    const queries = [
+        wineName,
+        ...allVariants.slice(7),
+        ...allVariants.slice(2, 7),
+    ];
+
     const stockists: StockistResult[] = [];
     try {
         const KNOWN_RETAILERS = [
@@ -763,12 +788,17 @@ const fetchSerpOrganic = async (
             { pattern: /firstchoiceliquor\.com\.au/i, name: "First Choice Liquor" },
             { pattern: /winedepot\.com\.au/i, name: "Wine Depot" },
             { pattern: /winestar\.com\.au/i, name: "Wine Star" },
+            { pattern: /grevilleawines\.com\.au/i, name: "Greville & Co Wines" },
+            { pattern: /thevinepress\.com\.au/i, name: "The Vine Press" },
+            { pattern: /worldwine\.com\.au/i, name: "World Wine" },
         ];
 
         for (const query of queries) {
             const url = new URL("https://serpapi.com/search");
             url.searchParams.set("engine", "google");
-            url.searchParams.set("q", query);
+            url.searchParams.set("google_domain", "google.com.au");
+            url.searchParams.set("location", "Sydney, New South Wales, Australia");
+            url.searchParams.set("q", `${query} buy`);
             url.searchParams.set("gl", "au");
             url.searchParams.set("hl", "en");
             url.searchParams.set("num", "10");
@@ -781,6 +811,7 @@ const fetchSerpOrganic = async (
             if (!response.ok) continue;
 
             const data = await response.json();
+            if (typeof data?.error === "string") continue;
             const inlineProducts: Array<{
                 price?: string;
                 extracted_price?: number;
@@ -962,74 +993,6 @@ const fetchBwsStockist = async (
                 fetchedAt: new Date().toISOString(),
             }];
         }
-        return [];
-    } catch {
-        return [];
-    }
-};
-
-const fetchLegacySerpBestStockist = async (
-    wineName: string,
-    producer?: string,
-    vintage?: number
-): Promise<StockistResult[]> => {
-    const serpKey = process.env.SERPAPI_KEY;
-    if (!hasUsableApiKey(serpKey)) return [];
-
-    const queries = buildQueryVariants(wineName, producer, vintage)
-        .slice(0, 8)
-        .map((query) => `${query} wine Australia`);
-
-    try {
-        for (const query of queries) {
-            const url = new URL("https://serpapi.com/search");
-            url.searchParams.set("engine", "google_shopping");
-            url.searchParams.set("q", query);
-            url.searchParams.set("gl", "au");
-            url.searchParams.set("hl", "en");
-            url.searchParams.set("num", "8");
-            url.searchParams.set("api_key", serpKey);
-
-            const response = await fetch(url.toString(), {
-                signal: AbortSignal.timeout(8000),
-                next: { revalidate: 0 },
-            });
-            if (!response.ok) {
-                console.warn(`[wine] legacy SerpAPI HTTP ${response.status} for query="${query}"`);
-                continue;
-            }
-
-            const data = await response.json();
-            if (typeof data?.error === "string") {
-                console.warn(`[wine] legacy SerpAPI error for query="${query}": ${data.error}`);
-                continue;
-            }
-            const results: Array<{
-                price?: string;
-                extracted_price?: number;
-                link?: string;
-                source?: string;
-            }> = data.shopping_results ?? [];
-
-            const sorted = [...results].sort((a, b) => {
-                const aDm = /dan\s*murphy/i.test(a.source ?? "");
-                const bDm = /dan\s*murphy/i.test(b.source ?? "");
-                return Number(bDm) - Number(aDm);
-            });
-
-            const fetchedAt = new Date().toISOString();
-            for (const result of sorted) {
-                const price = result.extracted_price ?? parsePrice(result.price);
-                if (Number.isNaN(price) || price <= 0 || !result.link) continue;
-                return [{
-                    source: result.source ?? "Google Shopping",
-                    price,
-                    url: result.link,
-                    fetchedAt,
-                }];
-            }
-        }
-
         return [];
     } catch {
         return [];
@@ -1219,8 +1182,7 @@ export async function fetchAllStockists(
     vintage?: number
 ): Promise<StockistResult[]> {
     const queryVariants = buildQueryVariants(wineName, producer, vintage);
-    const [legacyBest, serpShopping, serpOrganic, vivino, danMurphys, bws, wineCollective] = await Promise.all([
-        fetchLegacySerpBestStockist(wineName, producer, vintage),
+    const [serpShopping, serpOrganic, vivino, danMurphys, bws, wineCollective] = await Promise.all([
         fetchSerpShopping(wineName, producer, vintage),
         fetchSerpOrganic(wineName, producer, vintage),
         fetchVivinoStockists(wineName, producer, vintage),
@@ -1229,7 +1191,7 @@ export async function fetchAllStockists(
         fetchWineCollectiveStockist(wineName, producer, vintage),
     ]);
 
-    const all = [...legacyBest, ...serpShopping, ...serpOrganic, ...vivino, ...danMurphys, ...bws, ...wineCollective];
+    const all = [...serpShopping, ...serpOrganic, ...vivino, ...danMurphys, ...bws, ...wineCollective];
     const bySource = new Map<string, StockistResult>();
     for (const result of all) {
         const key = result.source.toLowerCase().trim();
@@ -1242,7 +1204,7 @@ export async function fetchAllStockists(
     const deduped = Array.from(bySource.values()).sort((a, b) => a.price - b.price);
     console.info(
         `[wine] stockist results for "${wineName}" (${producer ?? "unknown producer"}, ${vintage ?? "nv"}): `
-        + `legacy=${legacyBest.length} shopping=${serpShopping.length} organic=${serpOrganic.length} `
+        + `shopping=${serpShopping.length} organic=${serpOrganic.length} `
         + `vivino=${vivino.length} dm=${danMurphys.length} bws=${bws.length} wc=${wineCollective.length} total=${deduped.length}`
     );
     if (deduped.length === 0) {
