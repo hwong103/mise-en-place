@@ -84,7 +84,7 @@ export default async function CellarPage() {
                     danMurphysPriceAt: new Date(),
                 };
                 try {
-                    await prisma.wine.update({
+                    await prisma.wine.updateMany({
                         where: { id: w.id },
                         data: updateData,
                     });
@@ -92,7 +92,7 @@ export default async function CellarPage() {
                     if (!isMissingStockistsColumnError(error)) throw error;
                     markWineStockistsColumnMissing();
                     const { stockists: _stockists, ...fallbackData } = updateData;
-                    await prisma.wine.update({
+                    await prisma.wine.updateMany({
                         where: { id: w.id },
                         data: fallbackData,
                     });
