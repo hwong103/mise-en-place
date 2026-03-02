@@ -1041,55 +1041,173 @@ const fetchWineCollectiveStockist = async (
     producer?: string,
     vintage?: number
 ): Promise<StockistResult[]> => {
-    const query = buildSearchQuery(wineName, producer, vintage);
+    const queryVariants = buildQueryVariants(wineName, producer, vintage).slice(0, 6);
     const fetchedAt = new Date().toISOString();
+    const wineCollectiveOrigin = "https://www.thewinecollective.com.au";
 
-    try {
-        const response = await fetch(
-            `https://www.thewinecollective.com.au/search?type=product&q=${encodeURIComponent(query)}&view=json`,
-            {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                    Accept: "application/json, text/html, */*",
-                    Referer: "https://www.thewinecollective.com.au/",
-                },
-                signal: AbortSignal.timeout(7000),
+    const sanitizeProductUrl = (value: string | undefined) => {
+        if (!value) return undefined;
+        const trimmed = value.trim();
+        if (!trimmed || /{{|}}|%7B%7B|%7D%7D/i.test(trimmed)) return undefined;
+
+        try {
+            const parsed = new URL(trimmed, wineCollectiveOrigin);
+            if (!/thewinecollective\.com\.au$/i.test(parsed.hostname)) return undefined;
+            if (!parsed.pathname.startsWith("/products/")) return undefined;
+            return `${wineCollectiveOrigin}${parsed.pathname}`;
+        } catch {
+            return undefined;
+        }
+    };
+
+    const parseSuggestPrice = (value: unknown) => {
+        if (typeof value === "number") {
+            if (!Number.isFinite(value) || value <= 0) return NaN;
+            return value > 1000 ? value / 100 : value;
+        }
+        if (typeof value === "string") {
+            const parsed = parsePrice(value);
+            return Number.isFinite(parsed) ? parsed : NaN;
+        }
+        return NaN;
+    };
+
+    const fetchProductJson = async (handle: string) => {
+        const response = await fetch(`${wineCollectiveOrigin}/products/${encodeURIComponent(handle)}.js`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0",
+                Accept: "application/json",
+                Referer: `${wineCollectiveOrigin}/`,
+            },
+            signal: AbortSignal.timeout(7000),
+        });
+        if (!response.ok) return undefined;
+
+        const data = await response.json() as {
+            handle?: string;
+            price?: number;
+            price_min?: number;
+            variants?: Array<{ price?: number }>;
+        };
+
+        const cents = data.price_min ?? data.price ?? data.variants?.[0]?.price;
+        const price = typeof cents === "number" ? cents / 100 : NaN;
+        const canonicalHandle = typeof data.handle === "string" && data.handle.trim()
+            ? data.handle.trim()
+            : handle;
+
+        if (!Number.isFinite(price) || price <= 0) return undefined;
+        return {
+            price,
+            url: `${wineCollectiveOrigin}/products/${canonicalHandle}`,
+        };
+    };
+
+    const findBestHandleFromSuggest = (products: Array<{
+        handle?: string;
+        title?: string;
+        url?: string;
+        price?: string | number;
+        price_min?: string | number;
+    }>) => {
+        if (!products.length) return undefined;
+
+        const desiredName = normalizeSearchText(stripLeadingVintage(wineName)).toLowerCase();
+        const producerName = normalizeSearchText(producer ?? "").toLowerCase();
+        const desiredTokens = desiredName.split(" ").filter((token) => token.length >= 3);
+
+        let best:
+            | {
+                handle: string;
+                url: string;
+                price: number;
+                score: number;
             }
-        );
-        if (!response.ok) return [];
+            | undefined;
 
-        const contentType = response.headers.get("content-type") ?? "";
-        if (contentType.includes("json")) {
-            const data = await response.json();
-            const products: Array<{
-                url?: string;
-                price?: number;
-                variants?: Array<{ price?: number }>;
-            }> = data?.results ?? data?.products ?? [];
-            if (products.length === 0) return [];
+        for (const product of products) {
+            const fromUrl = sanitizeProductUrl(product.url);
+            const handleFromUrl = fromUrl?.match(/\/products\/([^/?#]+)/i)?.[1];
+            const handle = product.handle?.trim() || handleFromUrl;
+            if (!handle) continue;
 
-            const best = products[0];
-            const rawPrice = best.price ?? best.variants?.[0]?.price;
-            const price = rawPrice ? Number(rawPrice) / 100 : NaN;
-            if (Number.isNaN(price) || price <= 0) return [];
+            const url = fromUrl ?? `${wineCollectiveOrigin}/products/${handle}`;
+            const price = parseSuggestPrice(product.price_min ?? product.price);
+            if (!Number.isFinite(price) || price <= 0) continue;
 
-            const url = best.url
-                ? `https://www.thewinecollective.com.au${best.url}`
-                : `https://www.thewinecollective.com.au/search?q=${encodeURIComponent(query)}`;
-            return [{ source: "The Wine Collective", price, url, fetchedAt }];
+            const title = normalizeSearchText(product.title ?? "").toLowerCase();
+            const titleTokens = new Set(title.split(" ").filter(Boolean));
+            let score = 0;
+
+            if (title && desiredName && title.includes(desiredName)) score += 40;
+            if (title && producerName && title.includes(producerName)) score += 20;
+            if (vintage && title.includes(String(vintage))) score += 10;
+            score += desiredTokens.reduce((acc, token) => acc + (titleTokens.has(token) ? 1 : 0), 0);
+
+            if (!best || score > best.score) {
+                best = { handle, url, price, score };
+            }
         }
 
-        const html = await response.text();
-        const priceMatch = html.match(/(?:AUD\s*|A?\$\s*)([\d,]+(?:\.\d{1,2})?)/i);
-        if (!priceMatch) return [];
-        const price = parsePrice(priceMatch[1]);
-        if (Number.isNaN(price) || price <= 0) return [];
+        return best;
+    };
 
-        const productMatch = html.match(/href="(\/products\/[^"]+)"/i);
-        const url = productMatch
-            ? `https://www.thewinecollective.com.au${productMatch[1]}`
-            : `https://www.thewinecollective.com.au/search?q=${encodeURIComponent(query)}`;
-        return [{ source: "The Wine Collective", price, url, fetchedAt }];
+    try {
+        for (const query of queryVariants) {
+            const suggestUrl = new URL(`${wineCollectiveOrigin}/search/suggest.json`);
+            suggestUrl.searchParams.set("q", query);
+            suggestUrl.searchParams.set("resources[type]", "product");
+            suggestUrl.searchParams.set("resources[limit]", "8");
+            suggestUrl.searchParams.set("resources[options][unavailable_products]", "last");
+            suggestUrl.searchParams.set("resources[options][fields]", "title,product_type,variants.title,vendor,tag");
+
+            const suggestResponse = await fetch(suggestUrl.toString(), {
+                headers: {
+                    "User-Agent": "Mozilla/5.0",
+                    Accept: "application/json",
+                    Referer: `${wineCollectiveOrigin}/`,
+                },
+                signal: AbortSignal.timeout(7000),
+            });
+            if (!suggestResponse.ok) continue;
+
+            const suggestData = await suggestResponse.json() as {
+                resources?: {
+                    results?: {
+                        products?: Array<{
+                            handle?: string;
+                            title?: string;
+                            url?: string;
+                            price?: string | number;
+                            price_min?: string | number;
+                        }>;
+                    };
+                };
+            };
+
+            const products = suggestData?.resources?.results?.products ?? [];
+            const best = findBestHandleFromSuggest(products);
+            if (!best) continue;
+
+            const precise = await fetchProductJson(best.handle);
+            if (precise) {
+                return [{
+                    source: "The Wine Collective",
+                    price: precise.price,
+                    url: precise.url,
+                    fetchedAt,
+                }];
+            }
+
+            return [{
+                source: "The Wine Collective",
+                price: best.price,
+                url: best.url,
+                fetchedAt,
+            }];
+        }
+
+        return [];
     } catch {
         return [];
     }
