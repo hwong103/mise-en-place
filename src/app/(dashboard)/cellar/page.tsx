@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import CellarClient from "@/components/cellar/CellarClient";
 import type { StockistResult } from "@/lib/wine";
-import { isMissingStockistsColumnError } from "@/lib/wine-stockists";
+import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
 
 const parseStockists = (value: unknown): StockistResult[] => {
     if (!Array.isArray(value)) return [];
@@ -25,6 +25,7 @@ const parseStockists = (value: unknown): StockistResult[] => {
 
 export default async function CellarPage() {
     const householdId = await getCurrentHouseholdId();
+    const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
 
     let wines;
     try {
@@ -36,11 +37,15 @@ export default async function CellarPage() {
                 grapes: true, region: true, country: true, type: true,
                 rating: true, imageUrl: true, locationName: true,
                 danMurphysPrice: true, danMurphysPriceAt: true,
-                danMurphysProductId: true, stockists: true,
+                danMurphysProductId: true, ...(supportsStockists ? { stockists: true } : {}),
             },
         });
+        if (!supportsStockists) {
+            wines = wines.map((wine) => ({ ...wine, stockists: null }));
+        }
     } catch (error) {
         if (!isMissingStockistsColumnError(error)) throw error;
+        markWineStockistsColumnMissing();
         const fallback = await prisma.wine.findMany({
             where: { householdId },
             orderBy: [{ type: "asc" }, { rating: "desc" }, { createdAt: "desc" }],
@@ -72,7 +77,7 @@ export default async function CellarPage() {
                 if (!stockists.length) return;
                 const cheapest = stockists[0];
                 const updateData = {
-                    stockists,
+                    ...(supportsStockists ? { stockists } : {}),
                     danMurphysPrice: cheapest.price,
                     danMurphysUrl: cheapest.url,
                     danMurphysSource: cheapest.source,
@@ -85,6 +90,7 @@ export default async function CellarPage() {
                     });
                 } catch (error) {
                     if (!isMissingStockistsColumnError(error)) throw error;
+                    markWineStockistsColumnMissing();
                     const { stockists: _stockists, ...fallbackData } = updateData;
                     await prisma.wine.update({
                         where: { id: w.id },

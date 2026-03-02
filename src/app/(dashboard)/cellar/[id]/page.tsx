@@ -3,17 +3,42 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import WineDetail from "@/components/cellar/WineDetail";
 import type { StockistResult } from "@/lib/wine";
-import { isMissingStockistsColumnError } from "@/lib/wine-stockists";
+import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
 import { deleteWine, refreshWinePrice } from "../actions";
 
 export default async function WineDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const householdId = await getCurrentHouseholdId();
+    const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
+
+    const baseSelect = {
+        id: true,
+        name: true,
+        producer: true,
+        vintage: true,
+        grapes: true,
+        region: true,
+        country: true,
+        type: true,
+        rating: true,
+        tastingNotes: true,
+        danMurphysPrice: true,
+        danMurphysUrl: true,
+        danMurphysSource: true,
+        danMurphysPriceAt: true,
+        locationName: true,
+        locationAddress: true,
+        locationLat: true,
+        locationLng: true,
+        ...(supportsStockists ? { stockists: true } : {}),
+    };
 
     let wine = await prisma.wine.findFirst({
         where: { id, householdId },
+        select: baseSelect,
     }).catch(async (error) => {
         if (!isMissingStockistsColumnError(error)) throw error;
+        markWineStockistsColumnMissing();
         return prisma.wine.findFirst({
             where: { id, householdId },
             select: {
