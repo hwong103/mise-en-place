@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFormStatus } from "react-dom";
 import { MapPin } from "lucide-react";
 
 const WINE_TYPES = ["RED", "WHITE", "SPARKLING", "ROSE", "DESSERT", "FORTIFIED", "OTHER"];
@@ -47,7 +48,7 @@ export default function WineEditForm({
         locationLng: number | null;
     };
     updateAction: (fd: FormData) => Promise<void>;
-    mode?: "photo" | "url" | "manual" | "edit";
+    mode?: "photo" | "url" | "name" | "manual" | "edit";
 }) {
     const router = useRouter();
 
@@ -213,6 +214,7 @@ export default function WineEditForm({
                     <p className="text-sm text-slate-500 dark:text-slate-400">
                         {mode === "photo" && "Groq read your label — review and fill in the rest."}
                         {mode === "url" && "Groq extracted details from the URL — review and fill in the rest."}
+                        {mode === "name" && "We found these details — review and save to your cellar."}
                         {mode === "manual" && "Fill in what you know. You can always edit later."}
                         {mode === "edit" && "Edit wine details."}
                     </p>
@@ -352,14 +354,23 @@ export default function WineEditForm({
                     </div>
                 </div>
 
-                <button
-                    type="submit"
-                    className="w-full rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700"
-                >
-                    Save to Cellar
-                </button>
+                <SaveButton />
             </form>
         </div>
+    );
+}
+
+function SaveButton() {
+    const { pending } = useFormStatus();
+    return (
+        <button
+            type="submit"
+            disabled={pending}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+            {pending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+            {pending ? "Saving…" : "Save to Cellar"}
+        </button>
     );
 }
 

@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Camera, Link2, MapPin, PencilLine, Wine as WineIcon } from "lucide-react";
-import { createWineFromPhoto, createWineFromUrl, createWineManually } from "@/app/(dashboard)/cellar/actions";
+import { Camera, Link2, MapPin, PencilLine, Search, Wine as WineIcon } from "lucide-react";
+import { createWineFromName, createWineFromPhoto, createWineFromUrl, createWineManually } from "@/app/(dashboard)/cellar/actions";
 
 // Types
 type WineSummary = {
@@ -43,9 +43,11 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
     const [query, setQuery] = useState("");
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [nameInput, setNameInput] = useState("");
+    const [nameError, setNameError] = useState<string | null>(null);
     const [urlInput, setUrlInput] = useState("");
     const [urlError, setUrlError] = useState<string | null>(null);
-    const [pendingMode, setPendingMode] = useState<"photo" | "url" | "manual" | null>(null);
+    const [pendingMode, setPendingMode] = useState<"photo" | "url" | "name" | "manual" | null>(null);
     const [isPending, startTransition] = useTransition();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +102,23 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
         });
     };
 
+    const handleNameSearch = () => {
+        if (!nameInput.trim()) return;
+        setNameError(null);
+        setPendingMode("name");
+        setPickerOpen(false);
+        const formData = new FormData();
+        formData.set("name", nameInput.trim());
+        startTransition(async () => {
+            const result = await createWineFromName(formData);
+            if (result?.error) {
+                setNameError(result.error);
+                setPendingMode(null);
+                setPickerOpen(true);
+            }
+        });
+    };
+
     const handleManual = () => {
         setPickerOpen(false);
         setPendingMode("manual");
@@ -112,6 +131,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
     const loadingLabel =
         pendingMode === "photo" ? "Reading label…" :
             pendingMode === "url" ? "Fetching URL…" :
+                pendingMode === "name" ? "Searching…" :
                 pendingMode === "manual" ? "Opening form…" : "";
 
     const filtered = wines.filter((w) => {
@@ -170,6 +190,37 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
 
                     {pickerOpen && (
                         <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                            {/* Name search option */}
+                            <div className="px-3 py-2.5">
+                                <div className="mb-2 flex items-center gap-3">
+                                    <Search className="h-5 w-5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Search by name</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">Type the wine name, we&apos;ll find the rest</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        value={nameInput}
+                                        onChange={(e) => setNameInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleNameSearch()}
+                                        placeholder="e.g. Giaconda Chardonnay 2021"
+                                        className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleNameSearch}
+                                        disabled={!nameInput.trim()}
+                                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                                    >
+                                        Go
+                                    </button>
+                                </div>
+                                {nameError && <p className="mt-1.5 text-[10px] leading-tight text-rose-500">{nameError}</p>}
+                            </div>
+
+                            <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+
                             {/* Photo option */}
                             <label className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
                                 <input
