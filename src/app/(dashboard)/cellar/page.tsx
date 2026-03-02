@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import CellarClient from "@/components/cellar/CellarClient";
@@ -14,6 +13,7 @@ export default async function CellarPage() {
             grapes: true, region: true, country: true, type: true,
             rating: true, imageUrl: true, locationName: true,
             danMurphysPrice: true, danMurphysPriceAt: true,
+            triedAt: true,
             danMurphysProductId: true,
         },
     });

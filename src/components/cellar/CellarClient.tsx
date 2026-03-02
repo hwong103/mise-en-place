@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Wine } from "@prisma/client";
+import { Camera, Link2, MapPin, PenLine, Wine } from "lucide-react";
 import { createWineFromPhoto, createWineFromUrl, createWineManually } from "@/app/(dashboard)/cellar/actions";
 
 // Types
@@ -13,6 +13,7 @@ type WineSummary = {
     type: string; rating?: number | null;
     imageUrl?: string | null; locationName?: string | null;
     danMurphysPrice?: number | null; danMurphysPriceAt?: Date | null;
+    triedAt?: Date | null;
 };
 
 const WINE_TYPE_LABELS: Record<string, string> = {
@@ -160,7 +161,8 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                             </span>
                         ) : (
                             <>
-                                🍷 Log a Wine
+                                <Wine className="h-4 w-4" />
+                                Log a Wine
                                 <span className={`text-[10px] transition-transform ${pickerOpen ? "rotate-180" : ""}`}>▼</span>
                             </>
                         )}
@@ -177,7 +179,9 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                     onChange={handlePhotoUpload}
                                     className="hidden"
                                 />
-                                <span className="text-xl">📷</span>
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                                    <Camera className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                                </span>
                                 <div>
                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Photo</p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">Snap the label, Groq fills in the details</p>
@@ -189,7 +193,9 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                             {/* URL option */}
                             <div className="px-3 py-2.5">
                                 <div className="mb-2 flex items-center gap-3">
-                                    <span className="text-xl">🔗</span>
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                                        <Link2 className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                                    </span>
                                     <div>
                                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">URL</p>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">Vivino, Wine Searcher, winery page</p>
@@ -223,7 +229,9 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                 onClick={handleManual}
                                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
-                                <span className="text-xl">✏️</span>
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                                    <PenLine className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                                </span>
                                 <div>
                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Manual</p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">Type in the details yourself</p>
@@ -273,31 +281,62 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                             <h2 className="mb-4 text-xs font-black uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500">
                                 {WINE_TYPE_LABELS[type]} · {typeWines.length}
                             </h2>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
                                 {typeWines.map((wine) => (
                                     <Link
                                         key={wine.id}
                                         href={`/cellar/${wine.id}`}
-                                        className="group flex gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500"
+                                        className="group flex gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500"
                                     >
-                                        {/* Wine colour swatch */}
-                                        <div className={`h-14 w-1.5 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
+                                        {/* Wine type colour swatch */}
+                                        <div className={`mt-0.5 h-full w-1 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
 
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate font-bold text-slate-900 dark:text-slate-100">
+                                        <div className="min-w-0 flex-1 space-y-1.5">
+                                            <p className="truncate font-bold leading-snug text-slate-900 dark:text-slate-100">
                                                 {wine.name}
-                                                {wine.vintage ? <span className="ml-1.5 font-normal text-slate-400">{wine.vintage}</span> : null}
+                                                {wine.vintage ? (
+                                                    <span className="ml-1.5 font-normal text-slate-400">{wine.vintage}</span>
+                                                ) : null}
                                             </p>
-                                            {wine.producer ? (
-                                                <p className="truncate text-sm text-slate-500 dark:text-slate-400">{wine.producer}</p>
-                                            ) : null}
+
+                                            <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                                                {[wine.producer, wine.region, wine.country].filter(Boolean).join(" · ")}
+                                            </p>
+
                                             {wine.grapes.length > 0 ? (
-                                                <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
-                                                    {wine.grapes.join(", ")}
-                                                </p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {wine.grapes.slice(0, 3).map((grape) => (
+                                                        <span
+                                                            key={grape}
+                                                            className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                                                        >
+                                                            {grape}
+                                                        </span>
+                                                    ))}
+                                                    {wine.grapes.length > 3 ? (
+                                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-400 dark:bg-slate-800">
+                                                            +{wine.grapes.length - 3}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
                                             ) : null}
-                                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                                                {wine.locationName ? <span>📍 {wine.locationName}</span> : null}
+
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5 text-xs text-slate-400">
+                                                {wine.locationName ? (
+                                                    <span className="flex items-center gap-1">
+                                                        <MapPin className="h-3 w-3" />
+                                                        {wine.locationName}
+                                                    </span>
+                                                ) : null}
+                                                {wine.triedAt ? (
+                                                    <span>
+                                                        {new Date(wine.triedAt).toLocaleDateString("en-AU", {
+                                                            day: "numeric",
+                                                            month: "short",
+                                                            year: "numeric",
+                                                        })}
+                                                    </span>
+                                                ) : null}
                                                 {wine.danMurphysPrice ? (
                                                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                                                         ${wine.danMurphysPrice.toFixed(2)}
@@ -306,7 +345,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                             </div>
                                         </div>
 
-                                        {/* Rating */}
+                                        {/* Rating badge */}
                                         {wine.rating ? (
                                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-lg font-black text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                                                 {wine.rating}

@@ -3,6 +3,7 @@
 import { Wine } from "@prisma/client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { MapPin } from "lucide-react";
 
 const WINE_TYPES = ["RED", "WHITE", "SPARKLING", "ROSE", "DESSERT", "FORTIFIED", "OTHER"];
 
@@ -150,9 +151,11 @@ export default function WineEditForm({
 
     const handleSelectSuggestion = async (result: NominatimResult) => {
         const name = result.address?.amenity ?? result.name ?? result.display_name.split(",")[0];
+        const shortDisplay = result.display_name.split(",").slice(0, 2).join(",").trim();
+
         setLocationName(name);
         setLocationAddress(result.display_name);
-        setLocationQuery(result.display_name);
+        setLocationQuery(shortDisplay);
         setSuggestions([]);
         setShowSuggestions(false);
 
@@ -328,8 +331,9 @@ export default function WineEditForm({
                             </div>
                         )}
                         {lat && lng && locationName && (
-                            <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                                📍 {locationName}
+                            <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                <MapPin className="h-3 w-3" />
+                                {locationName}
                             </p>
                         )}
                     </div>
