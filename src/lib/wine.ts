@@ -749,7 +749,11 @@ const fetchSerpShopping = async (
                 price?: string;
                 extracted_price?: number;
                 link?: string;
+                product_link?: string;
                 source?: string;
+                seller?: string;
+                merchant?: string;
+                store?: string;
                 thumbnail?: string;
                 serpapi_thumbnail?: string;
             }> = data.shopping_results ?? [];
@@ -760,10 +764,27 @@ const fetchSerpShopping = async (
             const stockists = results
                 .map((result) => {
                     const price = result.extracted_price ?? parsePrice(result.price);
-                    if (Number.isNaN(price) || price <= 0 || !result.link || !result.source) return null;
-                    return { source: result.source, price, url: result.link, fetchedAt } satisfies StockistResult;
+                    const url = result.link ?? result.product_link;
+                    if (Number.isNaN(price) || price <= 0 || !url) return null;
+
+                    let source =
+                        result.source
+                        ?? result.seller
+                        ?? result.merchant
+                        ?? result.store;
+                    if (!source) {
+                        try {
+                            source = new URL(url).hostname.replace(/^www\./i, "");
+                        } catch {
+                            source = "Google Shopping";
+                        }
+                    }
+
+                    return { source, price, url, fetchedAt } satisfies StockistResult;
                 })
                 .filter((result): result is StockistResult => result !== null);
+
+            console.info(`[wine] SerpAPI shopping query="${query}" → ${stockists.length} parsed stockists`);
 
             if (stockists.length > 0) {
                 const thumbnailUrl = results.find((result) => result.serpapi_thumbnail || result.thumbnail)?.serpapi_thumbnail
