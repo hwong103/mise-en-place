@@ -27,6 +27,17 @@ const parsePrice = (value: string | undefined) => {
     return numeric ? Number(numeric) : NaN;
 };
 
+const normalizeSearchText = (value: string) =>
+    value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9\s'-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+const stripLeadingVintage = (value: string) =>
+    value.replace(/^\s*(?:19|20)\d{2}\s+/, "").trim();
+
 const MARKDOWN_TOOL_URL = "https://markdown.new/";
 
 const COUNTRY_TAGS = new Set([
@@ -640,13 +651,43 @@ export type StockistResult = {
     fetchedAt: string;
 };
 
-const buildQueryVariants = (wineName: string, producer?: string, vintage?: number) =>
-    Array.from(new Set([
-        [producer, wineName, vintage?.toString()].filter(Boolean).join(" ").trim(),
-        [producer, wineName].filter(Boolean).join(" ").trim(),
-        [wineName, vintage?.toString()].filter(Boolean).join(" ").trim(),
-        wineName.trim(),
+const buildQueryVariants = (wineName: string, producer?: string, vintage?: number) => {
+    const producerRaw = (producer ?? "").trim();
+    const wineRaw = wineName.trim();
+    const wineNoYear = stripLeadingVintage(wineRaw);
+
+    const producerNormalized = normalizeSearchText(producerRaw).toLowerCase();
+    const wineNoYearNormalized = normalizeSearchText(wineNoYear).toLowerCase();
+
+    let wineCore = wineNoYear;
+    if (producerNormalized && wineNoYearNormalized.startsWith(producerNormalized)) {
+        const producerWordCount = producerRaw.split(/\s+/).filter(Boolean).length;
+        const words = wineNoYear.split(/\s+/).filter(Boolean);
+        wineCore = words.slice(producerWordCount).join(" ").trim() || wineNoYear;
+    }
+
+    const producerAscii = normalizeSearchText(producerRaw);
+    const wineAscii = normalizeSearchText(wineCore || wineNoYear || wineRaw);
+    const wineNoYearAscii = normalizeSearchText(wineNoYear);
+    const wineRawAscii = normalizeSearchText(wineRaw);
+    const vintageText = vintage?.toString();
+
+    return Array.from(new Set([
+        [producerRaw, wineRaw, vintageText].filter(Boolean).join(" ").trim(),
+        [producerRaw, wineNoYear, vintageText].filter(Boolean).join(" ").trim(),
+        [producerRaw, wineCore, vintageText].filter(Boolean).join(" ").trim(),
+        [producerRaw, wineCore].filter(Boolean).join(" ").trim(),
+        [wineNoYear, vintageText].filter(Boolean).join(" ").trim(),
+        wineNoYear,
+        wineRaw,
+        [producerAscii, wineAscii, vintageText].filter(Boolean).join(" ").trim(),
+        [producerAscii, wineAscii].filter(Boolean).join(" ").trim(),
+        [wineAscii, vintageText].filter(Boolean).join(" ").trim(),
+        wineAscii,
+        wineNoYearAscii,
+        wineRawAscii,
     ].filter(Boolean)));
+};
 
 const fetchSerpShopping = async (
     wineName: string,
@@ -922,6 +963,7 @@ export async function fetchAllStockists(
     producer?: string,
     vintage?: number
 ): Promise<StockistResult[]> {
+    const queryVariants = buildQueryVariants(wineName, producer, vintage);
     const [serpShopping, serpOrganic, vivino, danMurphys, bws] = await Promise.all([
         fetchSerpShopping(wineName, producer, vintage),
         fetchSerpOrganic(wineName, producer, vintage),
@@ -945,6 +987,9 @@ export async function fetchAllStockists(
         `[wine] stockist results for "${wineName}" (${producer ?? "unknown producer"}, ${vintage ?? "nv"}): `
         + `shopping=${serpShopping.length} organic=${serpOrganic.length} vivino=${vivino.length} dm=${danMurphys.length} bws=${bws.length} total=${deduped.length}`
     );
+    if (deduped.length === 0) {
+        console.info(`[wine] query variants tried: ${queryVariants.join(" | ")}`);
+    }
     return deduped;
 }
 
