@@ -10,38 +10,43 @@ import type { WineType } from "@prisma/client";
 // ─── Create wine from photo ──────────────────────────────────────────────────
 
 export async function createWineFromPhoto(formData: FormData) {
-    const householdId = await getCurrentHouseholdId();
-    const base64Image = formData.get("base64Image")?.toString();
-    const mimeType = formData.get("mimeType")?.toString() ?? "image/jpeg";
+    try {
+        const householdId = await getCurrentHouseholdId();
+        const base64Image = formData.get("base64Image")?.toString();
+        const mimeType = formData.get("mimeType")?.toString() ?? "image/jpeg";
 
-    if (!base64Image) return { error: "No image provided" };
+        if (!base64Image) return { error: "No image provided" };
 
-    const vision = await extractWineFromImageViaGroq(base64Image, mimeType);
-    if (!vision) return { error: "Could not read label. Try a clearer photo." };
+        const vision = await extractWineFromImageViaGroq(base64Image, mimeType);
+        if (!vision) return { error: "Could not read label. Try a clearer photo." };
 
-    // Try to fetch Dan Murphy's price in the same request
-    const dmPrice = await fetchBottlePrice(vision.name, vision.producer, vision.vintage);
+        // Try to fetch Dan Murphy's price in the same request
+        const dmPrice = await fetchBottlePrice(vision.name, vision.producer, vision.vintage);
 
-    const wine = await prisma.wine.create({
-        data: {
-            householdId,
-            name: vision.name,
-            producer: vision.producer ?? null,
-            vintage: vision.vintage ?? null,
-            grapes: vision.grapes ?? [],
-            region: vision.region ?? null,
-            country: vision.country ?? null,
-            type: (vision.type as WineType) ?? "RED",
-            danMurphysProductId: dmPrice?.productId ?? null,
-            danMurphysUrl: dmPrice?.url ?? null,
-            danMurphysPrice: dmPrice?.price ?? null,
-            danMurphysSource: dmPrice?.source ?? null,
-            danMurphysPriceAt: dmPrice ? new Date() : null,
-        },
-    });
+        const wine = await prisma.wine.create({
+            data: {
+                householdId,
+                name: vision.name,
+                producer: vision.producer ?? null,
+                vintage: vision.vintage ?? null,
+                grapes: vision.grapes ?? [],
+                region: vision.region ?? null,
+                country: vision.country ?? null,
+                type: (vision.type as WineType) ?? "RED",
+                danMurphysProductId: dmPrice?.productId ?? null,
+                danMurphysUrl: dmPrice?.url ?? null,
+                danMurphysPrice: dmPrice?.price ?? null,
+                danMurphysSource: dmPrice?.source ?? null,
+                danMurphysPriceAt: dmPrice ? new Date() : null,
+            },
+        });
 
-    revalidatePath("/cellar");
-    redirect(`/cellar/${wine.id}/edit?mode=photo`);
+        revalidatePath("/cellar");
+        redirect(`/cellar/${wine.id}/edit?mode=photo`);
+    } catch (error) {
+        console.error("[cellar] Failed to create wine from photo:", error);
+        return { error: "Photo import failed. Check server logs and API key configuration." };
+    }
 }
 
 // ─── Create blank wine for manual entry ──────────────────────────────────────
@@ -65,36 +70,41 @@ export async function createWineManually() {
 // ─── Create wine from URL ─────────────────────────────────────────────────────
 
 export async function createWineFromUrl(formData: FormData) {
-    const householdId = await getCurrentHouseholdId();
-    const url = formData.get("url")?.toString().trim();
-    if (!url) return { error: "No URL provided" };
+    try {
+        const householdId = await getCurrentHouseholdId();
+        const url = formData.get("url")?.toString().trim();
+        if (!url) return { error: "No URL provided" };
 
-    const vision = await extractWineFromUrlViaGroq(url);
-    if (!vision) return { error: "Could not extract wine details from that URL." };
+        const vision = await extractWineFromUrlViaGroq(url);
+        if (!vision) return { error: "Could not extract wine details from that URL." };
 
-    const dmPrice = await fetchBottlePrice(vision.name, vision.producer, vision.vintage);
+        const dmPrice = await fetchBottlePrice(vision.name, vision.producer, vision.vintage);
 
-    const wine = await prisma.wine.create({
-        data: {
-            householdId,
-            name: vision.name,
-            producer: vision.producer ?? null,
-            vintage: vision.vintage ?? null,
-            grapes: vision.grapes ?? [],
-            region: vision.region ?? null,
-            country: vision.country ?? null,
-            type: (vision.type as WineType) ?? "RED",
-            imageUrl: vision.imageUrl ?? null,
-            danMurphysProductId: dmPrice?.productId ?? null,
-            danMurphysUrl: dmPrice?.url ?? null,
-            danMurphysPrice: dmPrice?.price ?? null,
-            danMurphysSource: dmPrice?.source ?? null,
-            danMurphysPriceAt: dmPrice ? new Date() : null,
-        },
-    });
+        const wine = await prisma.wine.create({
+            data: {
+                householdId,
+                name: vision.name,
+                producer: vision.producer ?? null,
+                vintage: vision.vintage ?? null,
+                grapes: vision.grapes ?? [],
+                region: vision.region ?? null,
+                country: vision.country ?? null,
+                type: (vision.type as WineType) ?? "RED",
+                imageUrl: vision.imageUrl ?? null,
+                danMurphysProductId: dmPrice?.productId ?? null,
+                danMurphysUrl: dmPrice?.url ?? null,
+                danMurphysPrice: dmPrice?.price ?? null,
+                danMurphysSource: dmPrice?.source ?? null,
+                danMurphysPriceAt: dmPrice ? new Date() : null,
+            },
+        });
 
-    revalidatePath("/cellar");
-    redirect(`/cellar/${wine.id}/edit?mode=url`);
+        revalidatePath("/cellar");
+        redirect(`/cellar/${wine.id}/edit?mode=url`);
+    } catch (error) {
+        console.error("[cellar] Failed to create wine from URL:", error);
+        return { error: "URL import failed. Check server logs and API key configuration." };
+    }
 }
 
 // ─── Update wine (after photo import or manual edit) ─────────────────────────
@@ -155,7 +165,10 @@ export async function refreshWinePrice(formData: FormData) {
     if (!wine) return;
 
     const dmPrice = await fetchBottlePrice(wine.name, wine.producer ?? undefined, wine.vintage ?? undefined);
-    if (!dmPrice) return;
+    if (!dmPrice) {
+        console.info(`[cellar] No price found for wine ${wine.id} (${wine.name})`);
+        return;
+    }
 
     await prisma.wine.update({
         where: { id },
