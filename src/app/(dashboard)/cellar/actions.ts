@@ -7,6 +7,13 @@ import { getCurrentHouseholdId } from "@/lib/household";
 import { extractWineFromImageViaGroq, extractWineFromUrlViaGroq, fetchBottlePrice } from "@/lib/wine";
 import type { WineType } from "@prisma/client";
 
+const isNextRedirectError = (error: unknown): error is { digest: string } =>
+    typeof error === "object"
+    && error !== null
+    && "digest" in error
+    && typeof (error as { digest: unknown }).digest === "string"
+    && (error as { digest: string }).digest.startsWith("NEXT_REDIRECT");
+
 // ─── Create wine from photo ──────────────────────────────────────────────────
 
 export async function createWineFromPhoto(formData: FormData) {
@@ -44,6 +51,7 @@ export async function createWineFromPhoto(formData: FormData) {
         revalidatePath("/cellar");
         redirect(`/cellar/${wine.id}/edit?mode=photo`);
     } catch (error) {
+        if (isNextRedirectError(error)) throw error;
         console.error("[cellar] Failed to create wine from photo:", error);
         return { error: "Photo import failed. Check server logs and API key configuration." };
     }
@@ -102,6 +110,7 @@ export async function createWineFromUrl(formData: FormData) {
         revalidatePath("/cellar");
         redirect(`/cellar/${wine.id}/edit?mode=url`);
     } catch (error) {
+        if (isNextRedirectError(error)) throw error;
         console.error("[cellar] Failed to create wine from URL:", error);
         return { error: "URL import failed. Check server logs and API key configuration." };
     }
