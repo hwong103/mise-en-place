@@ -2,6 +2,8 @@ const hasStockistsText = (value: unknown) =>
     typeof value === "string" && value.toLowerCase().includes("stockists");
 
 let wineStockistsColumnAvailable: boolean | null = null;
+let wineStockistsCheckedAtMs: number | null = null;
+const STOCKISTS_CACHE_TTL_MS = 60_000;
 
 const parseDbBoolean = (value: unknown) =>
     value === true
@@ -43,12 +45,20 @@ export const isMissingStockistsColumnError = (error: unknown) => {
 
 export const markWineStockistsColumnMissing = () => {
     wineStockistsColumnAvailable = false;
+    wineStockistsCheckedAtMs = Date.now();
 };
 
 export const hasWineStockistsColumn = async (
     queryFn: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>
 ) => {
-    if (wineStockistsColumnAvailable !== null) return wineStockistsColumnAvailable;
+    if (wineStockistsColumnAvailable === true) return true;
+    if (
+        wineStockistsColumnAvailable === false
+        && wineStockistsCheckedAtMs !== null
+        && (Date.now() - wineStockistsCheckedAtMs) < STOCKISTS_CACHE_TTL_MS
+    ) {
+        return false;
+    }
     try {
         const rows = await queryFn<Array<{ exists: boolean | string | number }>>`
             SELECT EXISTS (
@@ -60,9 +70,11 @@ export const hasWineStockistsColumn = async (
             ) AS "exists"
         `;
         wineStockistsColumnAvailable = parseDbBoolean(rows?.[0]?.exists);
+        wineStockistsCheckedAtMs = Date.now();
         return wineStockistsColumnAvailable;
     } catch {
         wineStockistsColumnAvailable = false;
+        wineStockistsCheckedAtMs = Date.now();
         return false;
     }
 };
