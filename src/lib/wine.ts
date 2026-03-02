@@ -689,6 +689,9 @@ const buildQueryVariants = (wineName: string, producer?: string, vintage?: numbe
     ].filter(Boolean)));
 };
 
+const buildSearchQuery = (wineName: string, producer?: string, vintage?: number) =>
+    buildQueryVariants(wineName, producer, vintage)[0] ?? [producer, wineName, vintage?.toString()].filter(Boolean).join(" ");
+
 const fetchSerpShopping = async (
     wineName: string,
     producer?: string,
@@ -819,13 +822,14 @@ const fetchVivinoStockists = async (
     vintage?: number
 ): Promise<StockistResult[]> => {
     const queries = [
-        [producer, wineName].filter(Boolean).join(" "),
-        wineName,
+        buildSearchQuery(wineName, producer, vintage),
+        [producer, stripLeadingVintage(wineName), vintage?.toString()].filter(Boolean).join(" "),
+        stripLeadingVintage(wineName),
     ].filter(Boolean);
     try {
         for (const query of queries) {
             const response = await fetch(
-                `https://www.vivino.com/api/explore/explore?q=${encodeURIComponent(query)}&country_codes[]=au&per_page=5`,
+                `https://www.vivino.com/api/explore/explore?q=${encodeURIComponent(query)}&per_page=8`,
                 {
                     headers: {
                         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -873,41 +877,47 @@ const fetchDanMurphysStockist = async (
     vintage?: number
 ): Promise<StockistResult[]> => {
     const queries = buildQueryVariants(wineName, producer, vintage);
+    const endpoints = [
+        "https://www.danmurphys.com.au/product/search",
+        "https://www.danmurphys.com.au/dm/product/search",
+    ];
     try {
         for (const query of queries) {
-            const response = await fetch(
-                `https://www.danmurphys.com.au/dm/product/search?searchTerm=${encodeURIComponent(query)}&pageNumber=1&pageSize=5`,
-                {
-                    headers: {
-                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                        Accept: "application/json, text/plain, */*",
-                        Referer: "https://www.danmurphys.com.au/",
-                    },
-                    signal: AbortSignal.timeout(6000),
-                }
-            );
-            if (!response.ok) continue;
+            for (const endpoint of endpoints) {
+                const response = await fetch(
+                    `${endpoint}?searchTerm=${encodeURIComponent(query)}&pageNumber=1&pageSize=5`,
+                    {
+                        headers: {
+                            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                            Accept: "application/json, text/plain, */*",
+                            Referer: "https://www.danmurphys.com.au/",
+                        },
+                        signal: AbortSignal.timeout(6000),
+                    }
+                );
+                if (!response.ok) continue;
 
-            const data = await response.json();
-            const products: Array<{
-                slug?: string;
-                id?: string | number;
-                priceValue?: number;
-                prices?: { promoPriceValue?: number; retailerPriceValue?: number };
-            }> = data?.products ?? data?.hits ?? data?.results ?? [];
+                const data = await response.json();
+                const products: Array<{
+                    slug?: string;
+                    id?: string | number;
+                    priceValue?: number;
+                    prices?: { promoPriceValue?: number; retailerPriceValue?: number };
+                }> = data?.products ?? data?.hits ?? data?.results ?? [];
 
-            if (!products.length) continue;
-            const best = products[0];
-            const price = best.priceValue ?? best.prices?.promoPriceValue ?? best.prices?.retailerPriceValue;
-            if (!price) continue;
+                if (!products.length) continue;
+                const best = products[0];
+                const price = best.priceValue ?? best.prices?.promoPriceValue ?? best.prices?.retailerPriceValue;
+                if (!price) continue;
 
-            const slug = best.slug ?? String(best.id ?? "");
-            return [{
-                source: "Dan Murphy's",
-                price: Number(price),
-                url: `https://www.danmurphys.com.au/product/${slug}`,
-                fetchedAt: new Date().toISOString(),
-            }];
+                const slug = best.slug ?? String(best.id ?? "");
+                return [{
+                    source: "Dan Murphy's",
+                    price: Number(price),
+                    url: `https://www.danmurphys.com.au/product/${slug}`,
+                    fetchedAt: new Date().toISOString(),
+                }];
+            }
         }
         return [];
     } catch {
@@ -1026,22 +1036,82 @@ const fetchLegacySerpBestStockist = async (
     }
 };
 
+const fetchWineCollectiveStockist = async (
+    wineName: string,
+    producer?: string,
+    vintage?: number
+): Promise<StockistResult[]> => {
+    const query = buildSearchQuery(wineName, producer, vintage);
+    const fetchedAt = new Date().toISOString();
+
+    try {
+        const response = await fetch(
+            `https://www.thewinecollective.com.au/search?type=product&q=${encodeURIComponent(query)}&view=json`,
+            {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                    Accept: "application/json, text/html, */*",
+                    Referer: "https://www.thewinecollective.com.au/",
+                },
+                signal: AbortSignal.timeout(7000),
+            }
+        );
+        if (!response.ok) return [];
+
+        const contentType = response.headers.get("content-type") ?? "";
+        if (contentType.includes("json")) {
+            const data = await response.json();
+            const products: Array<{
+                url?: string;
+                price?: number;
+                variants?: Array<{ price?: number }>;
+            }> = data?.results ?? data?.products ?? [];
+            if (products.length === 0) return [];
+
+            const best = products[0];
+            const rawPrice = best.price ?? best.variants?.[0]?.price;
+            const price = rawPrice ? Number(rawPrice) / 100 : NaN;
+            if (Number.isNaN(price) || price <= 0) return [];
+
+            const url = best.url
+                ? `https://www.thewinecollective.com.au${best.url}`
+                : `https://www.thewinecollective.com.au/search?q=${encodeURIComponent(query)}`;
+            return [{ source: "The Wine Collective", price, url, fetchedAt }];
+        }
+
+        const html = await response.text();
+        const priceMatch = html.match(/(?:AUD\s*|A?\$\s*)([\d,]+(?:\.\d{1,2})?)/i);
+        if (!priceMatch) return [];
+        const price = parsePrice(priceMatch[1]);
+        if (Number.isNaN(price) || price <= 0) return [];
+
+        const productMatch = html.match(/href="(\/products\/[^"]+)"/i);
+        const url = productMatch
+            ? `https://www.thewinecollective.com.au${productMatch[1]}`
+            : `https://www.thewinecollective.com.au/search?q=${encodeURIComponent(query)}`;
+        return [{ source: "The Wine Collective", price, url, fetchedAt }];
+    } catch {
+        return [];
+    }
+};
+
 export async function fetchAllStockists(
     wineName: string,
     producer?: string,
     vintage?: number
 ): Promise<StockistResult[]> {
     const queryVariants = buildQueryVariants(wineName, producer, vintage);
-    const [legacyBest, serpShopping, serpOrganic, vivino, danMurphys, bws] = await Promise.all([
+    const [legacyBest, serpShopping, serpOrganic, vivino, danMurphys, bws, wineCollective] = await Promise.all([
         fetchLegacySerpBestStockist(wineName, producer, vintage),
         fetchSerpShopping(wineName, producer, vintage),
         fetchSerpOrganic(wineName, producer, vintage),
         fetchVivinoStockists(wineName, producer, vintage),
         fetchDanMurphysStockist(wineName, producer, vintage),
         fetchBwsStockist(wineName, producer, vintage),
+        fetchWineCollectiveStockist(wineName, producer, vintage),
     ]);
 
-    const all = [...legacyBest, ...serpShopping, ...serpOrganic, ...vivino, ...danMurphys, ...bws];
+    const all = [...legacyBest, ...serpShopping, ...serpOrganic, ...vivino, ...danMurphys, ...bws, ...wineCollective];
     const bySource = new Map<string, StockistResult>();
     for (const result of all) {
         const key = result.source.toLowerCase().trim();
@@ -1055,7 +1125,7 @@ export async function fetchAllStockists(
     console.info(
         `[wine] stockist results for "${wineName}" (${producer ?? "unknown producer"}, ${vintage ?? "nv"}): `
         + `legacy=${legacyBest.length} shopping=${serpShopping.length} organic=${serpOrganic.length} `
-        + `vivino=${vivino.length} dm=${danMurphys.length} bws=${bws.length} total=${deduped.length}`
+        + `vivino=${vivino.length} dm=${danMurphys.length} bws=${bws.length} wc=${wineCollective.length} total=${deduped.length}`
     );
     if (deduped.length === 0) {
         console.info(`[wine] query variants tried: ${queryVariants.join(" | ")}`);
