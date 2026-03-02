@@ -597,8 +597,13 @@ export default function ShoppingList({
                                         Amount: {item.amountSummary}
                                       </div>
                                     ) : null}
-                                    {item.recipes.length > 0 ? (
+                                    {item.manual || item.recipes.length > 0 ? (
                                       <div className="mt-2 flex flex-wrap gap-1">
+                                        {item.manual ? (
+                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                            Manual
+                                          </span>
+                                        ) : null}
                                         {item.recipes.map((recipe) => (
                                           <span
                                             key={`${item.key}-${recipe}`}
