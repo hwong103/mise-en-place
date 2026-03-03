@@ -264,7 +264,7 @@ export async function updateRecipeSection(formData: FormData) {
       const tags = parseTags(formData.get("tags")?.toString() ?? "");
 
       const rawIngredients = parseLines(formData.get("ingredients")?.toString() ?? "");
-      const cleanedIngredients = cleanIngredientLines(rawIngredients);
+      const cleanedDirectIngredients = cleanIngredientLines(rawIngredients);
       const rawInstructions = parseLines(formData.get("instructions")?.toString() ?? "");
       const cleanedInstructions = cleanInstructionLines(rawInstructions);
       const rawNotes = parseLines(formData.get("notes")?.toString() ?? "");
@@ -276,7 +276,7 @@ export async function updateRecipeSection(formData: FormData) {
       while (formData.get(`ingredientGroupExists_${gIdx}`)) {
         const title = formData.get(`ingredientGroupTitle_${gIdx}`) as string || "";
         const itemsRaw = formData.get(`ingredientGroupItems_${gIdx}`) as string || "";
-        const items = itemsRaw.split("\n").filter(Boolean);
+        const items = parseLines(itemsRaw);
         if (items.length > 0) {
           ingredientGroups.push({ title, items, sourceGroup: true });
         }
@@ -289,7 +289,7 @@ export async function updateRecipeSection(formData: FormData) {
       while (formData.get(`miseGroupExists_${mIdx}`)) {
         const title = formData.get(`miseGroupTitle_${mIdx}`) as string || "";
         const itemsRaw = formData.get(`miseGroupItems_${mIdx}`) as string || "";
-        const items = itemsRaw.split("\n").filter(Boolean);
+        const items = parseLines(itemsRaw);
         if (items.length > 0) {
           miseGroups.push({ title, items, sourceGroup: false });
         }
@@ -297,6 +297,12 @@ export async function updateRecipeSection(formData: FormData) {
       }
 
       const allPrepGroups = [...ingredientGroups, ...miseGroups];
+      const ingredientLinesFromGroups = ingredientGroups.flatMap((group) => group.items);
+      const cleanedIngredients = cleanIngredientLines(
+        ingredientLinesFromGroups.length > 0
+          ? ingredientLinesFromGroups
+          : cleanedDirectIngredients.lines
+      );
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
