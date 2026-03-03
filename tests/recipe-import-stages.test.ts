@@ -4,6 +4,7 @@ import {
   fetchRenderedRecipeCandidate,
   isRenderFallbackEnabled,
 } from "@/lib/recipe-render-worker-client";
+import { extractRecipeFromImageViaGroq } from "@/lib/ocr";
 import { importRecipeFromUrl } from "@/app/(dashboard)/recipes/actions";
 
 const { redirectMock } = vi.hoisted(() => ({
@@ -28,6 +29,11 @@ vi.mock("@/lib/household", () => ({
 vi.mock("@/lib/recipe-render-worker-client", () => ({
   fetchRenderedRecipeCandidate: vi.fn(),
   isRenderFallbackEnabled: vi.fn(),
+}));
+
+vi.mock("@/lib/ocr", () => ({
+  buildOcrRecipePayload: vi.fn(),
+  extractRecipeFromImageViaGroq: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -66,6 +72,7 @@ describe("importRecipeFromUrl ingestion stages", () => {
     vi.mocked(prisma.recipe.create).mockResolvedValue({ id: "recipe_1" } as never);
     vi.mocked(isRenderFallbackEnabled).mockReturnValue(false);
     vi.mocked(fetchRenderedRecipeCandidate).mockResolvedValue(null);
+    vi.mocked(extractRecipeFromImageViaGroq).mockResolvedValue(null);
     global.fetch = vi.fn() as unknown as typeof fetch;
   });
 
@@ -692,6 +699,85 @@ ${Array.from({ length: 10 }, (_, i) => `${i + 1}. Mix and cook`).join("\n")}`,
     expect(fetchRenderedRecipeCandidate).toHaveBeenCalled();
     expect(prisma.recipe.create).toHaveBeenCalled();
     expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
+  it("creates a draft-like instagram recipe instead of failing when confidence is low", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          title: "Instagram post",
+          content: "Quick dinner idea. Save this for later.",
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => `
+          <html>
+            <head>
+              <meta property="og:title" content="Quick Dinner Reel" />
+              <meta property="og:image" content="https://cdn.example.com/reel.jpg" />
+            </head>
+          </html>
+        `,
+      } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://www.instagram.com/reel/DVL7IQ0lWOj/"))
+    );
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(createArg?.data.title).toBeTruthy();
+    expect(createArg?.data.sourceUrl).toBe("https://instagram.com/reel/DVL7IQ0lWOj");
+    expect((createArg?.data.notes as string[]).some((line) => /low confidence/i.test(line))).toBe(true);
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
+  it("returns blocked for private/login-gated instagram links without assisted input", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({ ok: false } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 403 } as Response);
+
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("https://www.instagram.com/p/privatepost/"))
+    );
+
+    expect(prisma.recipe.create).not.toHaveBeenCalled();
+    expect(redirected).toBe("REDIRECT:/recipes?importError=blocked");
+  });
+
+  it("uses assisted instagram frames to populate recipe fields when scraping is blocked", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({ ok: false } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 403 } as Response);
+    vi.mocked(extractRecipeFromImageViaGroq).mockResolvedValue({
+      title: "Assisted Lasagna",
+      ingredients: ["500g beef mince", "2 cups tomato sauce", "1 onion", "2 garlic cloves"],
+      instructions: ["Brown beef", "Add sauce and simmer", "Layer and bake"],
+      notes: [],
+      servings: 4,
+    });
+
+    const formData = buildFormData("https://www.instagram.com/reel/assisted123/");
+    formData.set("assistedFrames", JSON.stringify([{ base64: "abc", mimeType: "image/jpeg" }]));
+    const redirected = await withRedirect(() => importRecipeFromUrl(formData));
+
+    const createArg = vi.mocked(prisma.recipe.create).mock.calls[0]?.[0];
+    expect(extractRecipeFromImageViaGroq).toHaveBeenCalledTimes(1);
+    expect(createArg?.data.ingredients).toContain("500g beef mince");
+    expect(createArg?.data.instructions).toContain("Brown beef");
+    expect(createArg?.data.servings).toBe(4);
+    expect(redirected).toBe("REDIRECT:/recipes/recipe_1");
+  });
+
+  it("keeps invalid instagram url behavior", async () => {
+    const redirected = await withRedirect(() =>
+      importRecipeFromUrl(buildFormData("instagram-not-a-url"))
+    );
+
+    expect(prisma.recipe.create).not.toHaveBeenCalled();
+    expect(redirected).toBe("REDIRECT:/recipes?importError=invalid_url");
   });
 
   it("returns no_recipe_data when all stages fail to parse useful content", async () => {

@@ -5,6 +5,8 @@ import type {
 } from "@/lib/recipe-ingestion-types";
 
 const STAGE_PRIORITY: Record<IngestionStage, number> = {
+  instagram_assisted_ocr: 6,
+  instagram_caption: 5,
   markdown: 4,
   http_html: 3,
   rendered_html: 2,

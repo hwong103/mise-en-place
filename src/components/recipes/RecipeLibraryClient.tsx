@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
 import RecipeForm from "@/components/recipes/RecipeForm";
-import SubmitButton from "@/components/forms/SubmitButton";
 import OcrImportCard from "@/components/recipes/OcrImportCard";
 import FadeContent from "@/components/ui/FadeContent";
 
@@ -13,6 +12,72 @@ const normalize = (value: string) =>
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const resizeImage = (file: File, maxDimension: number): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
+
+      if (width > height && width > maxDimension) {
+        height *= maxDimension / width;
+        width = maxDimension;
+      } else if (height > maxDimension) {
+        width *= maxDimension / height;
+        height = maxDimension;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("canvas_context_unavailable"));
+        return;
+      }
+
+      context.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob) {
+            reject(new Error("blob_conversion_failed"));
+            return;
+          }
+          resolve(blob);
+        },
+        "image/jpeg",
+        0.82
+      );
+    };
+    img.onerror = (error) => {
+      URL.revokeObjectURL(objectUrl);
+      reject(error);
+    };
+    img.src = objectUrl;
+  });
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      resolve(value.split(",")[1] ?? "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+const isInstagramUrl = (value: string) => {
+  try {
+    const host = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+    return host === "instagram.com";
+  } catch {
+    return false;
+  }
+};
 
 type RecipeLibraryClientProps = {
   recipes: RecipeSummary[];
@@ -30,6 +95,11 @@ export default function RecipeLibraryClient({
   const [query, setQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selected, setSelected] = useState<"url" | "manual" | "ocr" | null>(null);
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [assistedCaption, setAssistedCaption] = useState("");
+  const [assistedFrames, setAssistedFrames] = useState<File[]>([]);
+  const [clientImportError, setClientImportError] = useState<string | null>(null);
+  const [isImportPending, startImportTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const needle = normalize(query);
@@ -69,6 +139,44 @@ export default function RecipeLibraryClient({
     return "Recipe import failed. Please try again.";
   }, [importError]);
 
+  const instagramImport = useMemo(() => isInstagramUrl(sourceUrl), [sourceUrl]);
+
+  const handleUrlImportSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClientImportError(null);
+
+    const formData = new FormData(event.currentTarget);
+
+    startImportTransition(async () => {
+      try {
+        if (instagramImport && assistedFrames.length > 0) {
+          const resized = await Promise.all(
+            assistedFrames.slice(0, 5).map(async (file) => {
+              const blob = await resizeImage(file, 1200);
+              const base64 = await blobToBase64(blob);
+              return { base64, mimeType: "image/jpeg" };
+            })
+          );
+          formData.set("assistedFrames", JSON.stringify(resized));
+        } else {
+          formData.set("assistedFrames", "");
+        }
+
+        if (!instagramImport) {
+          formData.set("assistedCaption", "");
+        }
+
+        await importAction(formData);
+      } catch (error) {
+        const digest = (error as Error & { digest?: string })?.digest;
+        if (digest?.startsWith("NEXT_REDIRECT")) {
+          return;
+        }
+        setClientImportError("Import failed. Please try again.");
+      }
+    });
+  };
+
   return (
     <div className="space-y-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -88,9 +196,9 @@ export default function RecipeLibraryClient({
         </button>
       </div>
 
-      {importErrorMessage ? (
+      {importErrorMessage || clientImportError ? (
         <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
-          {importErrorMessage}
+          {importErrorMessage ?? clientImportError}
         </div>
       ) : null}
 
@@ -165,19 +273,69 @@ export default function RecipeLibraryClient({
                         Drop in a recipe link and we&apos;ll import the full recipe when possible.
                       </p>
                     </div>
-                    <form action={importAction} className="space-y-4">
+                    <form onSubmit={handleUrlImportSubmit} className="space-y-4">
                       <input
                         type="url"
                         name="sourceUrl"
                         required
                         placeholder="https://example.com/recipe"
+                        value={sourceUrl}
+                        onChange={(event) => setSourceUrl(event.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                       />
-                      <SubmitButton
-                        label="Import Recipe"
-                        pendingLabel="Importing..."
+                      {instagramImport ? (
+                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                          <div className="space-y-2">
+                            <label
+                              htmlFor="assistedCaption"
+                              className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                            >
+                              Paste caption (optional)
+                            </label>
+                            <textarea
+                              id="assistedCaption"
+                              name="assistedCaption"
+                              rows={4}
+                              value={assistedCaption}
+                              onChange={(event) => setAssistedCaption(event.target.value)}
+                              placeholder="Paste the Instagram caption text to improve extraction."
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label
+                              htmlFor="assistedFrames"
+                              className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                            >
+                              Upload 1-5 screenshots (optional)
+                            </label>
+                            <input
+                              id="assistedFrames"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(event) => {
+                                const files = Array.from(event.target.files ?? []).slice(0, 5);
+                                setAssistedFrames(files);
+                              }}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            />
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              We only store extracted text and media URLs, not downloaded Instagram files.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <input type="hidden" name="assistedCaption" value="" />
+                      )}
+                      <input type="hidden" name="assistedFrames" value="" />
+                      <button
+                        type="submit"
+                        disabled={isImportPending}
                         className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-70"
-                      />
+                      >
+                        {isImportPending ? "Importing..." : "Import Recipe"}
+                      </button>
                     </form>
                   </section>
                 ) : null}

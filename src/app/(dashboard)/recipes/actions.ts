@@ -22,6 +22,7 @@ import {
   type PrepGroup,
 } from "@/lib/recipe-utils";
 import { buildOcrRecipePayload, extractRecipeFromImageViaGroq } from "@/lib/ocr";
+import { buildInstagramCandidate } from "@/lib/instagram-recipe-import";
 import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
 import {
   HIGH_CONFIDENCE_INGESTION_SCORE,
@@ -124,6 +125,56 @@ const normalizeSourceUrl = (value: string | undefined) => {
     return `${url.protocol}//${url.hostname}${url.pathname}`;
   } catch {
     return undefined;
+  }
+};
+
+const isInstagramHost = (value: string) => {
+  try {
+    const host = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+    return host === "instagram.com";
+  } catch {
+    return false;
+  }
+};
+
+type AssistedFramePayload = {
+  base64: string;
+  mimeType: string;
+};
+
+const parseAssistedFrames = (value: FormDataEntryValue | null): AssistedFramePayload[] => {
+  if (!value) {
+    return [];
+  }
+
+  const raw = value.toString().trim();
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .slice(0, 5)
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") {
+          return null;
+        }
+        const record = entry as Record<string, unknown>;
+        const base64 = typeof record.base64 === "string" ? record.base64.trim() : "";
+        const mimeType = typeof record.mimeType === "string" ? record.mimeType.trim() : "";
+        if (!base64 || !mimeType.startsWith("image/")) {
+          return null;
+        }
+        return { base64, mimeType };
+      })
+      .filter((entry): entry is AssistedFramePayload => entry !== null);
+  } catch {
+    return [];
   }
 };
 
@@ -1598,6 +1649,353 @@ export async function updateRecipeSection(formData: FormData) {
   redirect(`/recipes/${recipeId}`);
 }
 
+const importInstagramRecipe = async (
+  formData: FormData,
+  sourceUrl: string,
+  householdId: string,
+  webMcpTrackingEnabled: boolean
+) => {
+  const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
+  const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
+  if (existingRecipe) {
+    redirect(`/recipes/${existingRecipe.id}`);
+  }
+
+  const assistedCaption = toOptionalString(formData.get("assistedCaption"));
+  const assistedFrames = parseAssistedFrames(formData.get("assistedFrames"));
+  const assistedOcrRecipes: Awaited<ReturnType<typeof extractRecipeFromImageViaGroq>>[] = [];
+  for (const frame of assistedFrames) {
+    try {
+      const extracted = await extractRecipeFromImageViaGroq(frame.base64, frame.mimeType);
+      if (extracted) {
+        assistedOcrRecipes.push(extracted);
+      }
+    } catch {
+      // Ignore individual OCR frame failures so import can continue.
+    }
+  }
+  const successfulAssistedRecipes = assistedOcrRecipes.filter(
+    (recipe): recipe is NonNullable<typeof recipe> => Boolean(recipe)
+  );
+
+  const attempts: IngestionAttemptResult[] = [];
+  const candidates: RecipeIngestionCandidate[] = [];
+
+  let markdownTitle: string | undefined;
+  let markdownContent: string | undefined;
+  const markdownStartedAt = Date.now();
+  const markdownResult = await fetchMarkdownFromUrl(sourceUrl);
+  const markdownLatencyMs = Date.now() - markdownStartedAt;
+
+  if (markdownResult?.content) {
+    markdownTitle = markdownResult.title;
+    markdownContent = markdownResult.content;
+    attempts.push({
+      stage: "markdown",
+      success: true,
+      title: markdownResult.title,
+      ingredients: [],
+      instructions: [],
+      notes: [],
+      latencyMs: markdownLatencyMs,
+      errorCode: undefined,
+    });
+  } else {
+    attempts.push(createFailedAttempt("markdown", "fetch_failed", markdownLatencyMs));
+  }
+
+  let directHtml = "";
+  let blockedByHost = false;
+  const htmlStartedAt = Date.now();
+  try {
+    const htmlResponse = await fetch(sourceUrl, {
+      headers: {
+        "User-Agent": "MiseEnPlaceBot/2.0",
+      },
+      cache: "no-store",
+    });
+    const htmlLatencyMs = Date.now() - htmlStartedAt;
+    if (htmlResponse.ok) {
+      directHtml = await htmlResponse.text();
+      attempts.push({
+        stage: "http_html",
+        success: true,
+        title: undefined,
+        ingredients: [],
+        instructions: [],
+        notes: [],
+        latencyMs: htmlLatencyMs,
+        errorCode: undefined,
+      });
+    } else {
+      const errorCode = classifyFetchStatus(htmlResponse.status);
+      blockedByHost = errorCode === "blocked";
+      attempts.push(createFailedAttempt("http_html", errorCode, htmlLatencyMs));
+    }
+  } catch {
+    attempts.push(createFailedAttempt("http_html", "fetch_failed", Date.now() - htmlStartedAt));
+  }
+
+  const markdownRecipe = markdownContent
+    ? extractRecipeFromMarkdown(markdownContent, markdownTitle)
+    : null;
+  const metadataCandidate = directHtml
+    ? buildCandidateFromHtml({
+      stage: "http_html",
+      sourceUrl,
+      html: directHtml,
+      latencyMs: 0,
+    })
+    : null;
+
+  const instagramStartedAt = Date.now();
+  const instagramCandidate = buildInstagramCandidate({
+    sourceUrl,
+    title: markdownRecipe?.title ?? markdownTitle ?? metadataCandidate?.title,
+    description:
+      markdownRecipe?.description ??
+      metadataCandidate?.description ??
+      extractMeta(directHtml, "og:description", "property") ??
+      extractMeta(directHtml, "description", "name"),
+    imageUrl:
+      markdownRecipe?.imageUrl ??
+      metadataCandidate?.imageUrl ??
+      toOptionalUrlString(extractMeta(directHtml, "og:image", "property") ?? ""),
+    videoUrl:
+      markdownRecipe?.videoUrl ??
+      metadataCandidate?.videoUrl ??
+      normalizeVideoUrl(extractVideoFromHtml(directHtml)),
+    markdown: markdownContent,
+    assistedCaption,
+    assistedRecipes: successfulAssistedRecipes,
+    latencyMs: Date.now() - instagramStartedAt,
+  });
+
+  attempts.push({
+    stage: instagramCandidate.stage,
+    success: instagramCandidate.success,
+    title: instagramCandidate.title,
+    ingredients: instagramCandidate.ingredients,
+    instructions: instagramCandidate.instructions,
+    notes: instagramCandidate.notes,
+    latencyMs: instagramCandidate.latencyMs,
+    errorCode: instagramCandidate.success ? undefined : "parse_failed",
+  });
+
+  if (instagramCandidate.success) {
+    candidates.push(instagramCandidate);
+  }
+  if (
+    markdownRecipe &&
+    (markdownRecipe.ingredients.length > 0 || markdownRecipe.instructions.length > 0)
+  ) {
+    candidates.push({
+      stage: "markdown",
+      success: true,
+      title: markdownRecipe.title,
+      description: markdownRecipe.description,
+      imageUrl: markdownRecipe.imageUrl,
+      videoUrl: markdownRecipe.videoUrl,
+      ingredients: cleanCandidateLines(markdownRecipe.ingredients),
+      instructions: cleanCandidateLines(markdownRecipe.instructions),
+      notes: cleanCandidateLines(markdownRecipe.notes),
+      tags: markdownRecipe.tags,
+      servings: markdownRecipe.servings,
+      prepTime: markdownRecipe.prepTime,
+      cookTime: markdownRecipe.cookTime,
+      latencyMs: markdownLatencyMs,
+      sourcePlatform: "instagram",
+    });
+  }
+
+  let selected = selectBestRecipeIngestionCandidate(candidates);
+  const hasAssist =
+    Boolean(assistedCaption) || assistedFrames.length > 0 || successfulAssistedRecipes.length > 0;
+  const noNetworkMaterial = !markdownContent && !directHtml;
+  const networkFetchFailed = attempts.some(
+    (attempt) => attempt.errorCode === "fetch_failed" || attempt.errorCode === "timeout"
+  );
+  const shouldFailForUnreachableUrl =
+    noNetworkMaterial &&
+    networkFetchFailed &&
+    !blockedByHost &&
+    !hasAssist &&
+    selected.score === 0;
+  if (shouldFailForUnreachableUrl) {
+    logRecipeIngestionDiagnostics({
+      sourceUrl,
+      sourceHost,
+      sourcePlatform: "instagram",
+      resultQualityScore: selected.score,
+      failureReason: "fetch_failed",
+      draftCreated: false,
+      assistedOcrUsed: successfulAssistedRecipes.length > 0,
+      attempts: attempts.map((attempt) => ({
+        stage: attempt.stage,
+        success: attempt.success,
+        latencyMs: attempt.latencyMs,
+        errorCode: attempt.errorCode,
+        ingredients: attempt.ingredients.length,
+        instructions: attempt.instructions.length,
+      })),
+      webMcpTrackingEnabled,
+    });
+    redirect("/recipes?importError=fetch_failed");
+  }
+
+  const shouldBlockForPrivateLink =
+    blockedByHost &&
+    !hasAssist &&
+    selected.score === 0 &&
+    !instagramCandidate.ingredients.length &&
+    !instagramCandidate.instructions.length;
+
+  if (shouldBlockForPrivateLink) {
+    logRecipeIngestionDiagnostics({
+      sourceUrl,
+      sourceHost,
+      sourcePlatform: "instagram",
+      resultQualityScore: selected.score,
+      failureReason: "blocked",
+      draftCreated: false,
+      assistedOcrUsed: successfulAssistedRecipes.length > 0,
+      attempts: attempts.map((attempt) => ({
+        stage: attempt.stage,
+        success: attempt.success,
+        latencyMs: attempt.latencyMs,
+        errorCode: attempt.errorCode,
+        ingredients: attempt.ingredients.length,
+        instructions: attempt.instructions.length,
+      })),
+      webMcpTrackingEnabled,
+    });
+    redirect("/recipes?importError=blocked");
+  }
+
+  const selectedCandidate = selected.candidate ?? instagramCandidate;
+  const candidateHtml = selectedCandidate.html || directHtml;
+  const title =
+    selectedCandidate.title ||
+    markdownTitle ||
+    extractMeta(candidateHtml, "og:title", "property") ||
+    extractMeta(candidateHtml, "twitter:title", "name") ||
+    extractTitle(candidateHtml) ||
+    "Instagram Recipe Draft";
+  const descriptionCandidate =
+    selectedCandidate.description ||
+    extractMeta(candidateHtml, "description", "name") ||
+    extractMeta(candidateHtml, "og:description", "property");
+  const { description, notes: descriptionNotes } = extractNotesFromDescription(
+    cleanDescription(descriptionCandidate)
+  );
+  const cleanedCandidateIngredients = cleanIngredientLines(selectedCandidate.ingredients);
+  const cleanedIngredients = {
+    lines: cleanedCandidateIngredients.lines.map((line) => convertIngredientMeasurementToMetric(line)),
+    notes: cleanedCandidateIngredients.notes,
+  };
+  const cleanedInstructionsSource = cleanInstructionLines(selectedCandidate.instructions);
+  const cleanedInstructions = {
+    lines: cleanedInstructionsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
+    notes: cleanedInstructionsSource.notes,
+  };
+  const imageUrl = toOptionalUrl(
+    selectedCandidate.imageUrl ??
+    extractMeta(candidateHtml, "og:image", "property") ??
+    extractMeta(candidateHtml, "twitter:image", "name") ??
+    null
+  );
+  const rawVideoUrl = selectedCandidate.videoUrl ?? extractVideoFromHtml(candidateHtml);
+  const normalizedVideoUrl = normalizeVideoUrl(rawVideoUrl);
+  const videoUrl =
+    getVideoKind(normalizedVideoUrl) === "youtube"
+      ? normalizedVideoUrl
+      : normalizedVideoUrl ?? undefined;
+  const finalTags = selectedCandidate.tags?.length ? selectedCandidate.tags : [];
+  const draftCreated = selected.score < MIN_INGESTION_SCORE;
+  const draftReason = draftCreated
+    ? "Imported from Instagram with low confidence — review and complete."
+    : undefined;
+  const notes = normalizeImportedNotes(
+    Array.from(
+      new Set([
+        ...cleanedIngredients.notes,
+        ...cleanedInstructions.notes,
+        ...selectedCandidate.notes,
+        ...descriptionNotes,
+        ...(draftReason ? [draftReason] : []),
+      ])
+    )
+  );
+
+  // Prep groups mirror source-group and prep-group forms for independent editing.
+  const ingredientGroups = extractIngredientGroupsFromLines(selectedCandidate.ingredients);
+  const sourceGroupsRaw =
+    ingredientGroups.length > 0
+      ? cleanIngredientGroups(ingredientGroups).groups.map((group) => ({
+        ...group,
+        items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
+      }))
+      : cleanedIngredients.lines.length > 0
+        ? [{ title: "Ingredients", items: [...cleanedIngredients.lines] }]
+        : [];
+  const prepGroups: PrepGroup[] = [
+    ...sourceGroupsRaw.map((group) => ({ ...group, sourceGroup: true })),
+    ...sourceGroupsRaw.map((group) => ({ ...group, sourceGroup: false })),
+  ];
+
+  logRecipeIngestionDiagnostics({
+    sourceUrl,
+    sourceHost,
+    sourcePlatform: "instagram",
+    stageUsed: selectedCandidate.stage,
+    resultQualityScore: selected.score,
+    draftCreated,
+    assistedOcrUsed: successfulAssistedRecipes.length > 0,
+    attempts: attempts.map((attempt) => ({
+      stage: attempt.stage,
+      success: attempt.success,
+      latencyMs: attempt.latencyMs,
+      errorCode: attempt.errorCode,
+      ingredients: attempt.ingredients.length,
+      instructions: attempt.instructions.length,
+    })),
+    selected: {
+      stage: selectedCandidate.stage,
+      title: selectedCandidate.title,
+      ingredients: selectedCandidate.ingredients,
+      instructions: selectedCandidate.instructions,
+    },
+    webMcpTrackingEnabled,
+  });
+
+  const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
+  const recipe = await prisma.recipe.create({
+    data: {
+      householdId,
+      title,
+      description,
+      sourceUrl: normalizedSourceUrl,
+      imageUrl,
+      videoUrl,
+      servings: selectedCandidate.servings ?? null,
+      prepTime: selectedCandidate.prepTime ?? null,
+      cookTime: selectedCandidate.cookTime ?? null,
+      tags: finalTags,
+      ingredientCount: cleanedIngredients.lines.length,
+      ingredients: cleanedIngredients.lines,
+      instructions: cleanedInstructions.lines,
+      notes,
+      prepGroups,
+    },
+  });
+
+  revalidateTag(`recipes-${householdId}`, "max");
+  revalidateTag(`recipe-${recipe.id}`, "max");
+  revalidatePath("/recipes");
+  revalidatePath("/planner");
+  redirect(`/recipes/${recipe.id}`);
+};
+
 export async function importRecipeFromUrl(formData: FormData) {
   const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
   if (!sourceUrl) {
@@ -1605,9 +2003,13 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
 
   const householdId = await getCurrentHouseholdId();
+  const webMcpTrackingEnabled = process.env.INGEST_ENABLE_WEBMCP === "true";
+  if (isInstagramHost(sourceUrl)) {
+    await importInstagramRecipe(formData, sourceUrl, householdId, webMcpTrackingEnabled);
+  }
+
   const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
   const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
-  const webMcpTrackingEnabled = process.env.INGEST_ENABLE_WEBMCP === "true";
   const attempts: IngestionAttemptResult[] = [];
   const candidates: RecipeIngestionCandidate[] = [];
 
@@ -1835,8 +2237,11 @@ export async function importRecipeFromUrl(formData: FormData) {
     logRecipeIngestionDiagnostics({
       sourceUrl,
       sourceHost,
+      sourcePlatform: "web",
       resultQualityScore: selected.score,
       failureReason,
+      draftCreated: false,
+      assistedOcrUsed: false,
       attempts: attempts.map((attempt) => ({
         stage: attempt.stage,
         success: attempt.success,
@@ -1940,8 +2345,11 @@ export async function importRecipeFromUrl(formData: FormData) {
   logRecipeIngestionDiagnostics({
     sourceUrl,
     sourceHost,
+    sourcePlatform: "web",
     stageUsed: selectedCandidate.stage,
     resultQualityScore: selected.score,
+    draftCreated: false,
+    assistedOcrUsed: false,
     attempts: attempts.map((attempt) => ({
       stage: attempt.stage,
       success: attempt.success,
