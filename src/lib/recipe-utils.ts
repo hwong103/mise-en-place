@@ -380,7 +380,8 @@ export const cleanInstructionLines = (lines: string[]) => {
   const cleanedLines: string[] = [];
   const notes: string[] = [];
   const metadataLinePattern =
-    /^(?:course|cuisine|keyword|keywords|servings?|yield|author|calories|prep(?:\s+time)?|cook(?:\s+time)?|total(?:\s+time)?|equipment)\b[:\s-]*/i;
+    /^(?:course|cuisine|keyword|keywords|servings?|yield|author|calories)\b[:\s-]*/i;
+  const timedMetadataLinePattern = /^(?:prep(?:\s+time)?|cook(?:\s+time)?|total(?:\s+time)?|equipment)\s*:/i;
 
   for (const line of lines) {
     const trimmed = cleanLineBase(line);
@@ -391,7 +392,7 @@ export const cleanInstructionLines = (lines: string[]) => {
       notes.push(stripNoteText(trimmed));
       continue;
     }
-    if (metadataLinePattern.test(trimmed)) {
+    if (metadataLinePattern.test(trimmed) || timedMetadataLinePattern.test(trimmed)) {
       continue;
     }
     cleanedLines.push(trimmed);
