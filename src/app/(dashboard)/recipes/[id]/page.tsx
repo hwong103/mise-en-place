@@ -227,7 +227,7 @@ export default async function RecipeDetailPage({
                     }
                     className="block px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
-                    {isEditing ? "Done" : "Edit"}
+                    {isEditing ? "Cancel" : "Edit"}
                   </Link>
                   <form action={deleteRecipe}>
                     <input type="hidden" name="recipeId" value={recipe.id} />
