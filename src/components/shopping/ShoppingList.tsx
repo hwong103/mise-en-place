@@ -106,6 +106,9 @@ export default function ShoppingList({
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
   const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({});
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
+  const [completedTrayExpandedByLocation, setCompletedTrayExpandedByLocation] = useState<
+    Record<string, boolean>
+  >({});
   const [isClearing, setIsClearing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -319,6 +322,41 @@ export default function ShoppingList({
     return mergedLocations.find((location) => location.name === activeLocation) ?? mergedLocations[0] ?? null;
   }, [activeLocation, mergedLocations]);
 
+  const activeLocationView = useMemo(() => {
+    if (!activeLocationGroup) {
+      return null;
+    }
+
+    const categorized = activeLocationGroup.categories
+      .map((category) => {
+        const activeItems: MergedItem[] = [];
+
+        category.items.forEach((item) => {
+          const isChecked = optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
+          if (isChecked) {
+            return;
+          }
+          activeItems.push(item);
+        });
+
+        return {
+          name: category.name,
+          activeItems,
+        };
+      })
+      .filter((category) => category.activeItems.length > 0);
+
+    const completedItems = activeLocationGroup.categories.flatMap((category) =>
+      category.items.filter((item) => optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false))
+    );
+
+    return {
+      name: activeLocationGroup.name,
+      activeCategories: categorized,
+      completedItems,
+    };
+  }, [activeLocationGroup, optimisticChecked, persistedLookup]);
+
   const categoryOptions = useMemo(() => {
     return [...CATEGORY_ORDER];
   }, []);
@@ -487,7 +525,7 @@ export default function ShoppingList({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Shopping List</h1>
@@ -500,7 +538,7 @@ export default function ShoppingList({
         />
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add Manual Items</h2>
         {saveErrors.length > 0 ? (
           <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
@@ -573,21 +611,23 @@ export default function ShoppingList({
       </section>
 
       {mergedLocations.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
           No ingredients yet. Add meals in the planner to generate your list.
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div
-            className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900"
             role="tablist"
             aria-label="Shopping locations"
           >
             {mergedLocations.map((locationGroup) => {
-              const itemCount = locationGroup.categories.reduce(
-                (total, category) => total + category.items.length,
-                0
-              );
+              const itemCount = locationGroup.categories.reduce((total, category) => {
+                const activeCount = category.items.filter(
+                  (item) => !(optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false))
+                ).length;
+                return total + activeCount;
+              }, 0);
               const isActive = locationGroup.name === activeLocationGroup?.name;
               return (
                 <button
@@ -612,29 +652,35 @@ export default function ShoppingList({
             })}
           </div>
 
-          {activeLocationGroup ? (
+          {activeLocationView ? (
             <section
-              key={activeLocationGroup.name}
-              id={buildLocationPanelId(activeLocationGroup.name)}
+              key={activeLocationView.name}
+              id={buildLocationPanelId(activeLocationView.name)}
               role="tabpanel"
-              className="space-y-6"
+              className="space-y-4"
             >
               <h2 className="text-base font-extrabold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                {activeLocationGroup.name}
+                {activeLocationView.name}
               </h2>
 
-              <div className="columns-1 gap-6 sm:columns-2">
-                {activeLocationGroup.categories.map((category) => (
+              {activeLocationView.activeCategories.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  All items done for this location.
+                </div>
+              ) : null}
+
+              <div className="columns-1 gap-4 sm:columns-2">
+                {activeLocationView.activeCategories.map((category) => (
                   <div
-                    key={`${activeLocationGroup.name}-${category.name}`}
-                    className="mb-6 break-inside-avoid space-y-4"
+                    key={`${activeLocationView.name}-${category.name}`}
+                    className="mb-4 break-inside-avoid space-y-2"
                   >
                     <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       {category.name}
                     </h3>
-                    <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                       <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {category.items.map((item) => {
+                        {category.activeItems.map((item) => {
                           const isChecked =
                             optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
                           const isSaving = pendingKeys[item.key] ?? item._optimistic === true;
@@ -642,9 +688,9 @@ export default function ShoppingList({
                           const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
 
                           return (
-                            <li key={item.key} className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                                <label className="flex items-start gap-3">
+                            <li key={item.key} className="px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                                <label className="flex min-w-0 flex-1 items-start gap-2.5">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -657,28 +703,27 @@ export default function ShoppingList({
                                         location: item.location,
                                       })
                                     }
-                                    className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900"
+                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900"
                                   />
-                                  <div>
-                                    <div className={isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""}>
+                                  <div className="min-w-0">
+                                    <div
+                                      className={`truncate ${
+                                        isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""
+                                      }`}
+                                    >
                                       {item.line}
                                     </div>
-                                    {item.amountSummary ? (
-                                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        Amount: {item.amountSummary}
-                                      </div>
-                                    ) : null}
                                     {item.manual || item.recipes.length > 0 ? (
-                                      <div className="mt-2 flex flex-wrap gap-1">
+                                      <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
                                         {item.manual ? (
-                                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                             Manual
                                           </span>
                                         ) : null}
                                         {item.recipes.map((recipe) => (
                                           <span
                                             key={`${item.key}-${recipe}`}
-                                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                            className="rounded bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
                                           >
                                             {recipe}
                                           </span>
@@ -688,7 +733,7 @@ export default function ShoppingList({
                                   </div>
                                 </label>
 
-                                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                                <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
                                   <select
                                     value={item.location}
                                     onChange={(event) =>
@@ -700,7 +745,7 @@ export default function ShoppingList({
                                         location: event.target.value,
                                       })
                                     }
-                                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                                     disabled={isSaving || isPending}
                                     aria-label={`Location for ${item.line}`}
                                   >
@@ -711,13 +756,9 @@ export default function ShoppingList({
                                     ))}
                                   </select>
                                   {item.amountSummary ? (
-                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                      {item.amountSummary}
-                                    </span>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400">{item.amountSummary}</span>
                                   ) : item.count > 1 ? (
-                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                                      x{item.count}
-                                    </span>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400">x{item.count}</span>
                                   ) : null}
                                   {isSaveError ? (
                                     <span className="text-xs text-rose-500">Failed to save</span>
@@ -753,6 +794,86 @@ export default function ShoppingList({
                   </div>
                 ))}
               </div>
+
+              {activeLocationView.completedItems.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCompletedTrayExpandedByLocation((prev) => ({
+                        ...prev,
+                        [activeLocationView.name]: !prev[activeLocationView.name],
+                      }))
+                    }
+                    className="flex w-full items-center justify-between px-4 py-2 text-left text-sm font-semibold text-slate-700 dark:text-slate-200"
+                    aria-expanded={completedTrayExpandedByLocation[activeLocationView.name] ?? false}
+                  >
+                    <span>Completed ({activeLocationView.completedItems.length})</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {completedTrayExpandedByLocation[activeLocationView.name] ? "Hide" : "Show"}
+                    </span>
+                  </button>
+                  {completedTrayExpandedByLocation[activeLocationView.name] ? (
+                    <ul className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+                      {activeLocationView.completedItems.map((item) => {
+                        const isSaving = pendingKeys[item.key] ?? item._optimistic === true;
+                        const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
+
+                        return (
+                          <li
+                            key={`completed-${item.key}`}
+                            className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm text-slate-600 dark:text-slate-300"
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate line-through text-slate-400 dark:text-slate-500">{item.line}</span>
+                              <select
+                                value={item.location}
+                                onChange={(event) =>
+                                  handleLocationChange({
+                                    key: item.key,
+                                    line: item.line,
+                                    manual: item.manual,
+                                    category: item.category,
+                                    location: event.target.value,
+                                  })
+                                }
+                                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                disabled={isSaving || isPending}
+                                aria-label={`Location for ${item.line}`}
+                              >
+                                {itemLocationOptions.map((location) => (
+                                  <option key={location} value={location}>
+                                    {location}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleToggle({
+                                  key: item.key,
+                                  line: item.line,
+                                  manual: item.manual,
+                                  category: item.category,
+                                  location: item.location,
+                                })
+                              }
+                              disabled={isSaving || isPending}
+                              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                              Undo
+                            </button>
+                            {isSaving ? (
+                              <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
           ) : null}
         </div>
