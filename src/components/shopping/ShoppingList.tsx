@@ -75,6 +75,16 @@ type MergedItem = {
   recipes: string[];
   category: string;
   location: string;
+  _optimistic?: boolean;
+  _status?: "saving" | "error";
+};
+
+type OptimisticManualItem = {
+  tempId: string;
+  line: string;
+  category: string;
+  location: string;
+  status: "saving" | "error";
 };
 
 export default function ShoppingList({
@@ -91,7 +101,9 @@ export default function ShoppingList({
   const [newLocation, setNewLocation] = useState("");
   const [optimisticChecked, setOptimisticChecked] = useState<Record<string, boolean>>({});
   const [optimisticLocations, setOptimisticLocations] = useState<Record<string, string>>({});
+  const [optimisticManualItems, setOptimisticManualItems] = useState<OptimisticManualItem[]>([]);
   const [suppressedKeys, setSuppressedKeys] = useState<Record<string, boolean>>({});
+  const [saveErrors, setSaveErrors] = useState<string[]>([]);
   const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({});
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
@@ -215,6 +227,36 @@ export default function ShoppingList({
         });
       });
 
+    optimisticManualItems.forEach((item) => {
+      const alreadyPersisted = persistedItems.some(
+        (persisted) =>
+          persisted.manual &&
+          persisted.line.trim().toLowerCase() === item.line.trim().toLowerCase() &&
+          persisted.category === item.category
+      );
+      if (alreadyPersisted) {
+        return;
+      }
+
+      const key = buildShoppingItemKey(item.category, item.line, true);
+      if (isItemSuppressed(key)) {
+        return;
+      }
+
+      addItemToLocationMap(locationMap, item.location, toDisplayCategoryName(item.category), {
+        line: item.line,
+        count: 1,
+        amountSummary: undefined,
+        key: `optimistic-${item.tempId}`,
+        manual: true,
+        id: undefined,
+        recipes: [],
+        category: item.category,
+        _optimistic: true,
+        _status: item.status,
+      });
+    });
+
     return Array.from(locationMap.entries())
       .map(([locationName, categoryMap]) => ({
         name: locationName,
@@ -247,6 +289,7 @@ export default function ShoppingList({
     categories,
     categoryOrderLookup,
     locationPreferences,
+    optimisticManualItems,
     optimisticLocations,
     persistedItems,
     persistedLookup,
@@ -382,17 +425,30 @@ export default function ShoppingList({
     }
 
     const location = normalizeShoppingLocation(manualLocation);
-    setManualLine("");
-    setLocationOptions((current) => mergeLocationOptions(current, [location]));
+    const tempId = crypto.randomUUID();
 
-    startTransition(async () => {
-      await addManualShoppingItem({
+    setOptimisticManualItems((prev) => [
+      ...prev,
+      { tempId, line: trimmed, category: manualCategory, location, status: "saving" },
+    ]);
+    setLocationOptions((current) => mergeLocationOptions(current, [location]));
+    setManualLine("");
+
+    addManualShoppingItem({
         weekKey,
         line: trimmed,
         category: manualCategory,
         location,
+      })
+      .then(() => {
+        setOptimisticManualItems((prev) => prev.filter((item) => item.tempId !== tempId));
+      })
+      .catch(() => {
+        setOptimisticManualItems((prev) =>
+          prev.map((item) => (item.tempId === tempId ? { ...item, status: "error" } : item))
+        );
+        setSaveErrors((prev) => [...prev, `Failed to save "${trimmed}"`]);
       });
-    });
   };
 
   const handleAddLocation = () => {
@@ -446,6 +502,20 @@ export default function ShoppingList({
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add Manual Items</h2>
+        {saveErrors.length > 0 ? (
+          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+            <div className="flex items-center justify-between gap-2">
+              <span>{saveErrors[saveErrors.length - 1]}</span>
+              <button
+                type="button"
+                onClick={() => setSaveErrors([])}
+                className="text-xs font-semibold underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-3 sm:grid-cols-[1.5fr_1fr_1fr_auto]">
           <input
             value={manualLine}
@@ -479,7 +549,7 @@ export default function ShoppingList({
             type="button"
             onClick={handleAddManual}
             className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            disabled={isPending}
+            disabled={!manualLine.trim()}
           >
             Add
           </button>
@@ -567,7 +637,8 @@ export default function ShoppingList({
                         {category.items.map((item) => {
                           const isChecked =
                             optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
-                          const isSaving = pendingKeys[item.key] ?? false;
+                          const isSaving = pendingKeys[item.key] ?? item._optimistic === true;
+                          const isSaveError = item._status === "error";
                           const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
 
                           return (
@@ -648,7 +719,9 @@ export default function ShoppingList({
                                       x{item.count}
                                     </span>
                                   ) : null}
-                                  {isSaving ? (
+                                  {isSaveError ? (
+                                    <span className="text-xs text-rose-500">Failed to save</span>
+                                  ) : isSaving ? (
                                     <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
                                   ) : null}
                                   <button
@@ -664,7 +737,7 @@ export default function ShoppingList({
                                       })
                                     }
                                     className="rounded-full p-1 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
-                                    disabled={isSaving || isPending}
+                                    disabled={isSaving || isPending || item._optimistic}
                                     aria-label={`Remove ${item.line}`}
                                     title="Remove item"
                                   >
