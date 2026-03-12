@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model Household {
@@ -32,6 +31,7 @@ model User {
   avatarUrl          String?
   createdAt          DateTime          @default(now())
   authProviderUserId String?           @unique
+  betterAuthUserId   String?           @unique
   claimedHouseholds  Household[]       @relation("ClaimedHouseholds")
   households         HouseholdMember[]
 }
@@ -62,7 +62,7 @@ model Recipe {
   instructions    Json
   notes           Json?
   prepGroups      Json
-  tags            String[]
+  tags            Json
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   videoUrl        String?
@@ -78,7 +78,7 @@ model MealPlan {
   id          String    @id @default(cuid())
   householdId String
   recipeId    String
-  date        DateTime  @db.Date
+  date        DateTime
   mealType    MealType  @default(DINNER)
   servings    Int       @default(2)
   cooked      Boolean   @default(false)
@@ -92,7 +92,7 @@ model MealPlan {
 model ShoppingListItem {
   id             String    @id @default(cuid())
   householdId    String
-  weekStart      DateTime  @db.Date
+  weekStart      DateTime
   line           String
   lineNormalized String
   category       String
@@ -129,7 +129,7 @@ model Wine {
   name        String
   producer    String?
   vintage     Int?               // year e.g. 2021
-  grapes      String[]           // e.g. ["Shiraz", "Cabernet"]
+  grapes      Json               // e.g. ["Shiraz", "Cabernet"]
   region      String?            // e.g. "Barossa Valley"
   country     String?
   type        WineType           @default(RED)
@@ -171,4 +171,65 @@ enum WineType {
   DESSERT
   FORTIFIED
   OTHER
+}
+
+model AuthUser {
+  id            String        @id
+  name          String
+  email         String        @unique
+  emailVerified Boolean       @default(false)
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  authsessions  AuthSession[]
+  authaccounts  AuthAccount[]
+
+  @@map("AuthUser")
+}
+
+model AuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  authuser  AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("AuthSession")
+}
+
+model AuthAccount {
+  id                    String   @id
+  accountId             String
+  providerId            String
+  userId                String
+  authuser              AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+  @@map("AuthAccount")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("AuthVerification")
 }

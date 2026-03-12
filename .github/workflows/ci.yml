@@ -11,10 +11,14 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/miseenplace?schema=public
-      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/miseenplace?schema=public
-      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      DATABASE_URL: file:./prisma/dev.db
+      BETTER_AUTH_SECRET: test-secret-value-with-32-characters
+      BETTER_AUTH_URL: http://localhost:3000
+      GOOGLE_CLIENT_ID: test-google-client
+      GOOGLE_CLIENT_SECRET: test-google-secret
+      RESEND_API_KEY: test-resend-key
+      AUTH_FROM_EMAIL: noreply@hwong103.work
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
     steps:
       - name: Checkout

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import CellarClient from "@/components/cellar/CellarClient";
+import { readStringArray } from "@/lib/json-arrays";
 import type { StockistResult } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
 
@@ -108,6 +109,7 @@ export default async function CellarPage() {
 
     const winesForClient = wines.map((wine) => ({
         ...wine,
+        grapes: readStringArray(wine.grapes),
         stockists: parseStockists(wine.stockists),
     }));
 

@@ -18,7 +18,7 @@ Household recipe management with URL import, OCR import, weekly planning, and sh
   - Manual item additions and check-off state
 - Auth + tenant scoping:
   - Anonymous household start + share-link access
-  - Optional Supabase magic-link login for ownership claim/management
+  - Better Auth login with Google SSO and magic links for ownership claim/management
   - Data scoped to household access context (guest link or authenticated membership)
 - Settings (v1):
   - Household overview
@@ -31,8 +31,9 @@ Household recipe management with URL import, OCR import, weekly planning, and sh
 - Next.js 16 (App Router)
 - TypeScript
 - Tailwind CSS v4
-- Prisma + PostgreSQL
-- Supabase Auth
+- Prisma + Cloudflare D1
+- Better Auth + Resend
+- OpenNext for Cloudflare Workers
 - Tesseract.js + heic2any
 - dnd-kit
 - Vitest
@@ -69,17 +70,19 @@ npm run dev
 Required runtime variables:
 
 - `DATABASE_URL`
-- `DIRECT_URL`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_SITE_URL` (recommended for stable magic-link redirects, e.g. your deployed app URL)
+- `BETTER_AUTH_SECRET`
+- `BETTER_AUTH_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `RESEND_API_KEY`
+- `AUTH_FROM_EMAIL`
+- `NEXT_PUBLIC_SITE_URL`
 
 Optional variables:
 
 - `DEFAULT_HOUSEHOLD_NAME` (default: `My Household`)
 - `HOUSEHOLD_SHARE_SIGNING_SECRET` (required in production for household share tokens and signed guest sessions)
 - `HOUSEHOLD_GUEST_SESSION_DAYS` (default: `90`; sliding guest session window)
-- `SUPABASE_SERVICE_ROLE_KEY` (reserved for future admin flows)
 - `OPENAI_API_KEY` and `NEXT_PUBLIC_OCR_PROVIDER` (reserved for future OCR provider expansion)
 - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (reserved for future managed image storage)
 - `DISABLE_AUTH` (set to `true` only for debugging to bypass server auth)
@@ -97,6 +100,8 @@ Optional variables:
 - Typecheck: `npm run typecheck`
 - Tests: `npm run test:run`
 - Build: `npm run build`
+- Cloudflare build: `npm run cf:build`
+- Cloudflare preview: `npm run cf:preview`
 - Ingestion benchmark: `npm run ingestion:benchmark`
 - Ingestion regression check: `npm run ingestion:regression-check`
 
@@ -108,7 +113,7 @@ The URL import flow now uses a staged strategy with quality scoring:
 
 1. `markdown.new` markdown extraction
 2. direct HTTP HTML + JSON-LD parsing
-3. rendered HTML fallback via dedicated Playwright worker
+3. rendered HTML fallback via dedicated render worker
 4. readability/article fallback for noisy pages
 
 Structured import diagnostics are logged as JSON with source host, stage used, attempt latencies, quality score, and failure reason.
@@ -136,15 +141,20 @@ npm start
 - Share via `GET /join/<token>` invite link.
 - Guests receive a signed household session cookie (sliding expiration).
 - Managers can rotate links from Settings; rotation invalidates prior links and guest sessions.
-- Ownership can be claimed later via Supabase login (`/claim-household` flow), which grants durable manager access across devices.
+- Ownership can be claimed later via Better Auth login (`/claim-household` flow), which grants durable manager access across devices.
 
-## Supabase Auth Redirect Setup
+## Better Auth Redirect Setup
 
 To avoid magic links redirecting to the wrong host (for example `localhost`), configure both:
 
-- `NEXT_PUBLIC_SITE_URL` in your app environment
-- Supabase Auth URL configuration:
-  - `Site URL` set to your canonical app URL
-  - `Additional Redirect URLs` include:
-    - `http://localhost:3000/auth/callback` (dev)
-    - your deployed callback URL(s), e.g. `https://<your-domain>/auth/callback`
+- `NEXT_PUBLIC_SITE_URL` and `BETTER_AUTH_URL` in your app environment
+- Google OAuth redirect URLs:
+  - `http://localhost:3000/api/auth/callback/google` (dev)
+  - your deployed callback URL(s), e.g. `https://<your-domain>/api/auth/callback/google`
+- Resend sender verification for `AUTH_FROM_EMAIL`
+
+## Cloudflare Runtime
+
+- `wrangler.jsonc` defines the Cloudflare Worker entrypoint, D1 binding (`DB`), asset binding, and R2 cache bucket used by OpenNext.
+- Use `.dev.vars` for local Worker secrets and `wrangler secret put` / dashboard secrets for deployed environments.
+- The Next app can still be developed with `npm run dev`, while Cloudflare previewing uses `npm run cf:preview`.

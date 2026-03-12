@@ -1,12 +1,15 @@
-import prisma from "@/lib/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { logServerPerf } from "@/lib/server-perf";
 import { cache } from "react";
+import { headers } from "next/headers";
 
-type AuthUser = {
+import prisma from "@/lib/prisma";
+import { auth } from "@/lib/better-auth";
+import { logServerPerf } from "@/lib/server-perf";
+
+export type AuthUser = {
   id: string;
   email: string;
   name?: string | null;
+  image?: string | null;
 };
 
 const normalizeUserName = (value: string | null | undefined) => {
@@ -14,105 +17,52 @@ const normalizeUserName = (value: string | null | undefined) => {
   return trimmed && trimmed.length > 0 ? trimmed : null;
 };
 
-const readClaimString = (claims: Record<string, unknown>, key: string) => {
-  const value = claims[key];
-  return typeof value === "string" ? value.trim() : "";
-};
+const toAuthUser = (session: unknown): AuthUser | null => {
+  const candidate = session as
+    | {
+        user?: {
+          id?: unknown;
+          email?: unknown;
+          name?: unknown;
+          image?: unknown;
+        };
+      }
+    | null
+    | undefined;
+  const user = candidate?.user;
 
-const authUserFromClaims = (claims: Record<string, unknown>) => {
-  const id = readClaimString(claims, "sub");
-  const email = readClaimString(claims, "email").toLowerCase();
+  const id = typeof user?.id === "string" ? user.id.trim() : "";
+  const email = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+
   if (!id || !email) {
     return null;
   }
 
-  const fullName = normalizeUserName(readClaimString(claims, "full_name"));
-  const name = normalizeUserName(readClaimString(claims, "name"));
-
   return {
     id,
     email,
-    name: fullName ?? name ?? null,
+    name: normalizeUserName(typeof user?.name === "string" ? user.name : null),
+    image: typeof user?.image === "string" ? user.image : null,
   };
 };
 
 const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
   const startedAt = Date.now();
-  let authSource: "claims" | "get_user" | "none" = "none";
-  let claimsReadMs = 0;
-  let userReadMs = 0;
   try {
-    const supabase = await createSupabaseServerClient();
-    const claimsReadStartedAt = Date.now();
-    const claimsResult = await supabase.auth.getClaims();
-    claimsReadMs = Date.now() - claimsReadStartedAt;
-    if (!claimsResult.error && claimsResult.data?.claims) {
-      const claimsUser = authUserFromClaims(claimsResult.data.claims as Record<string, unknown>);
-      if (claimsUser) {
-        authSource = "claims";
-        logServerPerf({
-          phase: "auth.resolve_user",
-          route: "/server/auth/current-user",
-          startedAt,
-          success: true,
-          meta: { source: authSource, claims_read_ms: claimsReadMs, user_read_ms: userReadMs },
-        });
-        return claimsUser;
-      }
-    }
-
-    const userReadStartedAt = Date.now();
-    const { data, error } = await supabase.auth.getUser();
-    userReadMs = Date.now() - userReadStartedAt;
-    if (error || !data.user) {
-      logServerPerf({
-        phase: "auth.resolve_user",
-        route: "/server/auth/current-user",
-        startedAt,
-        success: false,
-        meta: {
-          source: authSource,
-          reason: "missing_user",
-          claims_read_ms: claimsReadMs,
-          user_read_ms: userReadMs,
-        },
-      });
-      return null;
-    }
-
-    const email = data.user.email?.trim().toLowerCase();
-    if (!email) {
-      logServerPerf({
-        phase: "auth.resolve_user",
-        route: "/server/auth/current-user",
-        startedAt,
-        success: false,
-        meta: {
-          source: authSource,
-          reason: "missing_email",
-          claims_read_ms: claimsReadMs,
-          user_read_ms: userReadMs,
-        },
-      });
-      return null;
-    }
-
-    authSource = "get_user";
-    const authUser = {
-      id: data.user.id,
-      email,
-      name:
-        normalizeUserName(data.user.user_metadata?.full_name) ??
-        normalizeUserName(data.user.user_metadata?.name) ??
-        null,
-    };
+    const headerStore = await headers();
+    const session = await auth.api.getSession({
+      headers: new Headers(headerStore),
+    });
+    const authUser = toAuthUser(session);
 
     logServerPerf({
       phase: "auth.resolve_user",
       route: "/server/auth/current-user",
       startedAt,
-      success: true,
-      meta: { source: authSource, claims_read_ms: claimsReadMs, user_read_ms: userReadMs },
+      success: Boolean(authUser),
+      meta: {
+        source: "better_auth_session",
+      },
     });
 
     return authUser;
@@ -123,9 +73,7 @@ const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
       startedAt,
       success: false,
       meta: {
-        source: authSource,
-        claims_read_ms: claimsReadMs,
-        user_read_ms: userReadMs,
+        source: "better_auth_session",
         error: error instanceof Error ? error.message : "unknown_error",
       },
     });
@@ -146,33 +94,42 @@ export async function requireCurrentAuthUser(): Promise<AuthUser> {
 }
 
 export async function getOrCreateAppUserId(authUser: AuthUser): Promise<string> {
-  const byProviderUserId = await prisma.user.findUnique({
-    where: { authProviderUserId: authUser.id },
+  const byBetterAuthUserId = await prisma.user.findUnique({
+    where: { betterAuthUserId: authUser.id },
     select: { id: true },
   });
 
-  if (byProviderUserId) {
-    return byProviderUserId.id;
+  if (byBetterAuthUserId) {
+    return byBetterAuthUserId.id;
   }
 
   const existing = await prisma.user.findUnique({
     where: { email: authUser.email },
-    select: { id: true, authProviderUserId: true, name: true },
+    select: {
+      id: true,
+      betterAuthUserId: true,
+      authProviderUserId: true,
+      name: true,
+      avatarUrl: true,
+    },
   });
 
   if (existing) {
-    if (
-      !existing.authProviderUserId ||
-      (authUser.name !== null && authUser.name !== undefined && existing.name !== authUser.name)
-    ) {
+    const shouldUpdateName =
+      authUser.name !== null && authUser.name !== undefined && existing.name !== authUser.name;
+    const shouldUpdateAvatar = authUser.image !== null && authUser.image !== undefined && existing.avatarUrl !== authUser.image;
+
+    if (!existing.betterAuthUserId || shouldUpdateName || shouldUpdateAvatar) {
       await prisma.user.update({
         where: { id: existing.id },
         data: {
-          authProviderUserId: existing.authProviderUserId ?? authUser.id,
-          ...(authUser.name !== null && authUser.name !== undefined ? { name: authUser.name } : {}),
+          betterAuthUserId: existing.betterAuthUserId ?? authUser.id,
+          ...(shouldUpdateName ? { name: authUser.name } : {}),
+          ...(shouldUpdateAvatar ? { avatarUrl: authUser.image } : {}),
         },
       });
     }
+
     return existing.id;
   }
 
@@ -180,7 +137,9 @@ export async function getOrCreateAppUserId(authUser: AuthUser): Promise<string> 
     data: {
       email: authUser.email,
       authProviderUserId: authUser.id,
+      betterAuthUserId: authUser.id,
       name: authUser.name,
+      avatarUrl: authUser.image,
     },
     select: { id: true },
   });

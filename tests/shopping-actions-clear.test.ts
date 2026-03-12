@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { clearShoppingListWeek } from "@/app/(dashboard)/shopping/actions";
 import { getCurrentHouseholdId } from "@/lib/household";
 import prisma from "@/lib/prisma";
@@ -14,7 +14,7 @@ const { txMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/cache", () => ({
-  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
 }));
 
 vi.mock("@/lib/household", () => ({
@@ -31,9 +31,8 @@ describe("clearShoppingListWeek", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getCurrentHouseholdId).mockResolvedValue("household_1");
-    vi.mocked(prisma.$transaction).mockImplementation(
-      async (callback: (tx: typeof txMock) => Promise<unknown>) => callback(txMock)
-    );
+    vi.mocked(prisma.$transaction).mockImplementation((async (callback: (tx: typeof txMock) => Promise<unknown>) =>
+      callback(txMock)) as never);
   });
 
   it("clears persisted rows and suppresses visible auto-generated items", async () => {
@@ -76,9 +75,8 @@ describe("clearShoppingListWeek", () => {
           checked: true,
         },
       ],
-      skipDuplicates: true,
     });
-    expect(revalidatePath).toHaveBeenCalledWith("/shopping");
+    expect(revalidateTag).toHaveBeenCalledWith("shopping-household_1", "max");
   });
 
   it("only deletes rows when there are no auto items to suppress", async () => {
@@ -89,6 +87,6 @@ describe("clearShoppingListWeek", () => {
 
     expect(txMock.shoppingListItem.deleteMany).toHaveBeenCalledTimes(1);
     expect(txMock.shoppingListItem.createMany).not.toHaveBeenCalled();
-    expect(revalidatePath).toHaveBeenCalledWith("/shopping");
+    expect(revalidateTag).toHaveBeenCalledWith("shopping-household_1", "max");
   });
 });

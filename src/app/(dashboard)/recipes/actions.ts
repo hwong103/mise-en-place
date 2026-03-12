@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
+import { readStringArray, writeStringArray } from "@/lib/json-arrays";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import { fromDateKey } from "@/lib/date";
@@ -1600,6 +1601,7 @@ export async function updateRecipeSection(formData: FormData) {
       const prepTime = toOptionalInt(formData.get("prepTime"));
       const cookTime = toOptionalInt(formData.get("cookTime"));
       const tags = parseTags(formData.get("tags")?.toString() ?? "");
+      const existingTags = readStringArray(recipe.tags);
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -1612,7 +1614,7 @@ export async function updateRecipeSection(formData: FormData) {
           servings: servings ?? recipe.servings,
           prepTime: prepTime ?? recipe.prepTime,
           cookTime: cookTime ?? recipe.cookTime,
-          tags: tags.length > 0 ? tags : recipe.tags,
+          tags: writeStringArray(tags.length > 0 ? tags : existingTags),
         },
       });
     }
@@ -1808,7 +1810,7 @@ const importInstagramRecipe = async (
     });
   }
 
-  let selected = selectBestRecipeIngestionCandidate(candidates);
+  const selected = selectBestRecipeIngestionCandidate(candidates);
   const hasAssist =
     Boolean(assistedCaption) || assistedFrames.length > 0 || successfulAssistedRecipes.length > 0;
   const noNetworkMaterial = !markdownContent && !directHtml;

@@ -9,8 +9,7 @@ const isServerAuthBypassed = () => {
     return true;
   }
 
-  const isPreview = (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview";
-  return isPreview && /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+  return /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 };
 
 export async function POST(request: NextRequest) {

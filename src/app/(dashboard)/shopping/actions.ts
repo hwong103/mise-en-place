@@ -320,12 +320,7 @@ export async function clearShoppingListWeek(input: {
     });
   });
 
-  await prisma.$transaction(async (tx: {
-    shoppingListItem: {
-      deleteMany: (args: { where: { householdId: string; weekStart: Date } }) => Promise<unknown>;
-      createMany: (args: { data: typeof suppressedRows; skipDuplicates: boolean }) => Promise<unknown>;
-    };
-  }) => {
+  await prisma.$transaction(async (tx) => {
     await tx.shoppingListItem.deleteMany({
       where: {
         householdId,
@@ -336,7 +331,6 @@ export async function clearShoppingListWeek(input: {
     if (suppressedRows.length > 0) {
       await tx.shoppingListItem.createMany({
         data: suppressedRows,
-        skipDuplicates: true,
       });
     }
   });
