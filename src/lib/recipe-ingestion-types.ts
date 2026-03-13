@@ -2,11 +2,7 @@ import type { PrepGroup } from "@/lib/recipe-utils";
 
 export type IngestionStage =
   | "markdown"
-  | "http_html"
-  | "rendered_html"
-  | "readability"
-  | "instagram_caption"
-  | "instagram_assisted_ocr";
+  | "http_html";
 
 export type IngestionErrorCode =
   | "fetch_failed"

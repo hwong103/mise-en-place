@@ -5,7 +5,7 @@ import { getCurrentAuthUser } from "@/lib/auth";
 const highlights = [
   {
     title: "Recipe Library",
-    detail: "Import URLs, extract cookbook pages with OCR, and keep one searchable source of truth.",
+    detail: "Import recipe URLs and keep one searchable source of truth for the whole household.",
     href: "/recipes",
     icon: UtensilsCrossed,
   },
