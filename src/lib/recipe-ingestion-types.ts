@@ -1,6 +1,8 @@
 import type { PrepGroup } from "@/lib/recipe-utils";
 
-export type IngestionStage = "markdown" | "http_html" | "rendered_html" | "readability";
+export type IngestionStage =
+  | "markdown"
+  | "http_html";
 
 export type IngestionErrorCode =
   | "fetch_failed"
@@ -32,4 +34,6 @@ export type RecipeIngestionCandidate = IngestionAttemptResult & {
   cookTime?: number;
   ingredientGroups?: PrepGroup[];
   html?: string;
+  sourcePlatform?: "instagram" | "web";
+  draftReason?: string;
 };

@@ -5,7 +5,7 @@ import { getCurrentAuthUser } from "@/lib/auth";
 const highlights = [
   {
     title: "Recipe Library",
-    detail: "Import URLs, extract cookbook pages with OCR, and keep one searchable source of truth.",
+    detail: "Import recipe URLs and keep one searchable source of truth for the whole household.",
     href: "/recipes",
     icon: UtensilsCrossed,
   },
@@ -34,8 +34,7 @@ const isAuthDisabled = () => {
     return true;
   }
 
-  const isPreview = (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview";
-  return isPreview && /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+  return /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 };
 
 export default async function HomePage({

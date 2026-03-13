@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
 import RecipeForm from "@/components/recipes/RecipeForm";
-import SubmitButton from "@/components/forms/SubmitButton";
-import OcrImportCard from "@/components/recipes/OcrImportCard";
 import FadeContent from "@/components/ui/FadeContent";
 
 const normalize = (value: string) =>
@@ -29,7 +27,10 @@ export default function RecipeLibraryClient({
 }: RecipeLibraryClientProps) {
   const [query, setQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [selected, setSelected] = useState<"url" | "manual" | "ocr" | null>(null);
+  const [selected, setSelected] = useState<"url" | "manual" | null>(null);
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [clientImportError, setClientImportError] = useState<string | null>(null);
+  const [isImportPending, startImportTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const needle = normalize(query);
@@ -69,6 +70,25 @@ export default function RecipeLibraryClient({
     return "Recipe import failed. Please try again.";
   }, [importError]);
 
+  const handleUrlImportSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClientImportError(null);
+
+    const formData = new FormData(event.currentTarget);
+
+    startImportTransition(async () => {
+      try {
+        await importAction(formData);
+      } catch (error) {
+        const digest = (error as Error & { digest?: string })?.digest;
+        if (digest?.startsWith("NEXT_REDIRECT")) {
+          return;
+        }
+        setClientImportError("Import failed. Please try again.");
+      }
+    });
+  };
+
   return (
     <div className="space-y-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -88,9 +108,9 @@ export default function RecipeLibraryClient({
         </button>
       </div>
 
-      {importErrorMessage ? (
+      {importErrorMessage || clientImportError ? (
         <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
-          {importErrorMessage}
+          {importErrorMessage ?? clientImportError}
         </div>
       ) : null}
 
@@ -115,7 +135,7 @@ export default function RecipeLibraryClient({
             </div>
 
             {!selected ? (
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setSelected("url")}
@@ -134,16 +154,6 @@ export default function RecipeLibraryClient({
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Manual Entry</h3>
                   <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                     Type the recipe in a structured form.
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelected("ocr")}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-left transition hover:border-emerald-300 dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-emerald-400"
-                >
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import from Photo</h3>
-                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Upload a cookbook photo and extract recipe text.
                   </p>
                 </button>
               </div>
@@ -165,19 +175,23 @@ export default function RecipeLibraryClient({
                         Drop in a recipe link and we&apos;ll import the full recipe when possible.
                       </p>
                     </div>
-                    <form action={importAction} className="space-y-4">
+                    <form onSubmit={handleUrlImportSubmit} className="space-y-4">
                       <input
                         type="url"
                         name="sourceUrl"
                         required
                         placeholder="https://example.com/recipe"
+                        value={sourceUrl}
+                        onChange={(event) => setSourceUrl(event.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                       />
-                      <SubmitButton
-                        label="Import Recipe"
-                        pendingLabel="Importing..."
+                      <button
+                        type="submit"
+                        disabled={isImportPending}
                         className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-70"
-                      />
+                      >
+                        {isImportPending ? "Importing..." : "Import Recipe"}
+                      </button>
                     </form>
                   </section>
                 ) : null}
@@ -193,8 +207,6 @@ export default function RecipeLibraryClient({
                     <RecipeForm action={createAction} submitLabel="Add Recipe" />
                   </section>
                 ) : null}
-
-                {selected === "ocr" ? <OcrImportCard /> : null}
               </div>
             )}
           </div>

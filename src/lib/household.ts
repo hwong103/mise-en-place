@@ -14,9 +14,7 @@ import { cache } from "react";
 const DEFAULT_HOUSEHOLD_NAME = "My Household";
 const BOOTSTRAP_CACHE_TTL_MS = 5 * 60 * 1000;
 const isServerAuthDisabled = () => /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH ?? "");
-const isPreviewPublicAuthDisabled = () =>
-  (process.env.VERCEL_ENV ?? "").toLowerCase() === "preview" &&
-  /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+const isPreviewPublicAuthDisabled = () => /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 const isAuthDisabled = () => isServerAuthDisabled() || isPreviewPublicAuthDisabled();
 
 let cachedBootstrapHouseholdId: string | null = null;

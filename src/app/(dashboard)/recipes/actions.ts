@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
+import { readStringArray, writeStringArray } from "@/lib/json-arrays";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import { fromDateKey } from "@/lib/date";
@@ -21,8 +22,6 @@ import {
   parseTags,
   type PrepGroup,
 } from "@/lib/recipe-utils";
-import { buildOcrRecipePayload, extractRecipeFromImageViaGroq } from "@/lib/ocr";
-import { fetchRenderedRecipeCandidate, isRenderFallbackEnabled } from "@/lib/recipe-render-worker-client";
 import {
   HIGH_CONFIDENCE_INGESTION_SCORE,
   MIN_INGESTION_SCORE,
@@ -1158,11 +1157,6 @@ const classifyFetchStatus = (status: number): IngestionErrorCode => {
 const cleanCandidateLines = (value: string[] | undefined) =>
   (value ?? []).map((line) => normalizeText(line)).filter(Boolean);
 
-const getReadabilityExtractor = async () => {
-  const readabilityModule = await import("@/lib/recipe-readability");
-  return readabilityModule.extractRecipeFromReadability;
-};
-
 const buildCandidateFromHtml = ({
   stage,
   sourceUrl,
@@ -1226,37 +1220,6 @@ const buildCandidateFromHtml = ({
   };
 };
 
-const buildReadabilityCandidate = async ({
-  html,
-  sourceUrl,
-  latencyMs,
-}: {
-  html: string;
-  sourceUrl: string;
-  latencyMs: number;
-}): Promise<RecipeIngestionCandidate | null> => {
-  const extractRecipeFromReadability = await getReadabilityExtractor();
-  const parsed = extractRecipeFromReadability(html, sourceUrl);
-  if (!parsed) {
-    return null;
-  }
-
-  return {
-    stage: "readability",
-    success: parsed.ingredients.length > 0 || parsed.instructions.length > 0 || Boolean(parsed.description),
-    title: parsed.title,
-    description: parsed.description,
-    imageUrl: toOptionalUrlString(parsed.imageUrl ?? ""),
-    videoUrl: normalizeVideoUrl(extractVideoFromHtml(html)),
-    ingredients: cleanCandidateLines(parsed.ingredients),
-    instructions: cleanCandidateLines(parsed.instructions),
-    notes: cleanCandidateLines(parsed.notes),
-    latencyMs,
-    html,
-    errorCode: undefined,
-  };
-};
-
 const buildRecipePayload = (formData: FormData) => {
   const title = toOptionalString(formData.get("title"));
   if (!title) {
@@ -1314,97 +1277,6 @@ export async function createRecipe(formData: FormData) {
   revalidatePath("/recipes");
   revalidatePath("/planner");
   redirect("/recipes");
-}
-
-export async function createRecipeFromOcr(formData: FormData): Promise<{ success: boolean; error?: string } | void> {
-  try {
-    const householdId = await getCurrentHouseholdId();
-
-    const base64Image = toOptionalString(formData.get("base64Image"));
-    const mimeType = toOptionalString(formData.get("mimeType")) ?? "image/jpeg";
-    const titleOverride = toOptionalString(formData.get("title"));
-
-    // Path A: Groq vision (new)
-    if (base64Image) {
-      let groqRecipe = null;
-      try {
-        groqRecipe = await extractRecipeFromImageViaGroq(base64Image, mimeType);
-      } catch (err) {
-        console.error("Groq vision failed, will not fallback:", err);
-      }
-
-      if (groqRecipe) {
-        const cleanedIngredients = cleanIngredientLines(groqRecipe.ingredients ?? []);
-        const cleanedInstructions = cleanInstructionLines(groqRecipe.instructions ?? []);
-        const prepGroups = buildPrepGroupsFromInstructions(
-          cleanedIngredients.lines,
-          cleanedInstructions.lines
-        );
-
-        const recipe = await prisma.recipe.create({
-          data: {
-            householdId,
-            title: titleOverride ?? groqRecipe.title ?? "Untitled Recipe",
-            description: groqRecipe.description ?? null,
-            imageUrl: null,
-            sourceUrl: null,
-            servings: groqRecipe.servings ?? null,
-            prepTime: groqRecipe.prepTime ?? null,
-            cookTime: groqRecipe.cookTime ?? null,
-            tags: [],
-            ingredientCount: cleanedIngredients.lines.length,
-            ingredients: cleanedIngredients.lines,
-            instructions: cleanedInstructions.lines,
-            notes: groqRecipe.notes ?? [],
-            prepGroups,
-          },
-        });
-
-        revalidateTag(`recipes-${householdId}`, "max");
-        revalidateTag(`recipe-${recipe.id}`, "max");
-        revalidatePath("/recipes");
-        revalidatePath("/planner");
-        redirect(`/recipes/${recipe.id}`);
-      }
-    }
-
-    // Path B: legacy text OCR fallback (existing behaviour preserved)
-    const ocrText = toOptionalString(formData.get("ocrText"));
-    if (!ocrText) return;
-
-    const payload = buildOcrRecipePayload(ocrText);
-    const recipe = await prisma.recipe.create({
-      data: {
-        householdId,
-        title: titleOverride ?? payload.title,
-        description: null,
-        imageUrl: null,
-        sourceUrl: null,
-        servings: payload.servings,
-        prepTime: payload.prepTime,
-        cookTime: payload.cookTime,
-        tags: [],
-        ingredientCount: payload.ingredients.length,
-        ingredients: payload.ingredients,
-        instructions: payload.instructions,
-        notes: payload.notes,
-        prepGroups: payload.prepGroups,
-      },
-    });
-
-    revalidateTag(`recipes-${householdId}`, "max");
-    revalidateTag(`recipe-${recipe.id}`, "max");
-    revalidatePath("/recipes");
-    revalidatePath("/planner");
-    redirect(`/recipes/${recipe.id}`);
-  } catch (err) {
-    const error = err as Error & { digest?: string };
-    if (error?.digest?.startsWith("NEXT_REDIRECT")) {
-      throw err;
-    }
-    console.error("createRecipeFromOcr failed:", err);
-    return { success: false, error: "A server error occurred. Please try again later." };
-  }
 }
 
 export async function updateRecipe(formData: FormData) {
@@ -1549,6 +1421,7 @@ export async function updateRecipeSection(formData: FormData) {
       const prepTime = toOptionalInt(formData.get("prepTime"));
       const cookTime = toOptionalInt(formData.get("cookTime"));
       const tags = parseTags(formData.get("tags")?.toString() ?? "");
+      const existingTags = readStringArray(recipe.tags);
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -1561,7 +1434,7 @@ export async function updateRecipeSection(formData: FormData) {
           servings: servings ?? recipe.servings,
           prepTime: prepTime ?? recipe.prepTime,
           cookTime: cookTime ?? recipe.cookTime,
-          tags: tags.length > 0 ? tags : recipe.tags,
+          tags: writeStringArray(tags.length > 0 ? tags : existingTags),
         },
       });
     }
@@ -1605,15 +1478,14 @@ export async function importRecipeFromUrl(formData: FormData) {
   }
 
   const householdId = await getCurrentHouseholdId();
+
   const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
   const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
-  const webMcpTrackingEnabled = process.env.INGEST_ENABLE_WEBMCP === "true";
   const attempts: IngestionAttemptResult[] = [];
   const candidates: RecipeIngestionCandidate[] = [];
 
   let markdownRecipe: ReturnType<typeof extractRecipeFromMarkdown> | null = null;
   let directHtml = "";
-  let renderedHtml = "";
   let metadataFallback: Pick<RecipeIngestionCandidate, "tags" | "servings" | "prepTime" | "cookTime"> = {};
 
   const markdownStartedAt = Date.now();
@@ -1763,55 +1635,6 @@ export async function importRecipeFromUrl(formData: FormData) {
 
   selected = selectBestRecipeIngestionCandidate(candidates);
 
-  if (selected.score < MIN_INGESTION_SCORE && isRenderFallbackEnabled()) {
-    const renderedStartedAt = Date.now();
-    const renderedCandidatePayload = await fetchRenderedRecipeCandidate(sourceUrl);
-    const renderedLatencyMs = Date.now() - renderedStartedAt;
-
-    if (renderedCandidatePayload) {
-      renderedHtml = renderedCandidatePayload.html;
-      const renderedCandidate = buildCandidateFromHtml({
-        stage: "rendered_html",
-        sourceUrl: renderedCandidatePayload.finalUrl ?? sourceUrl,
-        html: renderedCandidatePayload.html,
-        jsonLdBlocks: renderedCandidatePayload.jsonLd,
-        latencyMs: renderedLatencyMs,
-      });
-
-      if (renderedCandidate?.success) {
-        attempts.push(renderedCandidate);
-        candidates.push(renderedCandidate);
-      } else {
-        attempts.push(createFailedAttempt("rendered_html", "parse_failed", renderedLatencyMs));
-      }
-    } else {
-      attempts.push(createFailedAttempt("rendered_html", "fetch_failed", renderedLatencyMs));
-    }
-  }
-
-  selected = selectBestRecipeIngestionCandidate(candidates);
-
-  if (selected.score < MIN_INGESTION_SCORE) {
-    const readabilitySourceHtml = renderedHtml || directHtml;
-    if (readabilitySourceHtml) {
-      const readabilityStartedAt = Date.now();
-      const readabilityCandidate = await buildReadabilityCandidate({
-        html: readabilitySourceHtml,
-        sourceUrl,
-        latencyMs: Date.now() - readabilityStartedAt,
-      });
-
-      if (readabilityCandidate?.success) {
-        attempts.push(readabilityCandidate);
-        candidates.push(readabilityCandidate);
-      } else {
-        attempts.push(
-          createFailedAttempt("readability", "parse_failed", Date.now() - readabilityStartedAt)
-        );
-      }
-    }
-  }
-
   selected = selectBestRecipeIngestionCandidate(candidates);
   const markdownNeedsRescue =
     selected.candidate?.stage === "markdown" &&
@@ -1835,8 +1658,11 @@ export async function importRecipeFromUrl(formData: FormData) {
     logRecipeIngestionDiagnostics({
       sourceUrl,
       sourceHost,
+      sourcePlatform: "web",
       resultQualityScore: selected.score,
       failureReason,
+      draftCreated: false,
+      assistedOcrUsed: false,
       attempts: attempts.map((attempt) => ({
         stage: attempt.stage,
         success: attempt.success,
@@ -1854,7 +1680,7 @@ export async function importRecipeFromUrl(formData: FormData) {
     redirect(`/recipes?importError=${failureReason}`);
   }
 
-  const candidateHtml = selectedCandidate.html || renderedHtml || directHtml;
+  const candidateHtml = selectedCandidate.html || directHtml;
   const title =
     selectedCandidate.title ||
     markdownTitle ||
@@ -1940,8 +1766,11 @@ export async function importRecipeFromUrl(formData: FormData) {
   logRecipeIngestionDiagnostics({
     sourceUrl,
     sourceHost,
+    sourcePlatform: "web",
     stageUsed: selectedCandidate.stage,
     resultQualityScore: selected.score,
+    draftCreated: false,
+    assistedOcrUsed: false,
     attempts: attempts.map((attempt) => ({
       stage: attempt.stage,
       success: attempt.success,
@@ -1956,7 +1785,6 @@ export async function importRecipeFromUrl(formData: FormData) {
       ingredients: selectedCandidate.ingredients,
       instructions: selectedCandidate.instructions,
     },
-    webMcpTrackingEnabled,
   });
 
   const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;

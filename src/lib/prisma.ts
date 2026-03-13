@@ -1,4 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaD1 } from "@prisma/adapter-d1";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 250;
 
@@ -33,19 +35,36 @@ const hashValue = (value: string) => {
   return Math.abs(hash).toString(16);
 };
 
+const readCloudflareD1Binding = (): ConstructorParameters<typeof PrismaD1>[0] | undefined => {
+  try {
+    const { env } = getCloudflareContext();
+    return (env as Record<string, unknown>).DB as ConstructorParameters<typeof PrismaD1>[0] | undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const createPrismaClient = () => {
   const queryLoggingEnabled = isSlowQueryLoggingEnabled();
-  const client = new PrismaClient(
-    queryLoggingEnabled
-      ? {
-          log: [{ emit: "event", level: "query" }],
-        }
-      : undefined
-  );
+  const d1Binding = readCloudflareD1Binding();
+  const adapter = d1Binding ? new PrismaD1(d1Binding) : undefined;
+  const options: Record<string, unknown> = queryLoggingEnabled
+    ? {
+        log: [{ emit: "event", level: "query" }],
+      }
+    : {};
+
+  if (adapter) {
+    options.adapter = adapter;
+  }
+
+  const client = new PrismaClient(options as ConstructorParameters<typeof PrismaClient>[0]);
 
   if (queryLoggingEnabled) {
     const thresholdMs = readSlowQueryThreshold();
-    client.$on("query", (event: Prisma.QueryEvent) => {
+    (client as PrismaClient & { $on: (eventType: string, callback: (event: Prisma.QueryEvent) => void) => void }).$on(
+      "query",
+      (event: Prisma.QueryEvent) => {
       if (event.duration < thresholdMs) {
         return;
       }
@@ -71,20 +90,35 @@ const createPrismaClient = () => {
           },
         })
       );
-    });
+      }
+    );
   }
 
   return client;
 };
 
 declare global {
-  var prisma: undefined | ReturnType<typeof createPrismaClient>;
+  var prisma: undefined | PrismaClient;
 }
 
-const prisma = globalThis.prisma ?? createPrismaClient();
+let productionPrisma: PrismaClient | undefined;
+
+export const getPrismaClient = () => {
+  if (process.env.NODE_ENV === "production") {
+    productionPrisma ??= createPrismaClient();
+    return productionPrisma;
+  }
+
+  globalThis.prisma ??= createPrismaClient();
+  return globalThis.prisma;
+};
+
+const prisma = new Proxy({} as PrismaClient, {
+  get(_target, property, receiver) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client as object, property, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 
 export default prisma;
-
-if (process.env.NODE_ENV !== "production") {
-  globalThis.prisma = prisma;
-}

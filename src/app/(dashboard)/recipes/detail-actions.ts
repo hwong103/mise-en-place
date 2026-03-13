@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import prisma from "@/lib/prisma";
+import { readStringArray, writeStringArray } from "@/lib/json-arrays";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { logServerPerf } from "@/lib/server-perf";
 import {
@@ -235,6 +236,7 @@ export async function updateRecipeSection(formData: FormData) {
       const prepTime = toOptionalInt(formData.get("prepTime"));
       const cookTime = toOptionalInt(formData.get("cookTime"));
       const tags = parseTags(formData.get("tags")?.toString() ?? "");
+      const existingTags = readStringArray(recipe.tags);
 
       await prisma.recipe.updateMany({
         where: { id: recipeId, householdId },
@@ -247,7 +249,7 @@ export async function updateRecipeSection(formData: FormData) {
           servings: servings ?? recipe.servings,
           prepTime: prepTime ?? recipe.prepTime,
           cookTime: cookTime ?? recipe.cookTime,
-          tags: tags.length > 0 ? tags : recipe.tags,
+          tags: writeStringArray(tags.length > 0 ? tags : existingTags),
         },
       });
     }
@@ -262,6 +264,7 @@ export async function updateRecipeSection(formData: FormData) {
       const prepTime = toOptionalInt(formData.get("prepTime"));
       const cookTime = toOptionalInt(formData.get("cookTime"));
       const tags = parseTags(formData.get("tags")?.toString() ?? "");
+      const existingTags = readStringArray(recipe.tags);
 
       const rawIngredients = parseLines(formData.get("ingredients")?.toString() ?? "");
       const cleanedDirectIngredients = cleanIngredientLines(rawIngredients);
@@ -315,7 +318,7 @@ export async function updateRecipeSection(formData: FormData) {
           servings: servings ?? recipe.servings,
           prepTime: prepTime ?? recipe.prepTime,
           cookTime: cookTime ?? recipe.cookTime,
-          tags: tags.length > 0 ? tags : recipe.tags,
+          tags: writeStringArray(tags.length > 0 ? tags : existingTags),
           ingredientCount: cleanedIngredients.lines.length,
           ingredients: cleanedIngredients.lines,
           instructions: cleanedInstructions.lines,

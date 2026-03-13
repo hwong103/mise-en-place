@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
+import { readStringArray } from "@/lib/json-arrays";
 import WineEditForm from "@/components/cellar/WineEditForm";
 import { updateWine } from "../../actions";
 
@@ -39,7 +40,10 @@ export default async function WineEditPage({
 
     return (
         <WineEditForm
-            wine={wine}
+            wine={{
+                ...wine,
+                grapes: readStringArray(wine.grapes),
+            }}
             updateAction={updateWine}
             mode={(mode as "photo" | "url" | "manual" | "edit") ?? "edit"}
         />

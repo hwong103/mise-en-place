@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
 
 const isAuthDisabled = /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
 
@@ -11,37 +9,63 @@ type AuthStatusProps = {
   accessSource?: "guest" | "auth" | "bootstrap" | null;
 };
 
+type SessionUser = {
+  email?: string | null;
+  name?: string | null;
+};
+
+type SessionPayload = {
+  user?: SessionUser | null;
+} | null;
+
 export default function AuthStatus({ hasHouseholdAccess = false, accessSource = null }: AuthStatusProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(hasSupabasePublicEnv);
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = getBrowserSupabaseClient();
-    if (!supabase) {
-      return;
-    }
-
     let mounted = true;
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!mounted) {
-        return;
-      }
-      setUser(data.user ?? null);
-      setLoading(false);
-    });
+    const loadSession = async () => {
+      try {
+        const response = await fetch("/api/auth/get-session", {
+          credentials: "include",
+          cache: "no-store",
+        });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) {
-        return;
+        if (!mounted) {
+          return;
+        }
+
+        if (!response.ok) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        const payload = (await response.json()) as SessionPayload;
+        setUser(payload?.user ?? null);
+      } catch {
+        if (mounted) {
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      setUser(session?.user ?? null);
+    };
+
+    if (isAuthDisabled) {
       setLoading(false);
-    });
+      return () => {
+        mounted = false;
+      };
+    }
+
+    void loadSession();
 
     return () => {
       mounted = false;
-      subscription.subscription.unsubscribe();
     };
   }, []);
 
@@ -49,15 +73,12 @@ export default function AuthStatus({ hasHouseholdAccess = false, accessSource = 
     if (!user) {
       return null;
     }
-    return user.email ?? user.user_metadata?.full_name ?? "Signed in";
+
+    return user.email ?? user.name ?? "Signed in";
   }, [user]);
 
   if (isAuthDisabled) {
     return <span className="text-xs text-amber-600 dark:text-amber-400">Auth disabled</span>;
-  }
-
-  if (!hasSupabasePublicEnv) {
-    return <span className="text-xs text-amber-600 dark:text-amber-400">Auth not configured</span>;
   }
 
   if (loading) {
@@ -105,11 +126,10 @@ export default function AuthStatus({ hasHouseholdAccess = false, accessSource = 
       <button
         type="button"
         onClick={async () => {
-          const supabase = getBrowserSupabaseClient();
-          if (!supabase) {
-            return;
-          }
-          await supabase.auth.signOut();
+          await fetch("/api/auth/sign-out", {
+            method: "POST",
+            credentials: "include",
+          });
           await fetch("/api/session/clear", { method: "POST", credentials: "include" });
           window.location.assign("/login");
         }}

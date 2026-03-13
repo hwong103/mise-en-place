@@ -2,10 +2,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
 
-const STAGES = ["markdown", "http_html", "rendered_html", "readability"];
+const STAGES = ["markdown", "http_html"];
 
 const arg = (name, fallback = "") => {
   const found = process.argv.find((entry) => entry.startsWith(`${name}=`));
@@ -17,9 +15,6 @@ const fixturePath = arg(
   "--fixture",
   "tests/fixtures/recipe-ingestion/golden-urls.json"
 );
-const workerUrl = arg("--worker-url", process.env.INGEST_RENDER_WORKER_URL ?? "");
-const workerToken = arg("--worker-token", process.env.INGEST_RENDER_WORKER_TOKEN ?? "");
-
 const normalizeText = (value) => value.replace(/\s+/g, " ").trim();
 const stripHtml = (value) =>
   normalizeText(
@@ -78,37 +73,6 @@ const fetchHtml = async (url) => {
   return response.text();
 };
 
-const fetchRendered = async (url) => {
-  if (!workerUrl) {
-    return null;
-  }
-
-  const response = await fetch(workerUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
-    },
-    body: JSON.stringify({ url }),
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = await response.json();
-  return payload?.html ?? null;
-};
-
-const parseReadability = (html, url) => {
-  const dom = new JSDOM(html, { url });
-  const parsed = new Readability(dom.window.document).parse();
-  if (!parsed?.textContent) {
-    return null;
-  }
-  return parsed.textContent;
-};
-
 const run = async () => {
   const fixture = JSON.parse(await fs.readFile(path.resolve(fixturePath), "utf8"));
   const urls = Array.isArray(fixture.urls) ? fixture.urls : [];
@@ -121,11 +85,7 @@ const run = async () => {
     const stageSignals = {
       markdown: { score: 0, success: false },
       http_html: { score: 0, success: false },
-      rendered_html: { score: 0, success: false },
-      readability: { score: 0, success: false },
     };
-
-    let directHtml = "";
 
     try {
       const markdown = await postMarkdownNew(url);
@@ -139,31 +99,10 @@ const run = async () => {
     try {
       const html = await fetchHtml(url);
       if (html) {
-        directHtml = html;
         stageSignals.http_html = extractSignals(stripHtml(html));
       }
     } catch {
       // keep default failure signal
-    }
-
-    if (workerUrl) {
-      try {
-        const renderedHtml = await fetchRendered(url);
-        if (renderedHtml) {
-          stageSignals.rendered_html = extractSignals(stripHtml(renderedHtml));
-          const readabilityText = parseReadability(renderedHtml, url);
-          if (readabilityText) {
-            stageSignals.readability = extractSignals(readabilityText);
-          }
-        }
-      } catch {
-        // keep default failure signal
-      }
-    } else if (directHtml) {
-      const readabilityText = parseReadability(directHtml, url);
-      if (readabilityText) {
-        stageSignals.readability = extractSignals(readabilityText);
-      }
     }
 
     const winner = Object.entries(stageSignals)

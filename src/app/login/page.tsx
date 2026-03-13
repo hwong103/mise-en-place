@@ -1,72 +1,125 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
-import { getBrowserSupabaseClient, hasSupabasePublicEnv } from "@/lib/supabase/client";
+import { FormEvent, useState } from "react";
 
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const isAuthDisabled = /^(1|true|yes)$/i.test(process.env.NEXT_PUBLIC_DISABLE_AUTH ?? "");
+
 const normalizeNextPath = (value: string | null) => {
   if (!value) {
     return "/recipes";
   }
+
   if (!value.startsWith("/") || value.startsWith("//")) {
     return "/recipes";
   }
+
   return value;
+};
+
+type AuthApiResponse = {
+  redirect?: boolean;
+  url?: string;
+  error?: {
+    message?: string;
+  };
+};
+
+const readApiError = async (response: Response) => {
+  try {
+    const payload = (await response.json()) as AuthApiResponse;
+    return payload.error?.message ?? `Request failed with ${response.status}`;
+  } catch {
+    return `Request failed with ${response.status}`;
+  }
 };
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [magicLinkPending, setMagicLinkPending] = useState(false);
+  const [googlePending, setGooglePending] = useState(false);
 
-  const configuredSiteUrl = useMemo(() => {
-    const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-    return raw ? trimTrailingSlash(raw) : null;
-  }, []);
+  const nextPath =
+    typeof window === "undefined"
+      ? "/recipes"
+      : normalizeNextPath(new URLSearchParams(window.location.search).get("next"));
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const onMagicLinkSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setPending(true);
-    setError(null);
+    setMagicLinkPending(true);
     setMessage(null);
+    setError(null);
 
-    const supabase = getBrowserSupabaseClient();
-    if (!supabase) {
-      setPending(false);
-      setError("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-      return;
-    }
-
-    const origin = trimTrailingSlash(window.location.origin);
-    const baseUrl = configuredSiteUrl ?? origin;
-    const nextPath = normalizeNextPath(new URLSearchParams(window.location.search).get("next"));
-    const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`;
-
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: redirectTo,
+    const response = await fetch("/api/auth/sign-in/magic-link", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      credentials: "include",
+      body: JSON.stringify({
+        email,
+        callbackURL: nextPath,
+        newUserCallbackURL: nextPath,
+        errorCallbackURL: `/login?next=${encodeURIComponent(nextPath)}`,
+      }),
     });
 
-    setPending(false);
+    setMagicLinkPending(false);
 
-    if (signInError) {
-      setError(signInError.message);
+    if (!response.ok) {
+      setError(await readApiError(response));
       return;
     }
 
-    setMessage(`Check your email for the sign-in link. Redirect target: ${redirectTo}`);
+    setMessage(`Check your email for the sign-in link. You’ll land on ${nextPath} after sign-in.`);
   };
+
+  const onGoogleSignIn = async () => {
+    setGooglePending(true);
+    setMessage(null);
+    setError(null);
+
+    const response = await fetch("/api/auth/sign-in/social", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        provider: "google",
+        callbackURL: nextPath,
+        newUserCallbackURL: nextPath,
+        errorCallbackURL: `/login?next=${encodeURIComponent(nextPath)}`,
+        disableRedirect: true,
+      }),
+    });
+
+    if (!response.ok) {
+      setGooglePending(false);
+      setError(await readApiError(response));
+      return;
+    }
+
+    const payload = (await response.json()) as AuthApiResponse;
+    if (!payload.url) {
+      setGooglePending(false);
+      setError("Google sign-in did not return a redirect URL.");
+      return;
+    }
+
+    window.location.assign(payload.url);
+  };
+
+  const currentError =
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("error");
 
   return (
     <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Login</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        Use a magic link to sign in with Supabase Auth.
+        Sign in with Google or request a magic link.
       </p>
 
       {isAuthDisabled ? (
@@ -75,13 +128,24 @@ export default function LoginPage() {
         </div>
       ) : null}
 
-      {!hasSupabasePublicEnv ? (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-300">
-          Missing `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-        </div>
+      {!isAuthDisabled ? (
+        <button
+          type="button"
+          onClick={onGoogleSignIn}
+          disabled={googlePending}
+          className="mt-6 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:opacity-70 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
+        >
+          {googlePending ? "Redirecting to Google..." : "Continue with Google"}
+        </button>
       ) : null}
 
-      <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+      <div className="mt-6 flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+        <span>or</span>
+        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+      </div>
+
+      <form className="mt-6 space-y-4" onSubmit={onMagicLinkSubmit}>
         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300" htmlFor="email">
           Email
         </label>
@@ -97,10 +161,10 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={pending || !hasSupabasePublicEnv || isAuthDisabled}
+          disabled={magicLinkPending || isAuthDisabled}
           className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
         >
-          {pending ? "Sending..." : "Send Magic Link"}
+          {magicLinkPending ? "Sending..." : "Send Magic Link"}
         </button>
       </form>
 
@@ -134,12 +198,13 @@ export default function LoginPage() {
         )}
       </div>
 
-      {configuredSiteUrl ? (
-        <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">Using NEXT_PUBLIC_SITE_URL={configuredSiteUrl}</p>
-      ) : null}
-
       {message ? <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-300">{message}</p> : null}
       {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
+      {currentError && !error ? (
+        <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">
+          Sign-in failed: {currentError.replace(/_/g, " ").toLowerCase()}.
+        </p>
+      ) : null}
     </div>
   );
 }

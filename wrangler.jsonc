@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "mise-en-place",
+  "compatibility_date": "2026-03-12",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "mise-en-place"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "mise-en-place-opennext-cache"
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mise-en-place",
+      "database_id": "33c02402-805f-4864-8259-5e779f4e113d"
+    }
+  ],
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://mise-en-place.hwong103.work",
+    "BETTER_AUTH_URL": "https://mise-en-place.hwong103.work",
+    "AUTH_FROM_EMAIL": "noreply@hwong103.work"
+  }
+}

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
+import { readStringArray } from "@/lib/json-arrays";
 import WineDetail from "@/components/cellar/WineDetail";
 import type { StockistResult } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
@@ -34,7 +35,7 @@ export default async function WineDetailPage({ params }: { params: Promise<{ id:
         ...(supportsStockists ? { stockists: true } : {}),
     };
 
-    let wine = await prisma.wine.findFirst({
+    const wine = await prisma.wine.findFirst({
         where: { id, householdId },
         select: baseSelect,
     }).catch(async (error) => {
@@ -86,7 +87,10 @@ export default async function WineDetailPage({ params }: { params: Promise<{ id:
 
     return (
         <WineDetail
-            wine={wine}
+            wine={{
+                ...wine,
+                grapes: readStringArray(wine.grapes),
+            }}
             stockists={stockists}
             supportsStockistsPersistence={supportsStockists}
             deleteAction={deleteWine}

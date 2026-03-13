@@ -66,6 +66,40 @@ export default function WineDetail({
 }) {
     return (
         <div className="mx-auto max-w-2xl space-y-8">
+            {/* Header: back link + overflow actions */}
+            <div className="flex items-center justify-between">
+                <Link
+                    href="/cellar"
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                    <span className="md:hidden">← Back</span>
+                    <span className="hidden md:inline">← Back to Cellar</span>
+                </Link>
+
+                <details className="group relative">
+                    <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full border border-slate-200 bg-white text-lg leading-none text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
+                        &middot;&middot;&middot;
+                    </summary>
+                    <div className="absolute right-0 mt-2 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                        <Link
+                            href={`/cellar/${wine.id}/edit`}
+                            className="block px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Edit
+                        </Link>
+                        <form action={deleteAction}>
+                            <input type="hidden" name="id" value={wine.id} />
+                            <button
+                                type="submit"
+                                className="block w-full px-3 py-2 text-left text-sm font-medium text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                            >
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </details>
+            </div>
+
             {/* Hero */}
             <div className="flex items-start gap-5">
                 {wine.imageUrl ? (
@@ -144,24 +178,6 @@ export default function WineDetail({
                 </div>
             ) : null}
 
-            {/* Actions */}
-            <div className="flex gap-3">
-                <Link
-                    href={`/cellar/${wine.id}/edit`}
-                    className="flex-1 rounded-2xl border border-slate-200 py-3 text-center text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                    Edit
-                </Link>
-                <form action={deleteAction} className="flex-1">
-                    <input type="hidden" name="id" value={wine.id} />
-                    <button
-                        type="submit"
-                        className="w-full rounded-2xl border border-rose-200 py-3 text-sm font-bold text-rose-600 hover:bg-rose-50 dark:border-rose-900/50 dark:text-rose-400 dark:hover:bg-rose-950/30"
-                    >
-                        Delete
-                    </button>
-                </form>
-            </div>
         </div>
     );
 }

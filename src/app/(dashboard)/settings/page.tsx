@@ -205,7 +205,7 @@ export default async function SettingsPage({
         <section className="rounded-3xl border border-dashed border-emerald-200 bg-emerald-50/50 p-6 text-sm text-slate-700 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-slate-200">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Claim Household Ownership</h2>
           <p className="mt-2 text-slate-600 dark:text-slate-300">
-            Claiming links this household to your Supabase login so you can manage access from any device.
+            Claiming links this household to your account so you can manage access from any device.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-3">

@@ -7,10 +7,13 @@ import type {
 type RecipeIngestionDiagnostics = {
   sourceUrl: string;
   sourceHost: string;
+  sourcePlatform?: "instagram" | "web";
   stageUsed?: IngestionStage;
   resultQualityScore: number;
   failureReason?: IngestionErrorCode;
   webMcpTrackingEnabled?: boolean;
+  draftCreated?: boolean;
+  assistedOcrUsed?: boolean;
   attempts: Array<{
     stage: IngestionStage;
     success: boolean;
