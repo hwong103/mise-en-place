@@ -31,7 +31,8 @@
     }
   ],
   "vars": {
-    "NEXT_PUBLIC_SITE_URL": "http://localhost:3000",
+    "NEXT_PUBLIC_SITE_URL": "https://mise-en-place.hwong103.work",
+    "BETTER_AUTH_URL": "https://mise-en-place.hwong103.work",
     "AUTH_FROM_EMAIL": "noreply@hwong103.work"
   }
 }
