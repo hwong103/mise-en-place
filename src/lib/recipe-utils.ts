@@ -430,32 +430,94 @@ export const extractIngredientKeywords = (line: string) => {
   return Array.from(new Set(tokens));
 };
 
+const PREP_ACTION_PATTERNS = [
+  { title: "slice", pattern: /\b(?:slice|sliced|thinly sliced)\b/i },
+  { title: "chop", pattern: /\b(?:chop|chopped|roughly chopped|finely chopped)\b/i },
+  { title: "dice", pattern: /\b(?:dice|diced)\b/i },
+  { title: "mince", pattern: /\b(?:mince|minced)\b/i },
+  { title: "grate", pattern: /\b(?:grate|grated)\b/i },
+  { title: "crush", pattern: /\b(?:crush|crushed)\b/i },
+  { title: "peel", pattern: /\b(?:peel|peeled)\b/i },
+  { title: "trim", pattern: /\b(?:trim|trimmed)\b/i },
+] as const;
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const getPrepActionTitle = (value: string) =>
+  PREP_ACTION_PATTERNS.find(({ pattern }) => pattern.test(value))?.title;
 
 export function buildPrepGroupsFromInstructions(
   ingredients: string[],
   instructions: string[]
 ) {
-  if (ingredients.length === 0 || instructions.length === 0) {
+  if (ingredients.length === 0) {
     return [];
   }
 
   const ingredientKeywords = ingredients.map((line) => ({
     line,
     keywords: extractIngredientKeywords(line),
+    explicitTitle: getPrepActionTitle(line),
   }));
   const assigned = new Set<string>();
-  const groups: PrepGroup[] = [];
+  const groups = new Map<string, PrepGroup>();
+  const orderedTitles: string[] = [];
+
+  const upsertGroup = (title: string, items: string[], stepIndex?: number) => {
+    if (items.length === 0) {
+      return;
+    }
+
+    let group = groups.get(title);
+    if (!group) {
+      group = {
+        title,
+        items: [],
+        sourceGroup: false,
+        ...(stepIndex !== undefined ? { stepIndex } : {}),
+      };
+      groups.set(title, group);
+      orderedTitles.push(title);
+    } else if (group.stepIndex === undefined && stepIndex !== undefined) {
+      group.stepIndex = stepIndex;
+    }
+
+    for (const item of items) {
+      if (!group.items.includes(item)) {
+        group.items.push(item);
+      }
+    }
+  };
+
+  const explicitGroups = new Map<string, string[]>();
+  ingredientKeywords.forEach((ingredient) => {
+    if (!ingredient.explicitTitle) {
+      return;
+    }
+
+    const items = explicitGroups.get(ingredient.explicitTitle) ?? [];
+    items.push(ingredient.line);
+    explicitGroups.set(ingredient.explicitTitle, items);
+    assigned.add(ingredient.line);
+  });
+
+  explicitGroups.forEach((items, title) => {
+    upsertGroup(title, items);
+  });
 
   instructions.forEach((instruction, index) => {
-    const lower = instruction.toLowerCase();
-    // Handle natural language lists by checking all keywords against the instruction
+    const title = getPrepActionTitle(instruction);
+    if (!title) {
+      return;
+    }
+
     const matches = ingredientKeywords.filter(
       (ingredient) =>
         !assigned.has(ingredient.line) &&
+        !ingredient.explicitTitle &&
         ingredient.keywords.some((keyword) => {
-          // Robust whole-word match
-          const regex = new RegExp(`\\b${keyword} \\b`, "i");
-          return regex.test(lower);
+          const regex = new RegExp(`\\b${escapeRegExp(keyword)}\\b`, "i");
+          return regex.test(instruction);
         })
     );
 
@@ -463,35 +525,27 @@ export function buildPrepGroupsFromInstructions(
       return;
     }
 
-    // Default title is "Step N" as per spec
-    const title = `Step ${index + 1} `;
-
-    groups.push({
+    upsertGroup(
       title,
-      items: matches.map((match) => match.line),
-      stepIndex: index,
-    });
-
+      matches.map((match) => match.line),
+      index
+    );
     matches.forEach((match) => assigned.add(match.line));
   });
 
   const remaining = ingredients.filter((line) => !assigned.has(line));
 
-  // If no groups formed from instructions, we don't dump everything into one group.
-  // We return empty groups as per spec.
-  if (groups.length === 0) {
+  if (groups.size === 0) {
     return [];
   }
 
   if (remaining.length > 0) {
-    groups.push({
-      title: "Other Prep",
-      items: remaining,
-      sourceGroup: false, // Added sourceGroup: false
-    });
+    upsertGroup("Other Prep", remaining);
   }
 
-  return groups;
+  return orderedTitles
+    .map((title) => groups.get(title))
+    .filter((group): group is PrepGroup => group !== undefined);
 };
 
 export function parseLines(value: string) {
