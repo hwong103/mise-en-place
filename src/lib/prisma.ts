@@ -1,6 +1,6 @@
-import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaD1 } from "@prisma/adapter-d1";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 250;
 

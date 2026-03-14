@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/browser";
 
 export const readStringArray = (value: Prisma.JsonValue | null | undefined): string[] => {
   if (!Array.isArray(value)) {

@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { extractWineFromImageViaGroq, extractWineFromNameViaGroq, extractWineFromUrlViaGroq, fetchAllStockists } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
-import type { WineType } from "@prisma/client";
+import type { WineType } from "@/generated/prisma/browser";
 import type { StockistResult, WineVisionResult } from "@/lib/wine";
 
 const isNextRedirectError = (error: unknown): error is { digest: string } =>
