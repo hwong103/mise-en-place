@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Magnet from "@/components/ui/Magnet";
 
 import prisma from "@/lib/prisma";
 import { getUpcomingRange, getPastRange, toDateKey } from "@/lib/date";
@@ -25,8 +24,19 @@ export default async function PlannerPage() {
         householdId,
         date: { in: allDays },
       },
-      include: {
-        recipe: true,
+      select: {
+        id: true,
+        date: true,
+        recipeId: true,
+        mealType: true,
+        cooked: true,
+        cookedAt: true,
+        recipe: {
+          select: {
+            title: true,
+            imageUrl: true,
+          },
+        },
       },
       orderBy: [{ date: "asc" }, { mealType: "asc" }],
     }),
@@ -54,14 +64,12 @@ export default async function PlannerPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Planner</h1>
           <p className="text-slate-500 dark:text-slate-400">Plan your week and track your cooking history.</p>
         </div>
-        <Magnet strength={0.25}>
-          <Link
-            href="/shopping"
-            className="block rounded-xl bg-emerald-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
-          >
-            Generate Shopping List
-          </Link>
-        </Magnet>
+        <Link
+          href="/shopping"
+          className="block rounded-xl bg-emerald-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
+        >
+          Generate Shopping List
+        </Link>
       </div>
 
       {!hasRecipes ? (

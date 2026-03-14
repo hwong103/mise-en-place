@@ -1,9 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useState, useTransition } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
-import RecipeForm from "@/components/recipes/RecipeForm";
-import FadeContent from "@/components/ui/FadeContent";
+
+const RecipeForm = dynamic(() => import("@/components/recipes/RecipeForm"), {
+  loading: () => (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+      Loading recipe form...
+    </div>
+  ),
+});
 
 const normalize = (value: string) =>
   value
@@ -244,10 +251,10 @@ export default function RecipeLibraryClient({
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((recipe, index) => (
-            <FadeContent key={recipe.id} delay={Math.min(index * 0.05, 0.3)}>
+          {filtered.map((recipe) => (
+            <div key={recipe.id}>
               <RecipeCard recipe={recipe} />
-            </FadeContent>
+            </div>
           ))}
         </div>
       )}

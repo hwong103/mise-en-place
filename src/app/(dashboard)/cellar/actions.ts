@@ -46,6 +46,12 @@ const stockistsMatch = (entry: StockistResult, target: {
     && entry.fetchedAt === target.fetchedAt
     && Math.abs(entry.price - target.price) < 0.0001;
 
+const stripStockistsField = <T extends { stockists?: unknown }>(value: T) => {
+    const next = { ...value };
+    delete next.stockists;
+    return next;
+};
+
 // ─── Create wine from photo ──────────────────────────────────────────────────
 
 export async function createWineFromPhoto(formData: FormData) {
@@ -90,9 +96,8 @@ export async function createWineFromPhoto(formData: FormData) {
         } catch (error) {
             if (!isMissingStockistsColumnError(error)) throw error;
             markWineStockistsColumnMissing();
-            const { stockists: _stockists, ...fallbackData } = createData;
             wine = await prisma.wine.create({
-                data: fallbackData,
+                data: stripStockistsField(createData),
                 select: { id: true },
             });
         }
@@ -168,9 +173,8 @@ export async function createWineFromUrl(formData: FormData) {
         } catch (error) {
             if (!isMissingStockistsColumnError(error)) throw error;
             markWineStockistsColumnMissing();
-            const { stockists: _stockists, ...fallbackData } = createData;
             wine = await prisma.wine.create({
-                data: fallbackData,
+                data: stripStockistsField(createData),
                 select: { id: true },
             });
         }
@@ -247,8 +251,7 @@ export async function createWineFromName(formData: FormData) {
         } catch (error) {
             if (!isMissingStockistsColumnError(error)) throw error;
             markWineStockistsColumnMissing();
-            const { stockists: _stockists, ...fallbackData } = createData;
-            wine = await prisma.wine.create({ data: fallbackData, select: { id: true } });
+            wine = await prisma.wine.create({ data: stripStockistsField(createData), select: { id: true } });
         }
 
         revalidatePath("/cellar");
@@ -351,10 +354,9 @@ export async function refreshWinePrice(formData: FormData) {
     } catch (error) {
         if (!isMissingStockistsColumnError(error)) throw error;
         markWineStockistsColumnMissing();
-        const { stockists: _stockists, ...fallbackData } = updateData;
         await prisma.wine.updateMany({
             where: { id },
-            data: fallbackData,
+            data: stripStockistsField(updateData),
         });
     }
 

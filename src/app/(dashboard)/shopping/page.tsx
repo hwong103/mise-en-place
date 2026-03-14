@@ -33,7 +33,16 @@ export default async function ShoppingPage() {
               lte: end,
             },
           },
-          include: { recipe: true },
+          select: {
+            id: true,
+            cooked: true,
+            recipe: {
+              select: {
+                title: true,
+                ingredients: true,
+              },
+            },
+          },
         }),
         listShoppingItems(start, householdId),
         listShoppingLocationPreferences(householdId),

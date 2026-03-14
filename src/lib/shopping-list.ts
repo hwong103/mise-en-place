@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import {
@@ -24,28 +25,45 @@ export async function listShoppingItems(weekStart: Date, householdId?: string) {
 
 export async function listShoppingLocationPreferences(householdId?: string) {
   const resolvedHouseholdId = householdId ?? (await getCurrentHouseholdId());
-  const items = await prisma.shoppingListItem.findMany({
-    where: { householdId: resolvedHouseholdId },
-    select: {
-      line: true,
-      lineNormalized: true,
-      category: true,
-      location: true,
-      updatedAt: true,
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+  const loadPreferences = async (hid: string) => {
+    const items = await prisma.shoppingListItem.findMany({
+      where: { householdId: hid },
+      select: {
+        line: true,
+        lineNormalized: true,
+        category: true,
+        location: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
 
-  const preferences = new Map<string, string>();
-  for (const item of items) {
-    if (isSuppressedMarkerLine(item.line)) {
-      continue;
+    const preferences = new Map<string, string>();
+    for (const item of items) {
+      if (isSuppressedMarkerLine(item.line)) {
+        continue;
+      }
+      const key = buildShoppingLocationPreferenceKey(item.category, item.lineNormalized);
+      if (!preferences.has(key)) {
+        preferences.set(key, item.location);
+      }
     }
-    const key = buildShoppingLocationPreferenceKey(item.category, item.lineNormalized);
-    if (!preferences.has(key)) {
-      preferences.set(key, item.location);
-    }
+
+    return Object.fromEntries(preferences);
+  };
+
+  if (process.env.NODE_ENV === "test") {
+    return loadPreferences(resolvedHouseholdId);
   }
 
-  return Object.fromEntries(preferences);
+  const cachedQuery = unstable_cache(
+    loadPreferences,
+    ["shopping-location-preferences", resolvedHouseholdId],
+    {
+      revalidate: 300,
+      tags: [`shopping-${resolvedHouseholdId}`],
+    }
+  );
+
+  return cachedQuery(resolvedHouseholdId);
 }

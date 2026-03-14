@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { after } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import CellarClient from "@/components/cellar/CellarClient";
@@ -22,6 +22,12 @@ const parseStockists = (value: unknown): StockistResult[] => {
             && typeof entry.fetchedAt === "string"
         )
     );
+};
+
+const stripStockistsField = <T extends { stockists?: unknown }>(value: T) => {
+    const next = { ...value };
+    delete next.stockists;
+    return next;
 };
 
 export default async function CellarPage() {
@@ -69,42 +75,42 @@ export default async function CellarPage() {
         return ageHours > 24;
     });
 
-    // Fire-and-forget — don't await, don't block page render
     if (staleWines.length > 0) {
-        void Promise.all(
-            staleWines.slice(0, 5).map(async (w) => {  // max 5 at a time
-                const { fetchAllStockists } = await import("@/lib/wine");
-                const { stockists, bottleImageUrl } = await fetchAllStockists(
-                    w.name,
-                    w.producer ?? undefined,
-                    w.vintage ?? undefined
-                );
-                if (!stockists.length) return;
-                const cheapest = stockists[0];
-                const updateData = {
-                    ...(supportsStockists ? { stockists } : {}),
-                    ...(!w.imageUrl && bottleImageUrl ? { imageUrl: bottleImageUrl } : {}),
-                    danMurphysPrice: cheapest.price,
-                    danMurphysUrl: cheapest.url,
-                    danMurphysSource: cheapest.source,
-                    danMurphysPriceAt: new Date(),
-                };
-                try {
-                    await prisma.wine.updateMany({
-                        where: { id: w.id },
-                        data: updateData,
-                    });
-                } catch (error) {
-                    if (!isMissingStockistsColumnError(error)) throw error;
-                    markWineStockistsColumnMissing();
-                    const { stockists: _stockists, ...fallbackData } = updateData;
-                    await prisma.wine.updateMany({
-                        where: { id: w.id },
-                        data: fallbackData,
-                    });
-                }
-            })
-        );
+        after(async () => {
+            await Promise.all(
+                staleWines.slice(0, 5).map(async (w) => {
+                    const { fetchAllStockists } = await import("@/lib/wine");
+                    const { stockists, bottleImageUrl } = await fetchAllStockists(
+                        w.name,
+                        w.producer ?? undefined,
+                        w.vintage ?? undefined
+                    );
+                    if (!stockists.length) return;
+                    const cheapest = stockists[0];
+                    const updateData = {
+                        ...(supportsStockists ? { stockists } : {}),
+                        ...(!w.imageUrl && bottleImageUrl ? { imageUrl: bottleImageUrl } : {}),
+                        danMurphysPrice: cheapest.price,
+                        danMurphysUrl: cheapest.url,
+                        danMurphysSource: cheapest.source,
+                        danMurphysPriceAt: new Date(),
+                    };
+                    try {
+                        await prisma.wine.updateMany({
+                            where: { id: w.id },
+                            data: updateData,
+                        });
+                    } catch (error) {
+                        if (!isMissingStockistsColumnError(error)) throw error;
+                        markWineStockistsColumnMissing();
+                        await prisma.wine.updateMany({
+                            where: { id: w.id },
+                            data: stripStockistsField(updateData),
+                        });
+                    }
+                })
+            );
+        });
     }
 
     const winesForClient = wines.map((wine) => ({
