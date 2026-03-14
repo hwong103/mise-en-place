@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CATEGORY_ORDER, type ShoppingCategory } from "@/lib/shopping";
-import type { ShoppingListItem } from "@/generated/prisma/browser";
+import type { ShoppingListItem } from "@/lib/db-types";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
 import {
   addManualShoppingItem,

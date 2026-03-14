@@ -5,13 +5,6 @@ let wineStockistsColumnAvailable: boolean | null = null;
 let wineStockistsCheckedAtMs: number | null = null;
 const STOCKISTS_CACHE_TTL_MS = 60_000;
 
-const parseDbBoolean = (value: unknown) =>
-    value === true
-    || value === 1
-    || value === "1"
-    || value === "t"
-    || value === "true";
-
 const readErrorLike = (error: unknown) => {
     if (!error || typeof error !== "object") return undefined;
     return error as {
@@ -60,16 +53,12 @@ export const hasWineStockistsColumn = async (
         return false;
     }
     try {
-        const rows = await queryFn<Array<{ exists: boolean | string | number }>>`
-            SELECT EXISTS (
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND lower(table_name) = lower('Wine')
-                  AND lower(column_name) = lower('stockists')
-            ) AS "exists"
+        const rows = await queryFn<Array<{ name: string }>>`
+            SELECT name
+            FROM pragma_table_info('Wine')
+            WHERE lower(name) = lower('stockists')
         `;
-        wineStockistsColumnAvailable = parseDbBoolean(rows?.[0]?.exists);
+        wineStockistsColumnAvailable = rows.some((row) => typeof row?.name === "string");
         wineStockistsCheckedAtMs = Date.now();
         return wineStockistsColumnAvailable;
     } catch {

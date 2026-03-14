@@ -2,7 +2,7 @@ import { cache } from "react";
 import { headers } from "next/headers";
 
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/better-auth";
+import { getAuth } from "@/lib/better-auth";
 import { logServerPerf } from "@/lib/server-perf";
 
 export type AuthUser = {
@@ -50,7 +50,7 @@ const resolveCurrentAuthUser = cache(async (): Promise<AuthUser | null> => {
   const startedAt = Date.now();
   try {
     const headerStore = await headers();
-    const session = await auth.api.getSession({
+    const session = await getAuth().api.getSession({
       headers: new Headers(headerStore),
     });
     const authUser = toAuthUser(session);

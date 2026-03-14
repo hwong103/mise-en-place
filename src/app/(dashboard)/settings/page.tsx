@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import prisma from "@/lib/prisma";
+import type { HouseholdMember, User } from "@/lib/db-types";
 import { getCurrentAuthUser } from "@/lib/auth";
 import { getCurrentAccessContext } from "@/lib/household";
 import { getCurrentHouseholdShareLink } from "@/lib/household-access";
@@ -236,7 +237,7 @@ export default async function SettingsPage({
           <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No members yet.</p>
         ) : (
           <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-100 dark:divide-slate-800 dark:border-slate-800">
-            {household.members.map((member) => (
+            {household.members.map((member: HouseholdMember & { user: User }) => (
               <li key={member.id} className="flex items-center justify-between px-4 py-3 text-sm">
                 <div>
                   <p className="font-semibold text-slate-800 dark:text-slate-100">{member.user.name ?? member.user.email}</p>

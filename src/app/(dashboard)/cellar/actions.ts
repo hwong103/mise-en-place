@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
+import type { WineType } from "@/lib/db-types";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { extractWineFromImageViaGroq, extractWineFromNameViaGroq, extractWineFromUrlViaGroq, fetchAllStockists } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
-import type { WineType } from "@/generated/prisma/browser";
 import type { StockistResult, WineVisionResult } from "@/lib/wine";
 
 const isNextRedirectError = (error: unknown): error is { digest: string } =>

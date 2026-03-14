@@ -1,6 +1,6 @@
-import type { Prisma } from "@/generated/prisma/browser";
+import type { JsonValue } from "@/lib/db-types";
 
-export const readStringArray = (value: Prisma.JsonValue | null | undefined): string[] => {
+export const readStringArray = (value: JsonValue | null | undefined): string[] => {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -8,7 +8,7 @@ export const readStringArray = (value: Prisma.JsonValue | null | undefined): str
   return value.filter((entry): entry is string => typeof entry === "string");
 };
 
-export const writeStringArray = (value: string[] | null | undefined): Prisma.InputJsonValue => {
+export const writeStringArray = (value: string[] | null | undefined): JsonValue => {
   if (!value || value.length === 0) {
     return [];
   }

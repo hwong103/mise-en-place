@@ -121,16 +121,20 @@ export async function markMealPlanCooked(input: { planId: string }) {
 
   if (!plan || plan.cooked) return;
 
-  await prisma.$transaction([
-    prisma.mealPlan.update({
-      where: { id: plan.id },
-      data: { cooked: true, cookedAt: new Date() },
-    }),
-    prisma.recipe.update({
-      where: { id: plan.recipeId },
-      data: { cookCount: { increment: 1 } },
-    }),
-  ]);
+  await prisma.mealPlan.update({
+    where: { id: plan.id },
+    data: { cooked: true, cookedAt: new Date() },
+  });
+
+  const cookedPlans = await prisma.mealPlan.findMany({
+    where: { householdId, recipeId: plan.recipeId, cooked: true },
+    select: { id: true },
+  });
+
+  await prisma.recipe.update({
+    where: { id: plan.recipeId },
+    data: { cookCount: cookedPlans.length },
+  });
 
   revalidatePath("/planner");
   revalidatePath(`/recipes/${plan.recipeId}`);
@@ -147,17 +151,20 @@ export async function unmarkMealPlanCooked(input: { planId: string }) {
 
   if (!plan || !plan.cooked) return;
 
-  await prisma.$transaction([
-    prisma.mealPlan.update({
-      where: { id: plan.id },
-      data: { cooked: false, cookedAt: null },
-    }),
-    // Decrement but never go below 0
-    prisma.recipe.updateMany({
-      where: { id: plan.recipeId, cookCount: { gt: 0 } },
-      data: { cookCount: { decrement: 1 } },
-    }),
-  ]);
+  await prisma.mealPlan.update({
+    where: { id: plan.id },
+    data: { cooked: false, cookedAt: null },
+  });
+
+  const cookedPlans = await prisma.mealPlan.findMany({
+    where: { householdId, recipeId: plan.recipeId, cooked: true },
+    select: { id: true },
+  });
+
+  await prisma.recipe.update({
+    where: { id: plan.recipeId },
+    data: { cookCount: cookedPlans.length },
+  });
 
   revalidatePath("/planner");
   revalidatePath(`/recipes/${plan.recipeId}`);
