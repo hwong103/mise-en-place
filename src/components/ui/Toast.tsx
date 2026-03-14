@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 type ToastType = "success" | "error" | "info";
 
@@ -29,35 +28,41 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         }, 3500);
     }, []);
 
-    return (
-        <ToastContext.Provider value={{ showToast }}>
-            {children}
-            <div className="fixed bottom-24 right-4 z-50 flex flex-col gap-2 md:bottom-6 md:right-6">
-                <AnimatePresence>
-                    {toasts.map((toast) => (
-                        <motion.div
-                            key={toast.id}
-                            initial={{ opacity: 0, y: 16, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
-                            className={`flex items-center gap-2.5 rounded-2xl px-4 py-3 text-sm font-semibold shadow-xl
+  return (
+    <ToastContext.Provider value={{ showToast }}>
+      {children}
+      <div className="fixed bottom-24 right-4 z-50 flex flex-col gap-2 md:bottom-6 md:right-6">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`animate-[toast-in_0.2s_ease-out] flex items-center gap-2.5 rounded-2xl px-4 py-3 text-sm font-semibold shadow-xl
                 ${toast.type === "success"
-                                    ? "bg-emerald-600 text-white"
-                                    : toast.type === "error"
-                                        ? "bg-rose-600 text-white"
-                                        : "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                                }`}
-                        >
-                            {toast.type === "success" && <span>✓</span>}
-                            {toast.type === "error" && <span>✕</span>}
-                            {toast.message}
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            </div>
-        </ToastContext.Provider>
-    );
+                  ? "bg-emerald-600 text-white"
+                  : toast.type === "error"
+                    ? "bg-rose-600 text-white"
+                    : "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                }`}
+          >
+            {toast.type === "success" && <span>✓</span>}
+            {toast.type === "error" && <span>✕</span>}
+            {toast.message}
+          </div>
+        ))}
+      </div>
+      <style>{`
+        @keyframes toast-in {
+          from {
+            opacity: 0;
+            transform: translateY(16px) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
+    </ToastContext.Provider>
+  );
 }
 
 export function useToast() {

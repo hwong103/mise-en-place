@@ -656,6 +656,7 @@ export type StockistResult = {
     url: string;
     fetchedAt: string;
     productName?: string;
+    productId?: string;
 };
 
 type SerpShoppingResult = {
@@ -757,6 +758,7 @@ const fetchSerpShopping = async (
                 extracted_price?: number;
                 link?: string;
                 product_link?: string;
+                product_id?: string;
                 source?: string;
                 seller?: string;
                 merchant?: string;
@@ -789,12 +791,14 @@ const fetchSerpShopping = async (
                     }
 
                     const productName = typeof result.title === "string" ? normalizeText(result.title) : undefined;
+                    const productId = typeof result.product_id === "string" ? result.product_id : undefined;
                     return {
                         source,
                         price,
                         url,
                         fetchedAt,
                         ...(productName ? { productName } : {}),
+                        ...(productId ? { productId } : {}),
                     } satisfies StockistResult;
                 })
                 .filter((result) => result !== null);
@@ -1307,12 +1311,17 @@ export async function fetchBottlePrice(
     producer?: string,
     vintage?: number
 ): Promise<BottlePriceResult> {
+    if (!hasUsableApiKey(process.env.SERPAPI_KEY)) {
+        return null;
+    }
+
     const { stockists } = await fetchAllStockists(wineName, producer, vintage);
     if (!stockists.length) return null;
 
-    const best = stockists[0];
+    const best =
+        stockists.find((stockist) => stockist.source.toLowerCase().includes("dan murphy")) ?? stockists[0];
     return {
-        productId: best.url,
+        productId: best.productId ?? best.url,
         url: best.url,
         price: best.price,
         source: best.source,

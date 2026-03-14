@@ -1,11 +1,9 @@
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
-import LineListEditor from "@/components/recipes/LineListEditor";
-import RecipeFocusMode from "@/components/recipes/RecipeFocusMode";
 import SubmitButton from "@/components/forms/SubmitButton";
-import IngredientGroupsEditor from "@/components/recipes/IngredientGroupsEditor";
 import { getRecipeById } from "@/lib/recipes";
 import { getServerNow } from "@/lib/server-clock";
 import { logServerPerf } from "@/lib/server-perf";
@@ -17,6 +15,10 @@ import {
 
 
 import { deleteRecipe, updateRecipeSection } from "../detail-actions";
+
+const LineListEditor = dynamic(() => import("@/components/recipes/LineListEditor"));
+const RecipeFocusMode = dynamic(() => import("@/components/recipes/RecipeFocusMode"));
+const IngredientGroupsEditor = dynamic(() => import("@/components/recipes/IngredientGroupsEditor"));
 
 export const revalidate = 60;
 export const dynamicParams = true;

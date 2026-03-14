@@ -10,8 +10,6 @@ import {
   unmarkMealPlanCooked
 } from "@/app/(dashboard)/planner/actions";
 import { toDateKey } from "@/lib/date";
-import FadeContent from "@/components/ui/FadeContent";
-import AnimatedList from "@/components/ui/AnimatedList";
 import ClickSpark from "@/components/ui/ClickSpark";
 import { useToast } from "@/components/ui/Toast";
 
@@ -537,10 +535,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
             className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
 
-          <AnimatedList
-            stagger={0.05}
-            className="max-h-[40vh] space-y-2 overflow-auto pr-1 lg:max-h-[70vh]"
-          >
+          <div className="max-h-[40vh] space-y-2 overflow-auto pr-1 lg:max-h-[70vh]">
             {filteredRecipes.length === 0 ? (
               <div key="empty" className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                 No matching recipes.
@@ -561,7 +556,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
                 />
               ))
             )}
-          </AnimatedList>
+          </div>
         </div>
       </aside>
 
@@ -627,7 +622,11 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
               const assignable = selectedRecipeId !== null && !isDayFull(day.dateKey);
 
               return (
-                <FadeContent key={slotKey} delay={index * 0.04}>
+                <div
+                  key={slotKey}
+                  style={{ animationDelay: `${index * 40}ms` }}
+                  className="animate-[planner-card-in_0.24s_ease-out_both]"
+                >
                   <DayCard
                     label={day.dateKey === todayKey ? `Today, ${day.label.split(', ')[1]}` : day.label}
                     recipeSlots={daySlots}
@@ -643,7 +642,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
                     onMarkCooked={(planId) => handleMarkCooked(day.dateKey, planId)}
                     onUnmarkCooked={(planId) => handleUnmarkCooked(day.dateKey, planId)}
                   />
-                </FadeContent>
+                </div>
               );
             })}
           </div>
@@ -669,7 +668,18 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
           </div>
         )}
       </div>
-
+      <style>{`
+        @keyframes planner-card-in {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
 
     </div>
   );
