@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Lora } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -9,9 +9,7 @@ import NavigationPerfLogger from "@/components/perf/NavigationPerfLogger";
 import HeaderAccessControls from "@/components/layout/HeaderAccessControls";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import BrandLogo from "@/components/layout/BrandLogo";
-import MobileNav from "@/components/layout/MobileNav";
-
-import { ToastProvider } from "@/components/ui/Toast";
+import LayoutViewport from "@/components/layout/LayoutViewport";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -21,11 +19,6 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
-});
-
-const lora = Lora({
-  subsets: ["latin"],
-  variable: "--font-lora",
 });
 
 export const metadata: Metadata = {
@@ -65,25 +58,25 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${lora.variable}`}>
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <GuestSessionHeartbeat />
         <Suspense fallback={null}>
           <NavigationPerfLogger />
         </Suspense>
-        <div className="min-h-[100dvh] text-slate-900 dark:text-slate-100">
-          <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/75 dark:border-emerald-200/10 dark:bg-slate-950/80 dark:supports-[backdrop-filter]:bg-slate-950/55">
+        <div className="min-h-[100dvh]" style={{ color: "var(--foreground)" }}>
+          <header className="ui-shell-bar sticky top-0 z-40">
             <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center px-4 md:px-8">
               <Link href="/" className="mr-8 flex items-center gap-2">
                 <BrandLogo />
               </Link>
 
-              <nav className="hidden items-center gap-1 rounded-full border border-slate-200/80 bg-white/80 p-1 md:flex dark:border-slate-800 dark:bg-slate-900/70">
+              <nav className="ui-nav-shell hidden items-center gap-1 md:flex">
                 {navItems.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     prefetch={false}
-                    className="rounded-full px-4 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300"
+                    className="ui-nav-link"
                   >
                     {item.label}
                   </Link>
@@ -98,13 +91,7 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-
-          <main className="mx-auto w-full max-w-[1400px] px-4 py-6 pb-24 md:px-8 md:py-10 md:pb-10">
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </main>
-          <MobileNav />
+          <LayoutViewport>{children}</LayoutViewport>
         </div>
       </body>
     </html>

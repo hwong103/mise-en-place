@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useId, useMemo, useRef, useState, useTransition } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
 import RecipeForm from "@/components/recipes/RecipeForm";
 import FadeContent from "@/components/ui/FadeContent";
+import { useAccessibleDialog } from "@/components/ui/useAccessibleDialog";
 
 const normalize = (value: string) =>
   value
@@ -31,6 +32,22 @@ export default function RecipeLibraryClient({
   const [sourceUrl, setSourceUrl] = useState("");
   const [clientImportError, setClientImportError] = useState<string | null>(null);
   const [isImportPending, startImportTransition] = useTransition();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const addDialogTitleId = useId();
+  const addDialogDescriptionId = useId();
+  const searchInputId = useId();
+  const urlInputId = useId();
+
+  const closeAddDialog = useCallback(() => {
+    setIsAddOpen(false);
+    setSelected(null);
+  }, []);
+
+  const addDialogRef = useAccessibleDialog<HTMLDivElement>({
+    isOpen: isAddOpen,
+    onClose: closeAddDialog,
+    initialFocusRef: closeButtonRef,
+  });
 
   const filtered = useMemo(() => {
     const needle = normalize(query);
@@ -115,19 +132,36 @@ export default function RecipeLibraryClient({
       ) : null}
 
       {isAddOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl md:p-6 dark:bg-slate-900">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeAddDialog();
+            }
+          }}
+        >
+          <div
+            ref={addDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={addDialogTitleId}
+            aria-describedby={addDialogDescriptionId}
+            tabIndex={-1}
+            className="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl md:p-6 dark:bg-slate-900"
+          >
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Add a Recipe</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Pick how you want to add a recipe.</p>
+                <h2 id={addDialogTitleId} className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                  Add a Recipe
+                </h2>
+                <p id={addDialogDescriptionId} className="text-sm text-slate-500 dark:text-slate-400">
+                  Pick how you want to add a recipe.
+                </p>
               </div>
               <button
+                ref={closeButtonRef}
                 type="button"
-                onClick={() => {
-                  setIsAddOpen(false);
-                  setSelected(null);
-                }}
+                onClick={closeAddDialog}
                 className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
               >
                 Close
@@ -176,7 +210,11 @@ export default function RecipeLibraryClient({
                       </p>
                     </div>
                     <form onSubmit={handleUrlImportSubmit} className="space-y-4">
+                      <label htmlFor={urlInputId} className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Recipe URL
+                      </label>
                       <input
+                        id={urlInputId}
                         type="url"
                         name="sourceUrl"
                         required
@@ -217,12 +255,18 @@ export default function RecipeLibraryClient({
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Search</label>
+              <label
+                htmlFor={searchInputId}
+                className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
+              >
+                Search
+              </label>
               <div className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                 {filtered.length} of {recipes.length}
               </div>
             </div>
             <input
+              id={searchInputId}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search recipes or tags"

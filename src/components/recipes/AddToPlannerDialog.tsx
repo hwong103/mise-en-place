@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { addToMealPlan } from "@/app/(dashboard)/recipes/actions";
 import { toDateKey } from "@/lib/date";
+import { useAccessibleDialog } from "@/components/ui/useAccessibleDialog";
 
 type AddToPlannerDialogProps = {
   recipeId: string;
@@ -21,6 +22,10 @@ export default function AddToPlannerDialog({
 }: AddToPlannerDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogTitleId = useId();
+  const dialogDescriptionId = useId();
+  const dateSelectorId = useId();
 
   const today = toDateKey(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(defaultDate ?? today);
@@ -35,16 +40,30 @@ export default function AddToPlannerDialog({
     };
   });
 
+  const closeDialog = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  const dialogRef = useAccessibleDialog<HTMLDivElement>({
+    isOpen,
+    onClose: closeDialog,
+    initialFocusRef: cancelButtonRef,
+  });
+
   async function clientAction(formData: FormData) {
     setIsPending(true);
-    await addToMealPlan(formData);
-    setIsPending(false);
-    setIsOpen(false);
+    try {
+      await addToMealPlan(formData);
+      setIsOpen(false);
+    } finally {
+      setIsPending(false);
+    }
   }
 
   if (!isOpen) {
     return (
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
         className={
           triggerClassName ??
@@ -57,17 +76,38 @@ export default function AddToPlannerDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add to Planner</h3>
-        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          closeDialog();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        aria-describedby={dialogDescriptionId}
+        tabIndex={-1}
+        className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900"
+      >
+        <h3 id={dialogTitleId} className="text-lg font-bold text-slate-900 dark:text-slate-100">
+          Add to Planner
+        </h3>
+        <p id={dialogDescriptionId} className="mb-6 text-sm text-slate-500 dark:text-slate-400">
           Schedule <span className="font-semibold text-emerald-600 dark:text-emerald-400">{recipeTitle}</span> for a day.
         </p>
 
         <form action={clientAction} className="space-y-4">
           <input type="hidden" name="recipeId" value={recipeId} />
           <input type="hidden" name="date" value={selectedDate} />
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+          <fieldset className="space-y-2">
+            <legend id={dateSelectorId} className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Choose a day
+            </legend>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7" aria-labelledby={dateSelectorId}>
             {days.map((day) => {
               const isSelected = selectedDate === day.key;
               return (
@@ -75,6 +115,8 @@ export default function AddToPlannerDialog({
                   key={day.key}
                   type="button"
                   onClick={() => setSelectedDate(day.key)}
+                  aria-pressed={isSelected}
+                  aria-label={`Schedule for ${day.label} ${day.day} ${day.month}`}
                   className={`flex flex-col items-center rounded-2xl border py-3 transition-colors sm:py-4 ${
                     isSelected
                       ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-300"
@@ -99,12 +141,14 @@ export default function AddToPlannerDialog({
                 </button>
               );
             })}
-          </div>
+            </div>
+          </fieldset>
 
           <div className="flex justify-end gap-3 pt-4">
             <button
+              ref={cancelButtonRef}
               type="button"
-              onClick={() => setIsOpen(false)}
+              onClick={closeDialog}
               disabled={isPending}
               className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >

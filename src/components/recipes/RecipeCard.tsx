@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState, type SyntheticEvent } from "react";
 import CountUp from "@/components/ui/CountUp";
@@ -111,8 +112,13 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
       <div className="relative h-44 w-full">
         {recipe.imageUrl ? (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
+            <Image
+              src={recipe.imageUrl}
+              alt=""
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+              className="object-cover"
+            />
             <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/20 to-transparent" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(0,0,0,0.45)_0%,transparent_60%)]" />
             {recipe.sourceUrl ? <AuthorBadge sourceUrl={recipe.sourceUrl} /> : null}

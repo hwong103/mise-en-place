@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CATEGORY_ORDER, type ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@/lib/db-types";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
+import { useAccessibleDialog } from "@/components/ui/useAccessibleDialog";
 import {
   addManualShoppingItem,
   clearShoppingListWeek,
@@ -110,7 +111,14 @@ export default function ShoppingList({
     Record<string, boolean>
   >({});
   const [isClearing, setIsClearing] = useState(false);
+  const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const mobileManualInputRef = useRef<HTMLInputElement>(null);
+  const mobileManualDialogRef = useAccessibleDialog<HTMLDivElement>({
+    isOpen: isMobileManualOpen,
+    onClose: () => setIsMobileManualOpen(false),
+    initialFocusRef: mobileManualInputRef,
+  });
 
   const initialLocationOptions = useMemo(
     () =>
@@ -471,6 +479,7 @@ export default function ShoppingList({
     ]);
     setLocationOptions((current) => mergeLocationOptions(current, [location]));
     setManualLine("");
+    setIsMobileManualOpen(false);
 
     addManualShoppingItem({
         weekKey,
@@ -524,21 +533,15 @@ export default function ShoppingList({
     });
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Shopping List</h1>
-          <p className="text-slate-500 dark:text-slate-400">Confirm what you have and what you need.</p>
-        </div>
-        <ShoppingActions
-          shareInviteUrl={shareInviteUrl}
-          onClearList={handleClearList}
-          clearing={isClearing}
-        />
-      </div>
+  const manualSection = (options?: { mobile?: boolean; inputRef?: React.RefObject<HTMLInputElement | null> }) => {
+    const isMobile = options?.mobile ?? false;
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    return (
+      <section
+        className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
+          isMobile ? "" : "hidden sm:block"
+        }`}
+      >
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add Manual Items</h2>
         {saveErrors.length > 0 ? (
           <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
@@ -554,17 +557,18 @@ export default function ShoppingList({
             </div>
           </div>
         ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1.5fr_1fr_1fr_auto]">
+        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
           <input
+            ref={options?.inputRef}
             value={manualLine}
             onChange={(event) => setManualLine(event.target.value)}
             placeholder="Paper towels, coffee, etc."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="order-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-emerald-500 focus:outline-none sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
           <select
             value={manualCategory}
             onChange={(event) => setManualCategory(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+            className="order-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 sm:order-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
           >
             {categoryOptions.map((name) => (
               <option key={name} value={name}>
@@ -575,7 +579,7 @@ export default function ShoppingList({
           <select
             value={manualLocation}
             onChange={(event) => setManualLocation(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+            className="order-4 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 sm:order-3 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
           >
             {locationOptions.map((location) => (
               <option key={location} value={location}>
@@ -586,29 +590,52 @@ export default function ShoppingList({
           <button
             type="button"
             onClick={handleAddManual}
-            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="order-2 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-60 sm:order-4 sm:w-auto sm:py-2 sm:text-sm"
             disabled={!manualLine.trim()}
           >
             Add
           </button>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <input
-            value={newLocation}
-            onChange={(event) => setNewLocation(event.target.value)}
-            placeholder="Add a new location"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none sm:max-w-xs dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-          />
-          <button
-            type="button"
-            onClick={handleAddLocation}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            Add Location
-          </button>
-        </div>
+        <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/40">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-700 marker:hidden dark:text-slate-200">
+            Add another shopping location
+          </summary>
+          <div className="mt-3 grid gap-3 sm:max-w-sm">
+            <input
+              value={newLocation}
+              onChange={(event) => setNewLocation(event.target.value)}
+              placeholder="Add a new location"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            />
+            <button
+              type="button"
+              onClick={handleAddLocation}
+              className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Save Location
+            </button>
+          </div>
+        </details>
       </section>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Shopping List</h1>
+          <p className="text-slate-500 dark:text-slate-400">Confirm what you have and what you need.</p>
+        </div>
+        <ShoppingActions
+          shareInviteUrl={shareInviteUrl}
+          onClearList={handleClearList}
+          clearing={isClearing}
+        />
+      </div>
+
+      {manualSection()}
 
       {mergedLocations.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
@@ -659,10 +686,6 @@ export default function ShoppingList({
               role="tabpanel"
               className="space-y-4"
             >
-              <h2 className="text-base font-extrabold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                {activeLocationView.name}
-              </h2>
-
               {activeLocationView.activeCategories.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
                   All items done for this location.
@@ -688,9 +711,9 @@ export default function ShoppingList({
                           const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
 
                           return (
-                            <li key={item.key} className="px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200">
-                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                                <label className="flex min-w-0 flex-1 items-start gap-2.5">
+                            <li key={item.key} className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-200">
+                              <div className="space-y-3">
+                                <label className="flex min-w-0 items-start gap-3">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -705,7 +728,7 @@ export default function ShoppingList({
                                     }
                                     className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900"
                                   />
-                                  <div className="min-w-0">
+                                  <div className="min-w-0 flex-1">
                                     <div
                                       className={`truncate ${
                                         isChecked ? "line-through text-slate-400 dark:text-slate-500" : ""
@@ -733,7 +756,7 @@ export default function ShoppingList({
                                   </div>
                                 </label>
 
-                                <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                                <div className="ml-7 flex flex-wrap items-center gap-2">
                                   <select
                                     value={item.location}
                                     onChange={(event) =>
@@ -745,7 +768,7 @@ export default function ShoppingList({
                                         location: event.target.value,
                                       })
                                     }
-                                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                    className="min-w-[8.5rem] rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                                     disabled={isSaving || isPending}
                                     aria-label={`Location for ${item.line}`}
                                   >
@@ -777,7 +800,7 @@ export default function ShoppingList({
                                         id: item.id,
                                       })
                                     }
-                                    className="rounded-full p-1 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
+                                    className="ml-auto rounded-full p-2 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30 sm:ml-0"
                                     disabled={isSaving || isPending || item._optimistic}
                                     aria-label={`Remove ${item.line}`}
                                     title="Remove item"
@@ -878,6 +901,65 @@ export default function ShoppingList({
           ) : null}
         </div>
       )}
+
+      <div className="sm:hidden">
+        <button
+          type="button"
+          onClick={() => setIsMobileManualOpen(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-30 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20"
+          aria-haspopup="dialog"
+          aria-expanded={isMobileManualOpen}
+          aria-controls="mobile-manual-items-dialog"
+        >
+          <Plus className="h-4 w-4" />
+          Add item
+        </button>
+
+        {isMobileManualOpen ? (
+          <div className="fixed inset-0 z-40">
+            <button
+              type="button"
+              className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
+              onClick={() => setIsMobileManualOpen(false)}
+              aria-label="Close add manual items"
+            />
+            <div className="absolute inset-x-0 bottom-0 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+              <div
+                ref={mobileManualDialogRef}
+                id="mobile-manual-items-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="mobile-manual-items-title"
+                className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+                tabIndex={-1}
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h2
+                      id="mobile-manual-items-title"
+                      className="text-base font-bold text-slate-900 dark:text-slate-100"
+                    >
+                      Add Manual Items
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Tuck in anything you forgot before checkout.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileManualOpen(false)}
+                    className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                    aria-label="Close add manual items"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {manualSection({ mobile: true, inputRef: mobileManualInputRef })}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

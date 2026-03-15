@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import Image from "next/image";
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Camera, Link2, MapPin, PencilLine, Search, Wine as WineIcon } from "lucide-react";
 import { createWineFromName, createWineFromPhoto, createWineFromUrl, createWineManually } from "@/app/(dashboard)/cellar/actions";
@@ -52,6 +53,8 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pickerRef = useRef<HTMLDivElement>(null);
+    const searchInputId = useId();
+    const pickerMenuId = useId();
 
     const isLoading = isPending;
 
@@ -65,6 +68,19 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (!pickerOpen) return;
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setPickerOpen(false);
+            }
+        };
+
+        document.addEventListener("keydown", handleEscape);
+        return () => document.removeEventListener("keydown", handleEscape);
+    }, [pickerOpen]);
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -133,25 +149,26 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
             pendingMode === "url" ? "Fetching URL…" :
                 pendingMode === "name" ? "Searching…" :
                 pendingMode === "manual" ? "Opening form…" : "";
+    const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+    const grouped = useMemo(() => {
+        const filtered = wines.filter((wine) => {
+            const matchesQuery = !deferredQuery ||
+                wine.name.toLowerCase().includes(deferredQuery) ||
+                wine.producer?.toLowerCase().includes(deferredQuery) ||
+                wine.region?.toLowerCase().includes(deferredQuery) ||
+                wine.grapes.some((grape) => grape.toLowerCase().includes(deferredQuery));
+            const matchesType = !typeFilter || wine.type === typeFilter;
+            return matchesQuery && matchesType;
+        });
 
-    const filtered = wines.filter((w) => {
-        const q = query.toLowerCase();
-        const matchesQuery = !q ||
-            w.name.toLowerCase().includes(q) ||
-            w.producer?.toLowerCase().includes(q) ||
-            w.region?.toLowerCase().includes(q) ||
-            w.grapes.some((g) => g.toLowerCase().includes(q));
-        const matchesType = !typeFilter || w.type === typeFilter;
-        return matchesQuery && matchesType;
-    });
+        return filtered.reduce<Record<string, WineSummary[]>>((acc, wine) => {
+            if (!acc[wine.type]) acc[wine.type] = [];
+            acc[wine.type].push(wine);
+            return acc;
+        }, {});
+    }, [deferredQuery, typeFilter, wines]);
 
-    const grouped = filtered.reduce<Record<string, WineSummary[]>>((acc, wine) => {
-        if (!acc[wine.type]) acc[wine.type] = [];
-        acc[wine.type].push(wine);
-        return acc;
-    }, {});
-
-    const types = Object.keys(WINE_TYPE_LABELS);
+    const types = useMemo(() => Object.keys(WINE_TYPE_LABELS), []);
 
     return (
         <div className="space-y-8">
@@ -172,6 +189,9 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                         type="button"
                         onClick={() => setPickerOpen((o) => !o)}
                         disabled={isLoading}
+                        aria-haspopup="menu"
+                        aria-expanded={pickerOpen}
+                        aria-controls={pickerMenuId}
                         className={`inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 ${isLoading ? "opacity-60 cursor-not-allowed" : ""}`}
                     >
                         {isLoading ? (
@@ -189,7 +209,12 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                     </button>
 
                     {pickerOpen && (
-                        <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                        <div
+                            id={pickerMenuId}
+                            role="menu"
+                            aria-label="Log a wine options"
+                            className="absolute right-0 top-full z-20 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                        >
                             {/* Name search option */}
                             <div className="px-3 py-2.5">
                                 <div className="mb-2 flex items-center gap-3">
@@ -289,7 +314,11 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
 
             {/* Search + type filters */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label htmlFor={searchInputId} className="sr-only">
+                    Search wines, producers, grapes, and regions
+                </label>
                 <input
+                    id={searchInputId}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search wines, producers, grapes…"
@@ -335,11 +364,15 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                     >
                                         {/* Bottle image (fallback to colour swatch) */}
                                         {wine.imageUrl ? (
-                                            <img
-                                                src={wine.imageUrl}
-                                                alt={wine.name}
-                                                className="h-14 w-10 shrink-0 rounded-lg object-contain"
-                                            />
+                                            <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg">
+                                                <Image
+                                                    src={wine.imageUrl}
+                                                    alt={wine.name}
+                                                    fill
+                                                    sizes="40px"
+                                                    className="object-contain"
+                                                />
+                                            </div>
                                         ) : (
                                             <div className={`h-14 w-1.5 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
                                         )}

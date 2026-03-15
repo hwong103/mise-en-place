@@ -24,6 +24,7 @@ export default function ShoppingActions({
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
+  const shareMenuId = "shopping-share-menu";
 
   const handlePrint = () => {
     window.print();
@@ -81,16 +82,47 @@ export default function ShoppingActions({
     };
   }, [shareMenuOpen]);
 
+  useEffect(() => {
+    if (!shareMenuOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShareMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [shareMenuOpen]);
+
+  useEffect(() => {
+    if (shareStatus !== "copied") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShareStatus("idle");
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [shareStatus]);
+
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="grid w-full gap-3 sm:flex sm:flex-wrap">
       <button
         type="button"
         onClick={handlePrint}
-        className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="ui-button ui-button-secondary ui-button-block w-full active:translate-y-[1px] sm:w-auto"
       >
         Print List
       </button>
-      <div className="relative" ref={shareMenuRef}>
+      <div className="relative w-full sm:w-auto" ref={shareMenuRef}>
         <button
           type="button"
           onClick={() => {
@@ -99,27 +131,40 @@ export default function ShoppingActions({
             }
             setShareMenuOpen((current) => !current);
           }}
-          className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+          className="ui-button ui-button-primary ui-button-block w-full active:translate-y-[1px] sm:w-auto"
           disabled={!shareInviteUrl}
           title={!shareInviteUrl ? "Only household managers can share invite links." : undefined}
+          aria-expanded={shareMenuOpen}
+          aria-controls={shareInviteUrl ? shareMenuId : undefined}
+          aria-haspopup="menu"
         >
           Share List
         </button>
         {shareMenuOpen && shareInviteUrl ? (
-          <div className="absolute right-0 z-10 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+          <div
+            id={shareMenuId}
+            role="menu"
+            aria-label="Share shopping list"
+            className="ui-menu absolute inset-x-0 z-10 mt-2 sm:right-0 sm:left-auto sm:w-64"
+          >
+            <p className="ui-menu-label">
+              Share shopping list
+            </p>
             <button
               type="button"
               onClick={handleCopyLink}
-              className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="ui-menu-item"
+              role="menuitem"
             >
-              {shareStatus === "copied" ? "Copied" : "Copy"}
+              {shareStatus === "copied" ? "Invite link copied" : "Copy invite link"}
             </button>
             <button
               type="button"
               onClick={handleWhatsAppShare}
-              className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="ui-menu-item mt-1"
+              role="menuitem"
             >
-              Send via WhatsApp
+              Share on WhatsApp
             </button>
           </div>
         ) : null}
@@ -127,7 +172,7 @@ export default function ShoppingActions({
       <button
         type="button"
         onClick={onClearList}
-        className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-2 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-60 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/40"
+        className="ui-button ui-button-danger ui-button-block w-full active:translate-y-[1px] sm:w-auto"
         disabled={clearing}
       >
         {clearing ? "Clearing..." : "Clear List"}

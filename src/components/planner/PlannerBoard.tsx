@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, useTransition, useEffect } from "react";
 import {
@@ -76,8 +77,7 @@ function RecipeTile({
           ${isSelected ? "border-emerald-300 dark:border-emerald-600" : "border-slate-200 dark:border-slate-700 dark:bg-slate-800"}`}
         >
           {recipe.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
+            <Image src={recipe.imageUrl} alt="" fill sizes="32px" className="object-cover" />
           ) : null}
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
@@ -121,8 +121,7 @@ function PastDayCard({
                 <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800/50 dark:bg-green-950/30">
                   <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-green-200">
                     {slot.recipeImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={slot.recipeImageUrl} alt="" className="h-full w-full object-cover" />
+                      <Image src={slot.recipeImageUrl} alt="" fill sizes="36px" className="object-cover" />
                     ) : null}
                   </div>
                   <Link href={`/recipes/${slot.recipeId}`} className="flex-1 truncate text-sm font-semibold text-green-800 dark:text-green-300 transition-colors hover:underline underline-offset-4 decoration-green-400/50">
@@ -140,8 +139,7 @@ function PastDayCard({
                   <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 opacity-70 dark:border-slate-700 dark:bg-slate-900/40">
                     <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-slate-200 grayscale">
                       {slot.recipeImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={slot.recipeImageUrl} alt="" className="h-full w-full object-cover" />
+                        <Image src={slot.recipeImageUrl} alt="" fill sizes="36px" className="object-cover" />
                       ) : null}
                     </div>
                     <Link href={`/recipes/${slot.recipeId}`} className="flex-1 truncate text-sm font-semibold text-slate-500 line-through decoration-slate-400 decoration-1 underline-offset-4 transition-colors">
@@ -175,6 +173,7 @@ function DayCard({
   recipeSlots,
   isToday,
   isAssignable,
+  selectedRecipeTitle,
   onAssign,
   onClearDay,
   onRemoveEntry,
@@ -185,6 +184,7 @@ function DayCard({
   recipeSlots: PlannerSlot[];
   isToday?: boolean;
   isAssignable: boolean;
+  selectedRecipeTitle?: string | null;
   onAssign: () => void;
   onClearDay: () => void;
   onRemoveEntry: (planId: string) => void;
@@ -205,7 +205,10 @@ function DayCard({
         {recipeSlots.length > 0 ? (
           <button
             type="button"
-            onClick={onClearDay}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClearDay();
+            }}
             className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
           >
             Clear day
@@ -214,14 +217,23 @@ function DayCard({
       </div>
 
       {recipeSlots.length === 0 ? (
-        <div className={`flex flex-1 items-center justify-center rounded-2xl border border-dashed px-3 py-2 text-sm transition-colors
-          ${isAssignable
-            ? "border-emerald-300 bg-emerald-50/50 text-emerald-600 dark:border-emerald-600/50 dark:bg-emerald-950/30 dark:text-emerald-400"
-            : "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400"
-          }`}
-        >
-          {isAssignable ? "Tap to add here" : "Select a recipe"}
-        </div>
+        isAssignable ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAssign();
+            }}
+            className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 px-3 py-2 text-sm font-semibold text-emerald-600 dark:border-emerald-600/50 dark:bg-emerald-950/30 dark:text-emerald-400"
+            aria-label={`Add ${selectedRecipeTitle ?? "selected recipe"} to ${label}`}
+          >
+            Add {selectedRecipeTitle ? `"${selectedRecipeTitle}"` : "here"}
+          </button>
+        ) : (
+          <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
+            Select a recipe
+          </div>
+        )
       ) : (
         <div className="space-y-4">
           {recipeSlots.map((slot) => (
@@ -236,8 +248,13 @@ function DayCard({
                   <div className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border transition-all ${slot.cooked ? "border-green-200" : "border-slate-200 dark:border-slate-700"
                     }`}>
                     {slot.recipeImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={slot.recipeImageUrl} alt="" className={`h-full w-full object-cover transition-all ${slot.cooked ? "grayscale-0" : ""}`} />
+                      <Image
+                        src={slot.recipeImageUrl}
+                        alt=""
+                        fill
+                        sizes="40px"
+                        className={`object-cover transition-all ${slot.cooked ? "grayscale-0" : ""}`}
+                      />
                     ) : null}
                   </div>
                   <Link
@@ -302,9 +319,17 @@ function DayCard({
             </div>
           ))}
           {isAssignable && (
-            <div className="mt-2 flex items-center justify-center rounded-xl border border-dashed border-emerald-300 py-1.5 text-xs font-semibold text-emerald-600 dark:border-emerald-600/50 dark:text-emerald-400">
-              ＋ Add here
-            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAssign();
+              }}
+              className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-dashed border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-600 dark:border-emerald-600/50 dark:text-emerald-400"
+              aria-label={`Add ${selectedRecipeTitle ?? "selected recipe"} to ${label}`}
+            >
+              ＋ Add {selectedRecipeTitle ? `"${selectedRecipeTitle}"` : "here"}
+            </button>
           )}
         </div>
       )}
@@ -339,6 +364,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
   const { showToast } = useToast();
+  const recipeSearchInputId = "planner-recipe-search";
 
   const lastWeekCookedCount = useMemo(() => {
     return pastDays.reduce((count, day) => {
@@ -531,6 +557,8 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
           </div>
 
           <input
+            id={recipeSearchInputId}
+            aria-label="Search recipes to plan"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search recipes"
@@ -633,6 +661,7 @@ export default function PlannerBoard({ days, pastDays, recipes, slots }: Planner
                     recipeSlots={daySlots}
                     isToday={day.dateKey === todayKey}
                     isAssignable={assignable}
+                    selectedRecipeTitle={selectedRecipeId ? recipeLookup.get(selectedRecipeId)?.title ?? null : null}
                     onAssign={() => {
                       if (!selectedRecipeId) return;
                       handleAssign(day.dateKey, selectedRecipeId);

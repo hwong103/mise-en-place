@@ -12,12 +12,22 @@ const NAV_ITEMS = [
     { href: "/settings", label: "Settings", Icon: Settings },
 ] as const;
 
+const APP_ROUTE_PREFIXES = NAV_ITEMS.map((item) => item.href);
+
+export function isAppRoute(pathname: string | null) {
+    if (!pathname) {
+        return false;
+    }
+
+    return APP_ROUTE_PREFIXES.some((href) => pathname === href || pathname.startsWith(`${href}/`));
+}
+
 export default function MobileNav() {
     const pathname = usePathname();
 
     return (
         <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white/90 backdrop-blur-xl md:hidden dark:border-slate-800 dark:bg-slate-950/90">
-            <div className="flex h-16 items-stretch">
+            <div className="flex min-h-16 items-stretch">
                 {NAV_ITEMS.map(({ href, label, Icon }) => {
                     const active = pathname === href || pathname.startsWith(href + "/");
                     return (
@@ -25,7 +35,7 @@ export default function MobileNav() {
                             key={href}
                             href={href}
                             prefetch={false}
-                            className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold tracking-wide transition-colors
+                            className={`flex flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-semibold tracking-wide transition-colors
                 ${active
                                     ? "text-emerald-600 dark:text-emerald-400"
                                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"

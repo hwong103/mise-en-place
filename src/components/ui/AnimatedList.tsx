@@ -1,5 +1,5 @@
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 type AnimatedListProps = {
     children: React.ReactNode;
@@ -20,6 +20,11 @@ export default function AnimatedList({
     className,
 }: AnimatedListProps) {
     const childrenArray = React.Children.toArray(children);
+    const prefersReducedMotion = useReducedMotion();
+
+    if (prefersReducedMotion) {
+        return <div className={className}>{children}</div>;
+    }
 
     return (
         <motion.div

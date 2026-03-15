@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import PriceCard from "@/components/cellar/PriceCard";
 import type { StockistResult } from "@/lib/wine";
@@ -103,11 +104,15 @@ export default function WineDetail({
             {/* Hero */}
             <div className="flex items-start gap-5">
                 {wine.imageUrl ? (
-                    <img
-                        src={wine.imageUrl}
-                        alt={wine.name}
-                        className="mt-1 h-24 w-16 shrink-0 rounded-xl object-contain"
-                    />
+                    <div className="relative mt-1 h-24 w-16 shrink-0 overflow-hidden rounded-xl">
+                        <Image
+                            src={wine.imageUrl}
+                            alt={wine.name}
+                            fill
+                            sizes="64px"
+                            className="object-contain"
+                        />
+                    </div>
                 ) : (
                     <div className={`mt-1 h-16 w-2 shrink-0 rounded-full ${WINE_TYPE_COLORS[wine.type]}`} />
                 )}

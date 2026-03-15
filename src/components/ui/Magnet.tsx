@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useMotionValue, useSpring } from "framer-motion";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 
 type MagnetProps = {
     children: React.ReactNode;
@@ -11,6 +11,7 @@ type MagnetProps = {
 
 export default function Magnet({ children, strength = 0.3, className }: MagnetProps) {
     const ref = useRef<HTMLDivElement>(null);
+    const prefersReducedMotion = useReducedMotion();
 
     const x = useMotionValue(0);
     const y = useMotionValue(0);
@@ -19,6 +20,7 @@ export default function Magnet({ children, strength = 0.3, className }: MagnetPr
     const springY = useSpring(y, { stiffness: 200, damping: 20 });
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        if (prefersReducedMotion) return;
         const el = ref.current;
         if (!el) return;
         const rect = el.getBoundingClientRect();
@@ -36,7 +38,7 @@ export default function Magnet({ children, strength = 0.3, className }: MagnetPr
     return (
         <motion.div
             ref={ref}
-            style={{ x: springX, y: springY }}
+            style={prefersReducedMotion ? undefined : { x: springX, y: springY }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             className={className}

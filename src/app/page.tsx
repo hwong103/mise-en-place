@@ -1,31 +1,22 @@
 import Link from "next/link";
-import { ArrowRight, Calendar, ClipboardList, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { getCurrentAuthUser } from "@/lib/auth";
 
 const highlights = [
   {
-    title: "Recipe Library",
-    detail: "Import recipe URLs and keep one searchable source of truth for the whole household.",
+    title: "Save recipes",
+    detail: "Keep one searchable place for dinner ideas.",
     href: "/recipes",
-    icon: UtensilsCrossed,
   },
   {
-    title: "7-Day Planner",
-    detail: "Drag and schedule dinner plans by day so your week is clear before grocery runs.",
+    title: "Plan the week",
+    detail: "See what you are cooking before you shop.",
     href: "/planner",
-    icon: Calendar,
   },
   {
-    title: "Smart Shopping",
-    detail: "Generate grouped ingredient lists from planned recipes and check off items in-store.",
+    title: "Shop once",
+    detail: "Turn the plan into a list you can use in store.",
     href: "/shopping",
-    icon: ShoppingBasket,
-  },
-  {
-    title: "Quick Capture",
-    detail: "Add recipe notes and prep details fast so anyone in the household can cook.",
-    href: "/recipes#add-recipe",
-    icon: ClipboardList,
   },
 ];
 
@@ -51,85 +42,73 @@ export default async function HomePage({
     : resolvedSearchParams.join;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {joinStatus === "invalid" ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="ui-callout ui-callout-danger">
           That household invite link is invalid or expired. Ask the household manager for a new link.
         </div>
       ) : null}
 
-      <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:gap-10">
-        <section className="relative overflow-hidden rounded-[2rem] border border-emerald-900/10 bg-white px-6 py-8 shadow-[0_20px_40px_-20px_rgba(5,46,22,0.2)] md:px-10 md:py-12 dark:border-emerald-200/10 dark:bg-slate-900/70">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Household Meal OS</p>
-          <h1 className="mt-5 text-4xl leading-none tracking-tighter text-slate-900 md:text-6xl dark:text-slate-100">
-            Plan dinners with fewer tabs, fewer texts, and fewer forgotten ingredients.
+      <section className="max-w-4xl space-y-8 py-2 md:py-6">
+        <div className="space-y-4">
+          <h1 className="max-w-[12ch] text-4xl leading-[0.98] tracking-[-0.05em] sm:text-5xl md:text-6xl">
+            Plan dinner once. Shop once. Cook calmly.
           </h1>
-          <p className="mt-6 max-w-[65ch] text-base leading-relaxed text-slate-600 dark:text-slate-300">
-            Mise en Place keeps recipes, weekly planning, and grocery execution in one shared flow so anyone can pick up dinner without guesswork.
+          <p className="ui-copy-muted max-w-[58ch] text-base leading-relaxed">
+            Recipes, weekly planning, and shopping stay in one flow so anyone at home can pick up the next meal.
           </p>
+        </div>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <Link
+            href="/recipes"
+            className="ui-button ui-button-primary ui-button-pill w-full active:translate-y-[1px] sm:w-auto"
+          >
+            Open recipes
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          {!isLoggedIn && !authDisabled ? (
             <Link
-              href="/recipes"
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition-transform duration-300 hover:bg-emerald-600 active:translate-y-[1px]"
+              href="/login"
+              className="ui-button ui-button-secondary ui-button-pill w-full active:translate-y-[1px] sm:w-auto"
             >
-              Open Recipes
-              <ArrowRight className="h-4 w-4" />
+              Sign in
             </Link>
-            {!isLoggedIn ? (
-              <>
-                {authDisabled ? (
-                  <Link
-                    href="/recipes"
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
-                  >
-                    Continue Without Login
-                  </Link>
-                ) : (
-                  <form method="post" action="/start-household">
-                    <button
-                      type="submit"
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
-                    >
-                      Start Without Login
-                    </button>
-                  </form>
-                )}
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors duration-300 hover:border-emerald-200 hover:text-emerald-700 active:translate-y-[1px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-300"
-                >
-                  Login / Claim
-                </Link>
-              </>
-            ) : null}
-          </div>
-        </section>
+          ) : null}
+        </div>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-          {highlights.map((item, index) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.title}
-                href={item.href}
-                className="group rounded-3xl border border-slate-200/90 bg-white px-5 py-5 transition duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_16px_28px_-20px_rgba(5,46,22,0.35)] active:translate-y-[1px] dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-emerald-500/30"
-                style={{ animationDelay: `${index * 90}ms` }}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-2.5 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
-                    <Icon className="h-5 w-5" strokeWidth={1.8} />
-                  </div>
-                  <div className="space-y-2">
-                    <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">{item.title}</h2>
-                    <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{item.detail}</p>
-                  </div>
-                </div>
+        {!isLoggedIn ? (
+          <div className="ui-copy-muted text-sm">
+            {authDisabled ? (
+              <Link href="/recipes" className="font-medium underline underline-offset-4">
+                Continue without login
               </Link>
-            );
-          })}
-        </section>
-      </div>
+            ) : (
+              <form method="post" action="/start-household" className="inline">
+                <button type="submit" className="font-medium underline underline-offset-4">
+                  Start without login
+                </button>
+              </form>
+            )}
+          </div>
+        ) : null}
+
+        <div className="ui-divider max-w-3xl divide-y border-t">
+          {highlights.map((item) => (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="group flex items-start justify-between gap-4 py-4 transition-colors first:pt-5"
+            >
+              <div className="min-w-0 space-y-1">
+                <h2 className="text-base font-semibold tracking-tight">{item.title}</h2>
+                <p className="ui-copy-muted text-sm leading-relaxed">{item.detail}</p>
+              </div>
+              <ArrowRight className="ui-copy-muted mt-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

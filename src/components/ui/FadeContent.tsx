@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 type FadeContentProps = {
     children: React.ReactNode;
@@ -17,12 +17,14 @@ export default function FadeContent({
     delay = 0,
     className,
 }: FadeContentProps) {
+    const prefersReducedMotion = useReducedMotion();
+
     return (
         <motion.div
-            initial={{ opacity: 0, filter: blur ? "blur(8px)" : "none", y: 8 }}
-            whileInView={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, filter: blur ? "blur(8px)" : "none", y: 8 }}
+            whileInView={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, filter: "blur(0px)", y: 0 }}
             viewport={{ once: true, margin: "0px 0px -40px 0px" }}
-            transition={{ duration, delay, ease: "easeOut" }}
+            transition={prefersReducedMotion ? { duration: 0 } : { duration, delay, ease: "easeOut" }}
             className={className}
         >
             {children}

@@ -53,6 +53,24 @@ const autoResize = (el: HTMLTextAreaElement) => {
     el.style.height = `${el.scrollHeight}px`;
 };
 
+const toEditorGroups = (initialGroups: PrepGroup[]): EditorGroup[] =>
+    initialGroups.map((g) => ({
+        title: g.title,
+        items: g.items.map((value) => ({ id: generateId(), value })),
+        stepIndex: g.stepIndex,
+        sourceGroup: g.sourceGroup,
+    }));
+
+const getGroupsSignature = (initialGroups: PrepGroup[]) =>
+    JSON.stringify(
+        initialGroups.map((group) => ({
+            title: group.title,
+            items: group.items,
+            stepIndex: group.stepIndex ?? null,
+            sourceGroup: group.sourceGroup ?? false,
+        }))
+    );
+
 // ─── Sortable Item Row ──────────────────────────────────────────────
 
 type SortableItemProps = {
@@ -125,7 +143,7 @@ function SortableItemRow({
         >
             <button
                 type="button"
-                className="mt-2 cursor-grab text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+                className="mt-0.5 rounded-full p-2 text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 md:mt-2 md:opacity-0 md:group-hover:opacity-100 active:cursor-grabbing dark:hover:bg-slate-800"
                 aria-label={`Reorder item ${index + 1}`}
                 {...attributes}
                 {...listeners}
@@ -150,7 +168,7 @@ function SortableItemRow({
             <button
                 type="button"
                 onClick={() => onDelete(item.id)}
-                className="mt-1.5 text-slate-400 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100"
+                className="mt-0.5 rounded-full p-2 text-slate-400 opacity-100 transition-opacity hover:bg-rose-50 hover:text-rose-500 md:mt-1.5 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-rose-950/30"
                 aria-label={`Delete item ${index + 1}`}
             >
                 <X className="h-4 w-4" />
@@ -179,34 +197,36 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
         prefix = "ingredientGroup",
         showStepBadge = false,
     } = props;
-    const [groups, setGroups] = useState<EditorGroup[]>(() =>
-        initialGroups.map((g) => ({
-            title: g.title,
-            items: g.items.map((v) => ({ id: generateId(), value: v })),
-            stepIndex: g.stepIndex,
-            sourceGroup: g.sourceGroup,
-        }))
-    );
+    const initialSignature = getGroupsSignature(initialGroups);
+    const [editorState, setEditorState] = useState(() => ({
+        signature: initialSignature,
+        groups: toEditorGroups(initialGroups),
+    }));
     const [focusItemId, setFocusItemId] = useState<string | null>(null);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [newItemValues, setNewItemValues] = useState<Record<number, string>>({});
     const newInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+    const groups =
+        editorState.signature === initialSignature ? editorState.groups : toEditorGroups(initialGroups);
 
-    // Keep track of the last initialGroups to detect changes
-    const [prevInitialGroups, setPrevInitialGroups] = useState(initialGroups);
+    const updateGroups = useCallback(
+        (updater: EditorGroup[] | ((current: EditorGroup[]) => EditorGroup[])) => {
+            setEditorState((prev) => {
+                const baseGroups =
+                    prev.signature === initialSignature ? prev.groups : toEditorGroups(initialGroups);
+                const nextGroups =
+                    typeof updater === "function"
+                        ? (updater as (current: EditorGroup[]) => EditorGroup[])(baseGroups)
+                        : updater;
 
-    // Sync with server data if initialGroups changes reference/content fundamentally
-    if (initialGroups !== prevInitialGroups) {
-        setPrevInitialGroups(initialGroups);
-        setGroups(
-            initialGroups.map((g) => ({
-                title: g.title,
-                items: g.items.map((v) => ({ id: generateId(), value: v })),
-                stepIndex: g.stepIndex,
-                sourceGroup: g.sourceGroup,
-            }))
-        );
-    }
+                return {
+                    signature: initialSignature,
+                    groups: nextGroups,
+                };
+            });
+        },
+        [initialGroups, initialSignature]
+    );
 
     const { onChange } = props;
     useEffect(() => {
@@ -263,7 +283,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
 
         // If hovering over an item in a different group, move it immediately
         if (dest && source.gIdx !== dest.gIdx) {
-            setGroups((prev) => {
+            updateGroups((prev) => {
                 const next = prev.map((g) => ({ ...g, items: [...g.items] }));
                 const [movedItem] = next[source.gIdx].items.splice(source.iIdx, 1);
 
@@ -291,7 +311,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
         if (!source || !dest) return;
 
         // Final drop (usually within same group since cross-group is handled by DragOver)
-        setGroups((prev) => {
+        updateGroups((prev) => {
             const next = prev.map((g) => ({
                 ...g,
                 items: [...g.items],
@@ -307,17 +327,17 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
     // ── Item CRUD ──
 
     const updateItem = useCallback((id: string, value: string) => {
-        setGroups((prev) =>
+        updateGroups((prev) =>
             prev.map((g) => ({
                 ...g,
                 items: g.items.map((item) => (item.id === id ? { ...item, value } : item)),
             }))
         );
-    }, []);
+    }, [updateGroups]);
 
     const deleteItem = useCallback(
         (id: string) => {
-            setGroups((prev) => {
+            updateGroups((prev) => {
                 const loc = findItem(id);
                 if (!loc) return prev;
 
@@ -337,7 +357,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
                 return next;
             });
         },
-        [findItem]
+        [findItem, updateGroups]
     );
 
     const insertAfter = useCallback(
@@ -346,7 +366,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
             if (!loc) return;
 
             const newId = generateId();
-            setGroups((prev) =>
+            updateGroups((prev) =>
                 prev.map((g, gIdx) => {
                     if (gIdx !== loc.gIdx) return g;
                     const items = [...g.items];
@@ -356,13 +376,13 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
             );
             setFocusItemId(newId);
         },
-        [findItem]
+        [findItem, updateGroups]
     );
 
     // ── Group CRUD ──
 
     const addGroup = () => {
-        setGroups((prev) => [
+        updateGroups((prev) => [
             ...prev,
             {
                 title: "",
@@ -373,11 +393,11 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
     };
 
     const removeGroup = (gIdx: number) => {
-        setGroups((prev) => prev.filter((_, i) => i !== gIdx));
+        updateGroups((prev) => prev.filter((_, i) => i !== gIdx));
     };
 
     const updateGroupTitle = (gIdx: number, title: string) => {
-        setGroups((prev) =>
+        updateGroups((prev) =>
             prev.map((g, i) => (i === gIdx ? { ...g, title } : g))
         );
     };
@@ -389,7 +409,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
         if (!value) return;
 
         const newId = generateId();
-        setGroups((prev) =>
+        updateGroups((prev) =>
             prev.map((g, i) => {
                 if (i !== gIdx) return g;
                 return { ...g, items: [...g.items, { id: newId, value }] };
@@ -409,7 +429,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
         e.preventDefault();
         if (draggedGroupIdx === null || draggedGroupIdx === idx) return;
 
-        setGroups((prev) => {
+        updateGroups((prev) => {
             const next = [...prev];
             const dragged = next[draggedGroupIdx];
             next.splice(draggedGroupIdx, 1);
@@ -489,7 +509,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
                                 <button
                                     type="button"
                                     onClick={() => removeGroup(gIdx)}
-                                    className="text-slate-300 opacity-0 transition-opacity hover:text-rose-500 group-hover/section:opacity-100"
+                                    className="rounded-full p-2 text-slate-300 opacity-100 transition-opacity hover:bg-rose-50 hover:text-rose-500 md:opacity-0 md:group-hover/section:opacity-100 dark:hover:bg-rose-950/30"
                                     title="Remove Section"
                                 >
                                     <X className="h-4 w-4" />

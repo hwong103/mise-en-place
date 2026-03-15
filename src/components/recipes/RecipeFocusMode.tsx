@@ -1,12 +1,14 @@
 "use client";
 
-import { type TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type TouchEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Play, GripVertical } from "lucide-react";
+import { useReducedMotion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { extractIngredientKeywords, type PrepGroup } from "@/lib/recipe-utils";
 import { updatePrepGroupsOrder } from "@/app/(dashboard)/recipes/detail-actions";
 import IngredientGroupsEditor from "@/components/recipes/IngredientGroupsEditor";
+import { useAccessibleDialog } from "@/components/ui/useAccessibleDialog";
 
 type RecipeFocusModeProps = {
   recipeId?: string;
@@ -108,6 +110,7 @@ export default function RecipeFocusMode({
   showCookPlayIcon = false,
 }: RecipeFocusModeProps) {
   const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
   const [isMounted, setIsMounted] = useState(false);
   const [mode, setMode] = useState<FocusMode | null>(null);
   const [prepGroups, setPrepGroups] = useState(initialPrepGroups);
@@ -123,11 +126,38 @@ export default function RecipeFocusMode({
 
   const transitionTimeoutRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogTitleId = useId();
+  const dialogDescriptionId = useId();
 
   const stepCount = instructions.length;
   const canGoPrev = stepCount > 0 && activeStepIndex > 0;
   const canGoNext = stepCount > 0 && activeStepIndex < stepCount - 1;
   const progressPercent = stepCount > 0 ? ((activeStepIndex + 1) / stepCount) * 100 : 0;
+
+  const resetTransientState = useCallback(() => {
+    setIsEditing(false);
+    setPendingGroups(null);
+  }, []);
+
+  const closeFocusMode = useCallback(() => {
+    setMode(null);
+    resetTransientState();
+  }, [resetTransientState]);
+
+  const openMode = useCallback(
+    (nextMode: FocusMode) => {
+      setMode(nextMode);
+      resetTransientState();
+    },
+    [resetTransientState]
+  );
+
+  const dialogRef = useAccessibleDialog<HTMLDivElement>({
+    isOpen: isMounted && mode !== null,
+    onClose: closeFocusMode,
+    initialFocusRef: closeButtonRef,
+  });
 
   useEffect(() => {
     setIsMounted(true);
@@ -157,6 +187,8 @@ export default function RecipeFocusMode({
     }
   }, []);
 
+  useEffect(() => () => clearTransitionTimers(), [clearTransitionTimers]);
+
   const navigateStep = useCallback(
     (direction: -1 | 1) => {
       if (transitionPhase !== "idle" || stepCount === 0) {
@@ -165,6 +197,15 @@ export default function RecipeFocusMode({
 
       const targetIndex = Math.min(stepCount - 1, Math.max(0, activeStepIndex + direction));
       if (targetIndex === activeStepIndex) {
+        return;
+      }
+
+      if (prefersReducedMotion) {
+        clearTransitionTimers();
+        setTransitionDirection(direction);
+        setRenderedStepIndex(targetIndex);
+        setActiveStepIndex(targetIndex);
+        setTransitionPhase("idle");
         return;
       }
 
@@ -184,7 +225,7 @@ export default function RecipeFocusMode({
         transitionTimeoutRef.current = null;
       }, 250);
     },
-    [activeStepIndex, clearTransitionTimers, stepCount, transitionPhase]
+    [activeStepIndex, clearTransitionTimers, prefersReducedMotion, stepCount, transitionPhase]
   );
 
   // Drag and drop handlers
@@ -279,7 +320,9 @@ export default function RecipeFocusMode({
     }
   };
 
-  const stepMotionClass =
+  const stepMotionClass = prefersReducedMotion
+    ? "translate-y-0 opacity-100"
+    :
     transitionPhase === "out"
       ? transitionDirection === 1
         ? "-translate-y-[30px] opacity-0"
@@ -295,7 +338,7 @@ export default function RecipeFocusMode({
       <div className={triggerWrapperClassName ?? "flex flex-wrap gap-3"}>
         <button
           type="button"
-          onClick={() => setMode("mise")}
+          onClick={() => openMode("mise")}
           className={
             miseButtonClassName ??
             "rounded-xl border-[1.5px] border-[var(--mise-border)] bg-[var(--mise-bg)] px-4 py-2 text-sm font-semibold text-[var(--mise-text)] transition-all hover:bg-[#fef3c7] hover:border-[#b45309] hover:text-[#b45309] dark:bg-amber-950/40"
@@ -305,7 +348,7 @@ export default function RecipeFocusMode({
         </button>
         <button
           type="button"
-          onClick={() => setMode("cook")}
+          onClick={() => openMode("cook")}
           className={
             cookButtonClassName ??
             "rounded-xl border-[1.5px] border-[var(--cook-border)] bg-[var(--cook-bg)] px-4 py-2 text-sm font-semibold text-[var(--cook-text)] transition-all hover:bg-[#dcfce7] hover:border-[#15803d] hover:text-[#15803d] dark:bg-emerald-950/40"
@@ -320,15 +363,35 @@ export default function RecipeFocusMode({
 
       {isMounted && mode
         ? createPortal(
-          <div className="fixed inset-0 z-[100] bg-slate-950/60 p-3 backdrop-blur-sm md:p-6">
-            <div className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl md:rounded-3xl md:p-5 dark:border-slate-800 dark:bg-slate-950">
+          <div
+            className="fixed inset-0 z-[100] bg-slate-950/60 p-3 backdrop-blur-sm md:p-6"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeFocusMode();
+              }
+            }}
+          >
+            <div
+              ref={dialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={dialogTitleId}
+              aria-describedby={dialogDescriptionId}
+              tabIndex={-1}
+              className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl md:rounded-3xl md:p-5 dark:border-slate-800 dark:bg-slate-950"
+            >
               <div className="mb-4 flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
                 <div className="flex items-center gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#C67B2A] dark:text-[#E2A056]">
                       {mode === "mise" ? "Mise En Place" : "Cook Mode"}
                     </p>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h2>
+                    <h2 id={dialogTitleId} className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                      {title}
+                    </h2>
+                    <p id={dialogDescriptionId} className="sr-only">
+                      Focused recipe mode with prep groups and step-by-step cooking instructions.
+                    </p>
                   </div>
                   {isSaving && (
                     <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-500 font-medium animate-pulse">
@@ -339,7 +402,7 @@ export default function RecipeFocusMode({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => { setMode("mise"); setIsEditing(false); setPendingGroups(null); }}
+                    onClick={() => openMode("mise")}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "mise"
                       ? "border-[var(--mise-border)] bg-[var(--mise-bg)] text-[var(--mise-text)] dark:bg-amber-950/40"
                       : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--mise-border)] hover:text-[var(--mise-text)] dark:border-slate-700 dark:text-slate-400"
@@ -349,7 +412,7 @@ export default function RecipeFocusMode({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setMode("cook"); setIsEditing(false); setPendingGroups(null); }}
+                    onClick={() => openMode("cook")}
                     className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "cook"
                       ? "border-[var(--cook-border)] bg-[var(--cook-bg)] text-[var(--cook-text)] dark:bg-emerald-950/40"
                       : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--cook-border)] hover:text-[var(--cook-text)] dark:border-slate-700 dark:text-slate-400"
@@ -361,8 +424,9 @@ export default function RecipeFocusMode({
                     </span>
                   </button>
                   <button
+                    ref={closeButtonRef}
                     type="button"
-                    onClick={() => { setMode(null); setIsEditing(false); setPendingGroups(null); }}
+                    onClick={closeFocusMode}
                     className="ml-2 rounded-full border border-slate-200 bg-transparent px-4 py-1.5 text-[13px] font-medium text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-600 dark:border-slate-700 dark:text-slate-500"
                   >
                     Close
@@ -485,7 +549,7 @@ export default function RecipeFocusMode({
                   <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#d8e6de] bg-white dark:border-slate-700 dark:bg-slate-950">
                     <div className="h-[3px] w-full bg-[#e6f4ed] dark:bg-emerald-400/20">
                       <div
-                        className="h-full bg-[#1a6b4a] transition-[width] duration-300 ease-in-out dark:bg-emerald-400"
+                        className={`h-full bg-[#1a6b4a] dark:bg-emerald-400 ${prefersReducedMotion ? "" : "transition-[width] duration-300 ease-in-out"}`}
                         style={{ width: `${progressPercent}%` }}
                       />
                     </div>
@@ -572,10 +636,10 @@ export default function RecipeFocusMode({
       {isMounted && (
         <div className={`fab-container ${isFabVisible ? "visible" : ""}`} id="fab">
           <div className="fab-group">
-            <button className="fab-mise" onClick={() => setMode("mise")}>
+            <button type="button" className="fab-mise" onClick={() => openMode("mise")}>
               Mise
             </button>
-            <button className="fab-cook" onClick={() => setMode("cook")}>
+            <button type="button" className="fab-cook" onClick={() => openMode("cook")}>
               <span className="inline-flex items-center gap-1.5 w-full justify-center">
                 <Play className="h-[10px] w-[10px] fill-current" />
                 <span>Cook</span>

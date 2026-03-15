@@ -118,7 +118,7 @@ function SortableRow({
     <div ref={setNodeRef} style={style} className="group flex items-start gap-3 py-1">
       <button
         type="button"
-        className="mt-2 cursor-grab text-slate-400 opacity-0 transition-opacity group-hover:opacity-100"
+        className="mt-0.5 rounded-full p-2 text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 md:mt-2 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-slate-800"
         aria-label={`Reorder item ${index + 1}`}
         {...attributes}
         {...listeners}
@@ -143,7 +143,7 @@ function SortableRow({
       <button
         type="button"
         onClick={() => onDelete(id)}
-        className="mt-1.5 text-slate-400 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100"
+        className="mt-0.5 rounded-full p-2 text-slate-400 opacity-100 transition-opacity hover:bg-rose-50 hover:text-rose-500 md:mt-1.5 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-rose-950/30"
         aria-label={`Delete item ${index + 1}`}
       >
         <X className="h-4 w-4" />

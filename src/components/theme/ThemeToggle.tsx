@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 
 const THEME_STORAGE_KEY = "theme";
@@ -35,6 +35,7 @@ export default function ThemeToggle() {
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
   // Apply theme + listen for OS changes when in system mode
   useEffect(() => {
@@ -60,6 +61,19 @@ export default function ThemeToggle() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open]);
+
   const select = (value: ThemePreference) => {
     setPreference(value);
     applyTheme(value);
@@ -79,8 +93,11 @@ export default function ThemeToggle() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        className="ui-icon-button"
         aria-label="Theme settings"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
         title="Theme settings"
       >
         <CurrentIcon className="h-4 w-4" />
@@ -88,22 +105,29 @@ export default function ThemeToggle() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <div
+          id={menuId}
+          role="menu"
+          aria-label="Theme options"
+          className="ui-menu absolute right-0 top-full mt-2 w-36 overflow-hidden py-1"
+        >
           {OPTIONS.map(({ value, label, Icon }) => (
             <button
               key={value}
               type="button"
               onClick={() => select(value)}
-              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-medium transition-colors
-                ${preference === value
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
-                }`}
+              role="menuitemradio"
+              aria-checked={preference === value}
+              className={`ui-menu-item flex items-center gap-2.5 font-medium ${
+                preference === value ? "ui-menu-item-active" : ""
+              }`}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
               {label}
               {preference === value && (
-                <span className="ml-auto text-emerald-600 dark:text-emerald-400">✓</span>
+                <span className="ml-auto" style={{ color: "var(--accent-text)" }}>
+                  ✓
+                </span>
               )}
             </button>
           ))}

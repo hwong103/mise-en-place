@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 type ToastType = "success" | "error" | "info";
 
@@ -20,13 +20,24 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const counterRef = useRef(0);
+    const timeoutIdsRef = useRef<number[]>([]);
+    const prefersReducedMotion = useReducedMotion();
+
+    useEffect(() => {
+        return () => {
+            timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+            timeoutIdsRef.current = [];
+        };
+    }, []);
 
     const showToast = useCallback((message: string, type: ToastType = "success") => {
         const id = counterRef.current++;
         setToasts((prev) => [...prev, { id, message, type }]);
-        setTimeout(() => {
+        const timeoutId = window.setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
+            timeoutIdsRef.current = timeoutIdsRef.current.filter((currentId) => currentId !== timeoutId);
         }, 3500);
+        timeoutIdsRef.current.push(timeoutId);
     }, []);
 
     return (
@@ -37,10 +48,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     {toasts.map((toast) => (
                         <motion.div
                             key={toast.id}
-                            initial={{ opacity: 0, y: 16, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16, scale: 0.95 }}
+                            animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+                            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.95 }}
+                            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }}
                             className={`flex items-center gap-2.5 rounded-2xl px-4 py-3 text-sm font-semibold shadow-xl
                 ${toast.type === "success"
                                     ? "bg-emerald-600 text-white"

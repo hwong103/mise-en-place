@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { useReducedMotion } from "framer-motion";
 
 type Spark = {
     id: number;
@@ -28,8 +29,21 @@ export default function ClickSpark({
 }: ClickSparkProps) {
     const [sparks, setSparks] = useState<Spark[]>([]);
     const counterRef = useRef(0);
+    const timeoutIdsRef = useRef<number[]>([]);
+    const prefersReducedMotion = useReducedMotion();
+
+    useEffect(() => {
+        return () => {
+            timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+            timeoutIdsRef.current = [];
+        };
+    }, []);
 
     const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        if (prefersReducedMotion) {
+            return;
+        }
+
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -42,10 +56,12 @@ export default function ClickSpark({
         }));
 
         setSparks((prev) => [...prev, ...newSparks]);
-        setTimeout(() => {
+        const timeoutId = window.setTimeout(() => {
             setSparks((prev) => prev.filter((s) => !newSparks.find((ns) => ns.id === s.id)));
+            timeoutIdsRef.current = timeoutIdsRef.current.filter((id) => id !== timeoutId);
         }, duration);
-    }, [sparkCount, duration]);
+        timeoutIdsRef.current.push(timeoutId);
+    }, [duration, prefersReducedMotion, sparkCount]);
 
     return (
         <div
