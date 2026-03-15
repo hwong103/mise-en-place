@@ -1,6 +1,17 @@
 # Mise en Place
 
-Household recipe management with URL import, weekly planning, and shopping list generation.
+A calm household cooking app for singles and couples to save recipes, plan the week, shop once, and keep a lightweight wine cellar in sync.
+
+This project now runs on Cloudflare. Vercel is no longer part of the deployment path.
+
+## What It Does
+
+- Save recipes from the web or enter them manually
+- Organize prep, ingredients, notes, and source media for each recipe
+- Plan meals across the week with drag-and-drop scheduling
+- Generate and manage a shopping list grouped by store/location
+- Share a household with guests or signed-in members
+- Track wines, tasting notes, and cellar details in the built-in cellar
 
 ## Current Feature Set
 
@@ -14,7 +25,11 @@ Household recipe management with URL import, weekly planning, and shopping list 
   - Drag and drop recipes into meal slots
 - Shopping list:
   - Auto-generated from planned meals
-  - Manual item additions and check-off state
+  - Manual item additions, location grouping, and check-off state
+- Cellar:
+  - Manual wine logging and editing
+  - Tasting notes, ratings, type, producer, and region tracking
+  - Price and stockist groundwork for cellar workflows
 - Auth + tenant scoping:
   - Anonymous household start + share-link access
   - Better Auth login with Google SSO and magic links for ownership claim/management
@@ -30,9 +45,10 @@ Household recipe management with URL import, weekly planning, and shopping list 
 - Next.js 16 (App Router)
 - TypeScript
 - Tailwind CSS v4
-- Prisma + Cloudflare D1
+- Prisma client + Cloudflare D1 adapter
 - Better Auth + Resend
 - OpenNext for Cloudflare Workers
+- Cloudflare Workers + D1 + R2 cache bucket
 - dnd-kit
 - Vitest
 
@@ -47,20 +63,32 @@ npm install
 2. Configure environment variables
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-3. Prepare database
+3. Generate the Prisma client
 
 ```bash
 npx prisma generate
-npx prisma db push
 ```
 
-4. Run app
+4. Run the local Next.js app
 
 ```bash
 npm run dev
+```
+
+5. Preview against the Cloudflare runtime when needed
+
+```bash
+npm run cf:preview
+```
+
+For deployed environments, apply your D1 schema with Wrangler and then deploy the Worker bundle:
+
+```bash
+npm run cf:build
+npm run deploy
 ```
 
 ## Environment Variables
@@ -134,6 +162,8 @@ To avoid magic links redirecting to the wrong host (for example `localhost`), co
 
 ## Cloudflare Runtime
 
-- `wrangler.jsonc` defines the Cloudflare Worker entrypoint, D1 binding (`DB`), asset binding, and R2 cache bucket used by OpenNext.
+- `wrangler.jsonc` is the source of truth for the deployed runtime.
+- It defines the Cloudflare Worker entrypoint, D1 binding (`DB`), asset binding, image binding, and R2 cache bucket used by OpenNext.
 - Use `.dev.vars` for local Worker secrets and `wrangler secret put` / dashboard secrets for deployed environments.
-- The Next app can still be developed with `npm run dev`, while Cloudflare previewing uses `npm run cf:preview`.
+- Use `npm run dev` for fast app iteration and `npm run cf:preview` when you need to verify Cloudflare-specific behavior locally.
+- Vercel is no longer used for preview or production deployment.
