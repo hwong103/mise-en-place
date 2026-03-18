@@ -1,4 +1,4 @@
-import { revalidateTag } from "next/cache";
+import { updateTag } from "next/cache";
 import { clearShoppingListWeek } from "@/app/(dashboard)/shopping/actions";
 import { getCurrentHouseholdId } from "@/lib/household";
 import prisma from "@/lib/prisma";
@@ -14,7 +14,7 @@ const { txMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/cache", () => ({
-  revalidateTag: vi.fn(),
+  updateTag: vi.fn(),
 }));
 
 vi.mock("@/lib/household", () => ({
@@ -76,7 +76,7 @@ describe("clearShoppingListWeek", () => {
         },
       ],
     });
-    expect(revalidateTag).toHaveBeenCalledWith("shopping-household_1", "max");
+    expect(updateTag).toHaveBeenCalledWith("shopping-household_1");
   });
 
   it("only deletes rows when there are no auto items to suppress", async () => {
@@ -87,6 +87,6 @@ describe("clearShoppingListWeek", () => {
 
     expect(txMock.shoppingListItem.deleteMany).toHaveBeenCalledTimes(1);
     expect(txMock.shoppingListItem.createMany).not.toHaveBeenCalled();
-    expect(revalidateTag).toHaveBeenCalledWith("shopping-household_1", "max");
+    expect(updateTag).toHaveBeenCalledWith("shopping-household_1");
   });
 });
