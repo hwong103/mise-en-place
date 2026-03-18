@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { readStringArray, writeStringArray } from "@/lib/json-arrays";
@@ -1273,7 +1273,7 @@ export async function createRecipe(formData: FormData) {
     },
   });
 
-  revalidateTag(`recipes-${householdId}`, "max");
+  updateTag(`recipes-${householdId}`);
   revalidatePath("/recipes");
   revalidatePath("/planner");
   redirect("/recipes");
@@ -1297,8 +1297,8 @@ export async function updateRecipe(formData: FormData) {
     data: payload,
   });
 
-  revalidateTag(`recipes-${householdId}`, "max");
-  revalidateTag(`recipe-${recipeId}`, "max");
+  updateTag(`recipes-${householdId}`);
+  updateTag(`recipe-${recipeId}`);
   revalidatePath("/recipes");
   revalidatePath(`/recipes/${recipeId}`);
   revalidatePath("/planner");
@@ -1464,9 +1464,9 @@ export async function updateRecipeSection(formData: FormData) {
   });
 
   if (householdId) {
-    revalidateTag(`recipes-${householdId}`, "max");
+    updateTag(`recipes-${householdId}`);
   }
-  revalidateTag(`recipe-${recipeId}`, "max");
+  updateTag(`recipe-${recipeId}`);
   revalidatePath(`/recipes/${recipeId}`);
   redirect(`/recipes/${recipeId}`);
 }
@@ -1846,8 +1846,8 @@ export async function importRecipeFromUrl(formData: FormData) {
       }
     }
 
-    revalidateTag(`recipes-${householdId}`, "max");
-    revalidateTag(`recipe-${existingRecipe.id}`, "max");
+    updateTag(`recipes-${householdId}`);
+    updateTag(`recipe-${existingRecipe.id}`);
     revalidatePath("/recipes");
     revalidatePath(`/recipes/${existingRecipe.id}`);
     redirect(`/recipes/${existingRecipe.id}`);
@@ -1873,8 +1873,8 @@ export async function importRecipeFromUrl(formData: FormData) {
     },
   });
 
-  revalidateTag(`recipes-${householdId}`, "max");
-  revalidateTag(`recipe-${recipe.id}`, "max");
+  updateTag(`recipes-${householdId}`);
+  updateTag(`recipe-${recipe.id}`);
   revalidatePath("/recipes");
   revalidatePath("/planner");
   redirect(`/recipes/${recipe.id}`);
@@ -1896,8 +1896,8 @@ export async function deleteRecipe(formData: FormData) {
     where: { id: recipeId, householdId },
   });
 
-  revalidateTag(`recipes-${householdId}`, "max");
-  revalidateTag(`recipe-${recipeId}`, "max");
+  updateTag(`recipes-${householdId}`);
+  updateTag(`recipe-${recipeId}`);
   revalidatePath("/recipes");
   revalidatePath("/planner");
   revalidatePath("/shopping");
