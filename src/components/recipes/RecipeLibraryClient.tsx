@@ -1,10 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useId, useMemo, useRef, useState, useTransition } from "react";
 import RecipeCard, { type RecipeSummary } from "@/components/recipes/RecipeCard";
-import RecipeForm from "@/components/recipes/RecipeForm";
 import FadeContent from "@/components/ui/FadeContent";
 import { useAccessibleDialog } from "@/components/ui/useAccessibleDialog";
+
+const RecipeForm = dynamic(() => import("@/components/recipes/RecipeForm"), {
+  loading: () => (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+      Loading recipe form...
+    </div>
+  ),
+});
 
 const normalize = (value: string) =>
   value
@@ -56,11 +64,7 @@ export default function RecipeLibraryClient({
     }
 
     return recipes.filter((recipe) => {
-      const haystack = normalize([
-        recipe.title,
-        recipe.description ?? "",
-        (recipe.tags ?? []).join(" "),
-      ].join(" "));
+      const haystack = normalize([recipe.title, recipe.description ?? "", (recipe.tags ?? []).join(" ")].join(" "));
       return haystack.includes(needle);
     });
   }, [query, recipes]);
@@ -280,7 +284,12 @@ export default function RecipeLibraryClient({
         <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-white py-24 text-center dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-6 rounded-full bg-slate-50 p-4 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
             <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253"
+              />
             </svg>
           </div>
           <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">No recipes found</h3>

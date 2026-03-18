@@ -25,8 +25,19 @@ export default async function PlannerPage() {
         householdId,
         date: { in: allDays },
       },
-      include: {
-        recipe: true,
+      select: {
+        id: true,
+        date: true,
+        recipeId: true,
+        mealType: true,
+        cooked: true,
+        cookedAt: true,
+        recipe: {
+          select: {
+            title: true,
+            imageUrl: true,
+          },
+        },
       },
       orderBy: [{ date: "asc" }, { mealType: "asc" }],
     }),
