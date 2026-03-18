@@ -119,7 +119,7 @@ export default function RecipeLibraryClient({
             setIsAddOpen(true);
             setSelected(null);
           }}
-          className="flex items-center space-x-2 rounded-xl bg-emerald-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
+          className="ui-button ui-button-primary ui-button-block active:translate-y-[1px]"
         >
           <span>Add Recipe</span>
         </button>

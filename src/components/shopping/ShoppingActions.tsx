@@ -114,13 +114,13 @@ export default function ShoppingActions({
   }, [shareStatus]);
 
   return (
-    <div className="grid w-full gap-3 sm:flex sm:flex-wrap">
+    <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-3">
       <button
         type="button"
         onClick={handlePrint}
-        className="ui-button ui-button-secondary ui-button-block w-full active:translate-y-[1px] sm:w-auto"
+        className="ui-button ui-button-secondary min-h-10 w-full rounded-full px-3 py-2 text-xs active:translate-y-[1px] sm:min-h-11 sm:w-auto sm:rounded-xl sm:px-4 sm:py-3 sm:text-sm"
       >
-        Print List
+        Print
       </button>
       <div className="relative w-full sm:w-auto" ref={shareMenuRef}>
         <button
@@ -131,21 +131,21 @@ export default function ShoppingActions({
             }
             setShareMenuOpen((current) => !current);
           }}
-          className="ui-button ui-button-primary ui-button-block w-full active:translate-y-[1px] sm:w-auto"
+          className="ui-button ui-button-primary min-h-10 w-full rounded-full px-3 py-2 text-xs active:translate-y-[1px] sm:min-h-11 sm:w-auto sm:rounded-xl sm:px-4 sm:py-3 sm:text-sm"
           disabled={!shareInviteUrl}
           title={!shareInviteUrl ? "Only household managers can share invite links." : undefined}
           aria-expanded={shareMenuOpen}
           aria-controls={shareInviteUrl ? shareMenuId : undefined}
           aria-haspopup="menu"
         >
-          Share List
+          Share
         </button>
         {shareMenuOpen && shareInviteUrl ? (
           <div
             id={shareMenuId}
             role="menu"
             aria-label="Share shopping list"
-            className="ui-menu absolute inset-x-0 z-10 mt-2 sm:right-0 sm:left-auto sm:w-64"
+            className="ui-menu absolute left-0 right-0 z-10 mt-2 sm:left-auto sm:right-0 sm:w-64"
           >
             <p className="ui-menu-label">
               Share shopping list
@@ -172,10 +172,10 @@ export default function ShoppingActions({
       <button
         type="button"
         onClick={onClearList}
-        className="ui-button ui-button-danger ui-button-block w-full active:translate-y-[1px] sm:w-auto"
+        className="ui-button ui-button-danger min-h-10 w-full rounded-full px-3 py-2 text-xs active:translate-y-[1px] sm:min-h-11 sm:w-auto sm:rounded-xl sm:px-4 sm:py-3 sm:text-sm"
         disabled={clearing}
       >
-        {clearing ? "Clearing..." : "Clear List"}
+        {clearing ? "Clearing..." : "Clear"}
       </button>
     </div>
   );

@@ -533,16 +533,27 @@ export default function ShoppingList({
     });
   };
 
-  const manualSection = (options?: { mobile?: boolean; inputRef?: React.RefObject<HTMLInputElement | null> }) => {
+  const manualSection = (options?: {
+    mobile?: boolean;
+    embedded?: boolean;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
+  }) => {
     const isMobile = options?.mobile ?? false;
+    const isEmbedded = options?.embedded ?? false;
 
     return (
       <section
-        className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
+        className={`${
+          isEmbedded
+            ? "rounded-none border-0 bg-transparent p-0 shadow-none dark:bg-transparent"
+            : "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+        } ${
           isMobile ? "" : "hidden sm:block"
         }`}
       >
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add Manual Items</h2>
+        {!isEmbedded ? (
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Add Manual Items</h2>
+        ) : null}
         {saveErrors.length > 0 ? (
           <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
             <div className="flex items-center justify-between gap-2">
@@ -712,7 +723,7 @@ export default function ShoppingList({
 
                           return (
                             <li key={item.key} className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-200">
-                              <div className="space-y-3">
+                              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2">
                                 <label className="flex min-w-0 items-start gap-3">
                                   <input
                                     type="checkbox"
@@ -755,29 +766,29 @@ export default function ShoppingList({
                                     ) : null}
                                   </div>
                                 </label>
+                                <select
+                                  value={item.location}
+                                  onChange={(event) =>
+                                    handleLocationChange({
+                                      key: item.key,
+                                      line: item.line,
+                                      manual: item.manual,
+                                      category: item.category,
+                                      location: event.target.value,
+                                    })
+                                  }
+                                  className="w-[7.5rem] justify-self-end rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                  disabled={isSaving || isPending}
+                                  aria-label={`Location for ${item.line}`}
+                                >
+                                  {itemLocationOptions.map((location) => (
+                                    <option key={location} value={location}>
+                                      {location}
+                                    </option>
+                                  ))}
+                                </select>
 
-                                <div className="ml-7 flex flex-wrap items-center gap-2">
-                                  <select
-                                    value={item.location}
-                                    onChange={(event) =>
-                                      handleLocationChange({
-                                        key: item.key,
-                                        line: item.line,
-                                        manual: item.manual,
-                                        category: item.category,
-                                        location: event.target.value,
-                                      })
-                                    }
-                                    className="min-w-[8.5rem] rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                                    disabled={isSaving || isPending}
-                                    aria-label={`Location for ${item.line}`}
-                                  >
-                                    {itemLocationOptions.map((location) => (
-                                      <option key={location} value={location}>
-                                        {location}
-                                      </option>
-                                    ))}
-                                  </select>
+                                <div className="flex min-h-8 items-center gap-2 pl-7">
                                   {item.amountSummary ? (
                                     <span className="text-xs text-slate-500 dark:text-slate-400">{item.amountSummary}</span>
                                   ) : item.count > 1 ? (
@@ -788,6 +799,9 @@ export default function ShoppingList({
                                   ) : isSaving ? (
                                     <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
                                   ) : null}
+                                </div>
+
+                                <div className="flex items-center justify-end">
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -800,7 +814,7 @@ export default function ShoppingList({
                                         id: item.id,
                                       })
                                     }
-                                    className="ml-auto rounded-full p-2 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30 sm:ml-0"
+                                    className="rounded-full p-2 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
                                     disabled={isSaving || isPending || item._optimistic}
                                     aria-label={`Remove ${item.line}`}
                                     title="Remove item"
@@ -923,14 +937,14 @@ export default function ShoppingList({
               onClick={() => setIsMobileManualOpen(false)}
               aria-label="Close add manual items"
             />
-            <div className="absolute inset-x-0 bottom-0 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+            <div className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] px-3">
               <div
                 ref={mobileManualDialogRef}
                 id="mobile-manual-items-dialog"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="mobile-manual-items-title"
-                className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+                className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-6.5rem)] flex-col rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
                 tabIndex={-1}
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -954,7 +968,9 @@ export default function ShoppingList({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                {manualSection({ mobile: true, inputRef: mobileManualInputRef })}
+                <div className="-mr-1 overflow-y-auto pr-1">
+                  {manualSection({ mobile: true, embedded: true, inputRef: mobileManualInputRef })}
+                </div>
               </div>
             </div>
           </div>

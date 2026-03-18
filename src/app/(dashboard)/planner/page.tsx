@@ -57,7 +57,7 @@ export default async function PlannerPage() {
         <Magnet strength={0.25}>
           <Link
             href="/shopping"
-            className="block rounded-xl bg-emerald-600 px-6 py-2.5 font-bold text-white shadow-lg transition-transform active:scale-95"
+            className="ui-button ui-button-primary ui-button-block active:translate-y-[1px]"
           >
             Generate Shopping List
           </Link>
