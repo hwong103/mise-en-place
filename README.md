@@ -2,7 +2,7 @@
 
 A calm household cooking app for singles and couples to save recipes, plan the week, shop once, and keep a lightweight wine cellar in sync.
 
-This project now runs on Cloudflare. Vercel is no longer part of the deployment path.
+This project runs on Cloudflare.
 
 ## What It Does
 
@@ -166,4 +166,3 @@ To avoid magic links redirecting to the wrong host (for example `localhost`), co
 - It defines the Cloudflare Worker entrypoint, D1 binding (`DB`), asset binding, image binding, and R2 cache bucket used by OpenNext.
 - Use `.dev.vars` for local Worker secrets and `wrangler secret put` / dashboard secrets for deployed environments.
 - Use `npm run dev` for fast app iteration and `npm run cf:preview` when you need to verify Cloudflare-specific behavior locally.
-- Vercel is no longer used for preview or production deployment.
