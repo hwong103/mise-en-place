@@ -14,6 +14,7 @@ type RecipeFocusModeProps = {
   recipeId?: string;
   title: string;
   prepGroups: PrepGroup[];
+  ingredientGroups: PrepGroup[];
   instructions: string[];
   notes: string[];
   triggerWrapperClassName?: string;
@@ -102,6 +103,7 @@ export default function RecipeFocusMode({
   recipeId,
   title,
   prepGroups: initialPrepGroups,
+  ingredientGroups,
   instructions,
   notes,
   triggerWrapperClassName,
@@ -613,19 +615,21 @@ export default function RecipeFocusMode({
                       Ingredients
                     </h3>
                     <div className="mt-4 space-y-4">
-                      {misePrepGroups.length === 0 ? (
+                      {ingredientGroups.length === 0 ? (
                         <p className="text-sm text-slate-500 dark:text-slate-400">No ingredients listed.</p>
                       ) : (
-                        misePrepGroups.map((group, index) => {
+                        ingredientGroups.map((group, index) => {
                           const color = HIGHLIGHT_COLORS[index % HIGHLIGHT_COLORS.length];
                           return (
                             <div
-                              key={group.title}
+                              key={group.title || index}
                               className="rounded-xl border border-white/50 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
                             >
-                              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                {group.title}
-                              </h4>
+                              {group.title ? (
+                                <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                  {group.title}
+                                </h4>
+                              ) : null}
                               <ul className="mt-2 space-y-1.5 text-[13px] text-slate-600 dark:text-slate-300">
                                 {group.items.map((item) => (
                                   <li key={item} className="flex items-start gap-2">

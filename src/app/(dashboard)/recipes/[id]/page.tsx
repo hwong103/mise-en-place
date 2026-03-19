@@ -202,6 +202,7 @@ export default async function RecipeDetailPage({
                 recipeId={recipe.id}
                 title={recipe.title}
                 prepGroups={prepGroups}
+                ingredientGroups={ingredientGroups}
                 instructions={instructions}
                 notes={notes}
                 triggerWrapperClassName="contents"
