@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import prisma from "@/lib/prisma";
@@ -360,6 +360,8 @@ export async function updateRecipeSection(formData: FormData) {
   updateTag(`recipes-${householdId}`);
   updateTag(`recipe-${recipeId}`);
   updateTag(`shopping-${householdId}`);
+  revalidateTag(`recipes-${householdId}`, "max");
+  revalidateTag(`recipe-${recipeId}`, "max");
   revalidatePath("/recipes");
   revalidatePath(`/recipes/${recipeId}`);
   revalidatePath("/planner");

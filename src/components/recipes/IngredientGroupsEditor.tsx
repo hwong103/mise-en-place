@@ -522,7 +522,12 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
                                 <input
                                     type="hidden"
                                     name={`${prefix}Items_${gIdx}`}
-                                    value={group.items.map((item) => item.value).join("\n")}
+                                    value={[
+                                        ...group.items.map((item) => item.value),
+                                        ...(newItemValues[gIdx]?.trim()
+                                            ? [newItemValues[gIdx].trim()]
+                                            : []),
+                                    ].join("\n")}
                                 />
 
                                 <SortableContext
