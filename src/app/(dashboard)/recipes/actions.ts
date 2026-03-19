@@ -1472,195 +1472,304 @@ export async function updateRecipeSection(formData: FormData) {
 }
 
 export async function importRecipeFromUrl(formData: FormData) {
-  const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
-  if (!sourceUrl) {
-    redirect("/recipes?importError=invalid_url");
-  }
+  try {
+    const sourceUrl = toOptionalUrl(formData.get("sourceUrl"));
+    if (!sourceUrl) {
+      redirect("/recipes?importError=invalid_url");
+    }
 
-  const householdId = await getCurrentHouseholdId();
+    const householdId = await getCurrentHouseholdId();
 
-  const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
-  const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
-  const attempts: IngestionAttemptResult[] = [];
-  const candidates: RecipeIngestionCandidate[] = [];
+    const existingRecipe = await findRecipeBySourceUrl(householdId, sourceUrl);
+    const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
+    const attempts: IngestionAttemptResult[] = [];
+    const candidates: RecipeIngestionCandidate[] = [];
 
-  let markdownRecipe: ReturnType<typeof extractRecipeFromMarkdown> | null = null;
-  let directHtml = "";
-  let metadataFallback: Pick<RecipeIngestionCandidate, "tags" | "servings" | "prepTime" | "cookTime"> = {};
+    let markdownRecipe: ReturnType<typeof extractRecipeFromMarkdown> | null = null;
+    let directHtml = "";
+    let metadataFallback: Pick<RecipeIngestionCandidate, "tags" | "servings" | "prepTime" | "cookTime"> = {};
 
-  const markdownStartedAt = Date.now();
-  const markdownResult = await fetchMarkdownFromUrl(sourceUrl);
-  const markdownLatencyMs = Date.now() - markdownStartedAt;
-  const markdownTitle = markdownResult?.title;
+    const markdownStartedAt = Date.now();
+    const markdownResult = await fetchMarkdownFromUrl(sourceUrl);
+    const markdownLatencyMs = Date.now() - markdownStartedAt;
+    const markdownTitle = markdownResult?.title;
 
-  if (markdownResult?.content) {
-    markdownRecipe = extractRecipeFromMarkdown(markdownResult.content, markdownResult.title);
-    const markdownCandidate: RecipeIngestionCandidate = {
-      stage: "markdown",
-      success: Boolean(
-        markdownRecipe.title ||
-        markdownRecipe.description ||
-        markdownRecipe.ingredients.length > 0 ||
-        markdownRecipe.instructions.length > 0
-      ),
-      title: markdownRecipe.title,
-      description: markdownRecipe.description,
-      imageUrl: markdownRecipe.imageUrl,
-      videoUrl: markdownRecipe.videoUrl,
-      ingredients: cleanCandidateLines(markdownRecipe.ingredients),
-      instructions: cleanCandidateLines(markdownRecipe.instructions),
-      notes: cleanCandidateLines(markdownRecipe.notes),
-      tags: markdownRecipe.tags,
-      servings: markdownRecipe.servings,
-      prepTime: markdownRecipe.prepTime,
-      cookTime: markdownRecipe.cookTime,
-      latencyMs: markdownLatencyMs,
-      errorCode: undefined,
-    };
+    if (markdownResult?.content) {
+      markdownRecipe = extractRecipeFromMarkdown(markdownResult.content, markdownResult.title);
+      const markdownCandidate: RecipeIngestionCandidate = {
+        stage: "markdown",
+        success: Boolean(
+          markdownRecipe.title ||
+          markdownRecipe.description ||
+          markdownRecipe.ingredients.length > 0 ||
+          markdownRecipe.instructions.length > 0
+        ),
+        title: markdownRecipe.title,
+        description: markdownRecipe.description,
+        imageUrl: markdownRecipe.imageUrl,
+        videoUrl: markdownRecipe.videoUrl,
+        ingredients: cleanCandidateLines(markdownRecipe.ingredients),
+        instructions: cleanCandidateLines(markdownRecipe.instructions),
+        notes: cleanCandidateLines(markdownRecipe.notes),
+        tags: markdownRecipe.tags,
+        servings: markdownRecipe.servings,
+        prepTime: markdownRecipe.prepTime,
+        cookTime: markdownRecipe.cookTime,
+        latencyMs: markdownLatencyMs,
+        errorCode: undefined,
+      };
 
-    if (markdownCandidate.success) {
-      attempts.push(markdownCandidate);
-      candidates.push(markdownCandidate);
+      if (markdownCandidate.success) {
+        attempts.push(markdownCandidate);
+        candidates.push(markdownCandidate);
+      } else {
+        attempts.push(createFailedAttempt("markdown", "parse_failed", markdownLatencyMs));
+      }
     } else {
-      attempts.push(createFailedAttempt("markdown", "parse_failed", markdownLatencyMs));
+      attempts.push(createFailedAttempt("markdown", "fetch_failed", markdownLatencyMs));
     }
-  } else {
-    attempts.push(createFailedAttempt("markdown", "fetch_failed", markdownLatencyMs));
-  }
 
-  let selected = selectBestRecipeIngestionCandidate(candidates);
-  const markdownHasBalancedSections =
-    selected.candidate?.stage === "markdown" &&
-    selected.candidate.ingredients.length >= 4 &&
-    selected.candidate.instructions.length >= 3;
-  const markdownIsHighConfidence =
-    selected.candidate?.stage === "markdown" &&
-    selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE &&
-    markdownHasBalancedSections;
+    let selected = selectBestRecipeIngestionCandidate(candidates);
+    const markdownHasBalancedSections =
+      selected.candidate?.stage === "markdown" &&
+      selected.candidate.ingredients.length >= 4 &&
+      selected.candidate.instructions.length >= 3;
+    const markdownIsHighConfidence =
+      selected.candidate?.stage === "markdown" &&
+      selected.score >= HIGH_CONFIDENCE_INGESTION_SCORE &&
+      markdownHasBalancedSections;
 
-  if (markdownIsHighConfidence && (!markdownRecipe?.imageUrl || !markdownRecipe?.videoUrl)) {
-    const mediaHtmlStartedAt = Date.now();
-    const mediaHtmlController = new AbortController();
-    const mediaHtmlTimeout = setTimeout(() => mediaHtmlController.abort(), 6000);
-    try {
-      const response = await fetch(sourceUrl, {
-        headers: {
-          "User-Agent": "MiseEnPlaceBot/2.0",
-        },
-        cache: "no-store",
-        signal: mediaHtmlController.signal,
-      });
-
-      if (response.ok) {
-        directHtml = await response.text();
-        const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
-        const metadataCandidate = buildCandidateFromHtml({
-          stage: "http_html",
-          sourceUrl,
-          html: directHtml,
-          latencyMs: mediaHtmlLatencyMs,
+    if (markdownIsHighConfidence && (!markdownRecipe?.imageUrl || !markdownRecipe?.videoUrl)) {
+      const mediaHtmlStartedAt = Date.now();
+      const mediaHtmlController = new AbortController();
+      const mediaHtmlTimeout = setTimeout(() => mediaHtmlController.abort(), 6000);
+      try {
+        const response = await fetch(sourceUrl, {
+          headers: {
+            "User-Agent": "MiseEnPlaceBot/2.0",
+          },
+          cache: "no-store",
+          signal: mediaHtmlController.signal,
         });
-        if (metadataCandidate) {
-          metadataFallback = {
-            tags: metadataCandidate.tags?.length ? metadataCandidate.tags : undefined,
-            servings: metadataCandidate.servings,
-            prepTime: metadataCandidate.prepTime,
-            cookTime: metadataCandidate.cookTime,
-          };
-        }
-        attempts.push({
-          stage: "http_html",
-          success: true,
-          title: undefined,
-          ingredients: [],
-          instructions: [],
-          notes: [],
-          latencyMs: mediaHtmlLatencyMs,
-          errorCode: undefined,
-        });
-      } else {
-        attempts.push(
-          createFailedAttempt("http_html", classifyFetchStatus(response.status), Date.now() - mediaHtmlStartedAt)
-        );
-      }
-    } catch (error) {
-      const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
-      const timeoutError =
-        error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
-      attempts.push(createFailedAttempt("http_html", timeoutError, mediaHtmlLatencyMs));
-    } finally {
-      clearTimeout(mediaHtmlTimeout);
-    }
-  }
 
-  if (!markdownIsHighConfidence) {
-    const htmlStartedAt = Date.now();
-    const htmlController = new AbortController();
-    const htmlTimeout = setTimeout(() => htmlController.abort(), 10000);
-    try {
-      const response = await fetch(sourceUrl, {
-        headers: {
-          "User-Agent": "MiseEnPlaceBot/2.0",
-        },
-        cache: "no-store",
-        signal: htmlController.signal,
-      });
-      const htmlLatencyMs = Date.now() - htmlStartedAt;
-      if (!response.ok) {
-        attempts.push(createFailedAttempt("http_html", classifyFetchStatus(response.status), htmlLatencyMs));
-      } else {
-        directHtml = await response.text();
-        const htmlCandidate = buildCandidateFromHtml({
-          stage: "http_html",
-          sourceUrl,
-          html: directHtml,
-          latencyMs: htmlLatencyMs,
-        });
-        if (htmlCandidate?.success) {
-          attempts.push(htmlCandidate);
-          candidates.push(htmlCandidate);
+        if (response.ok) {
+          directHtml = await response.text();
+          const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
+          const metadataCandidate = buildCandidateFromHtml({
+            stage: "http_html",
+            sourceUrl,
+            html: directHtml,
+            latencyMs: mediaHtmlLatencyMs,
+          });
+          if (metadataCandidate) {
+            metadataFallback = {
+              tags: metadataCandidate.tags?.length ? metadataCandidate.tags : undefined,
+              servings: metadataCandidate.servings,
+              prepTime: metadataCandidate.prepTime,
+              cookTime: metadataCandidate.cookTime,
+            };
+          }
+          attempts.push({
+            stage: "http_html",
+            success: true,
+            title: undefined,
+            ingredients: [],
+            instructions: [],
+            notes: [],
+            latencyMs: mediaHtmlLatencyMs,
+            errorCode: undefined,
+          });
         } else {
-          attempts.push(createFailedAttempt("http_html", "parse_failed", htmlLatencyMs));
+          attempts.push(
+            createFailedAttempt("http_html", classifyFetchStatus(response.status), Date.now() - mediaHtmlStartedAt)
+          );
         }
+      } catch (error) {
+        const mediaHtmlLatencyMs = Date.now() - mediaHtmlStartedAt;
+        const timeoutError =
+          error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
+        attempts.push(createFailedAttempt("http_html", timeoutError, mediaHtmlLatencyMs));
+      } finally {
+        clearTimeout(mediaHtmlTimeout);
       }
-    } catch (error) {
-      const htmlLatencyMs = Date.now() - htmlStartedAt;
-      const timeoutError =
-        error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
-      attempts.push(createFailedAttempt("http_html", timeoutError, htmlLatencyMs));
-    } finally {
-      clearTimeout(htmlTimeout);
     }
-  }
 
-  selected = selectBestRecipeIngestionCandidate(candidates);
+    if (!markdownIsHighConfidence) {
+      const htmlStartedAt = Date.now();
+      const htmlController = new AbortController();
+      const htmlTimeout = setTimeout(() => htmlController.abort(), 10000);
+      try {
+        const response = await fetch(sourceUrl, {
+          headers: {
+            "User-Agent": "MiseEnPlaceBot/2.0",
+          },
+          cache: "no-store",
+          signal: htmlController.signal,
+        });
+        const htmlLatencyMs = Date.now() - htmlStartedAt;
+        if (!response.ok) {
+          attempts.push(createFailedAttempt("http_html", classifyFetchStatus(response.status), htmlLatencyMs));
+        } else {
+          directHtml = await response.text();
+          const htmlCandidate = buildCandidateFromHtml({
+            stage: "http_html",
+            sourceUrl,
+            html: directHtml,
+            latencyMs: htmlLatencyMs,
+          });
+          if (htmlCandidate?.success) {
+            attempts.push(htmlCandidate);
+            candidates.push(htmlCandidate);
+          } else {
+            attempts.push(createFailedAttempt("http_html", "parse_failed", htmlLatencyMs));
+          }
+        }
+      } catch (error) {
+        const htmlLatencyMs = Date.now() - htmlStartedAt;
+        const timeoutError =
+          error instanceof DOMException && error.name === "AbortError" ? "timeout" : "fetch_failed";
+        attempts.push(createFailedAttempt("http_html", timeoutError, htmlLatencyMs));
+      } finally {
+        clearTimeout(htmlTimeout);
+      }
+    }
 
-  selected = selectBestRecipeIngestionCandidate(candidates);
-  const markdownNeedsRescue =
-    selected.candidate?.stage === "markdown" &&
-    (selected.candidate.ingredients.length < 4 || selected.candidate.instructions.length < 3);
-  if (markdownNeedsRescue) {
-    const balancedFallbackCandidates = candidates.filter(
-      (candidate) =>
-        candidate.stage !== "markdown" &&
-        candidate.ingredients.length >= 4 &&
-        candidate.instructions.length >= 3
+    selected = selectBestRecipeIngestionCandidate(candidates);
+
+    selected = selectBestRecipeIngestionCandidate(candidates);
+    const markdownNeedsRescue =
+      selected.candidate?.stage === "markdown" &&
+      (selected.candidate.ingredients.length < 4 || selected.candidate.instructions.length < 3);
+    if (markdownNeedsRescue) {
+      const balancedFallbackCandidates = candidates.filter(
+        (candidate) =>
+          candidate.stage !== "markdown" &&
+          candidate.ingredients.length >= 4 &&
+          candidate.instructions.length >= 3
+      );
+      if (balancedFallbackCandidates.length > 0) {
+        selected = selectBestRecipeIngestionCandidate(balancedFallbackCandidates);
+      }
+    }
+
+    const selectedCandidate = selected.candidate;
+    const failureReason = classifyIngestionFailure(attempts, selectedCandidate);
+
+    if (!selectedCandidate || selected.score < MIN_INGESTION_SCORE) {
+      logRecipeIngestionDiagnostics({
+        sourceUrl,
+        sourceHost,
+        sourcePlatform: "web",
+        resultQualityScore: selected.score,
+        failureReason,
+        draftCreated: false,
+        assistedOcrUsed: false,
+        attempts: attempts.map((attempt) => ({
+          stage: attempt.stage,
+          success: attempt.success,
+          latencyMs: attempt.latencyMs,
+          errorCode: attempt.errorCode,
+          ingredients: attempt.ingredients.length,
+          instructions: attempt.instructions.length,
+        })),
+      });
+
+      if (existingRecipe) {
+        redirect(`/recipes/${existingRecipe.id}`);
+      }
+
+      redirect(`/recipes?importError=${failureReason}`);
+    }
+
+    const candidateHtml = selectedCandidate.html || directHtml;
+    const title =
+      selectedCandidate.title ||
+      markdownTitle ||
+      extractMeta(candidateHtml, "og:title", "property") ||
+      extractMeta(candidateHtml, "twitter:title", "name") ||
+      extractTitle(candidateHtml) ||
+      sourceHost;
+    const cleanedCandidateIngredients = cleanIngredientLines(selectedCandidate.ingredients);
+    const cleanedIngredients = {
+      lines: cleanedCandidateIngredients.lines.map((line) => convertIngredientMeasurementToMetric(line)),
+      notes: cleanedCandidateIngredients.notes,
+    };
+    const cleanedInstructionsSource = cleanInstructionLines(selectedCandidate.instructions);
+    const cleanedInstructions = {
+      lines: cleanedInstructionsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
+      notes: cleanedInstructionsSource.notes,
+    };
+    const htmlNotes = candidateHtml ? extractNotesFromHtml(candidateHtml) : [];
+
+    // Prep groups: store two copies of source groupings so ingredients and prep groups
+    // are independently editable. sourceGroup=true powers the Ingredients card (with headers),
+    // sourceGroup=false powers the Prep Groups card and Mise Focus mode.
+    const ingredientGroupCandidates =
+      selectedCandidate.ingredientGroups?.length
+        ? selectedCandidate.ingredientGroups
+        : extractIngredientGroupsFromLines(selectedCandidate.ingredients);
+    const sourceGroupsRaw =
+      ingredientGroupCandidates.length > 0
+        ? cleanIngredientGroups(ingredientGroupCandidates).groups.map((group) => ({
+          ...group,
+          items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
+        }))
+        : cleanedIngredients.lines.length > 0
+          ? [{ title: "Ingredients", items: [...cleanedIngredients.lines] }]
+          : [];
+    const prepGroups: PrepGroup[] = [
+      ...sourceGroupsRaw.map((g) => ({ ...g, sourceGroup: true })),
+      ...sourceGroupsRaw.map((g) => ({ ...g, sourceGroup: false })),
+    ];
+    const rawDescription =
+      selectedCandidate.description ||
+      extractMeta(candidateHtml, "description", "name") ||
+      extractMeta(candidateHtml, "og:description", "property") ||
+      extractMeta(candidateHtml, "twitter:description", "name");
+    const descriptionCandidate = cleanDescription(rawDescription);
+    const { description, notes: descriptionNotes } = extractNotesFromDescription(
+      descriptionCandidate
     );
-    if (balancedFallbackCandidates.length > 0) {
-      selected = selectBestRecipeIngestionCandidate(balancedFallbackCandidates);
-    }
-  }
+    const imageUrl = toOptionalUrl(
+      selectedCandidate.imageUrl ??
+      extractMeta(candidateHtml, "og:image", "property") ??
+      extractMeta(candidateHtml, "twitter:image", "name") ??
+      null
+    );
+    const rawVideoUrl = selectedCandidate.videoUrl ?? extractVideoFromHtml(candidateHtml);
+    const normalizedVideoUrl = normalizeVideoUrl(rawVideoUrl);
+    const videoUrl =
+      getVideoKind(normalizedVideoUrl) === "youtube"
+        ? normalizedVideoUrl
+        : normalizedVideoUrl ?? undefined;
+    const finalTags =
+      selectedCandidate.tags?.length
+        ? selectedCandidate.tags
+        : markdownRecipe?.tags?.length
+          ? markdownRecipe.tags
+          : metadataFallback.tags ?? [];
+    const finalServings = selectedCandidate.servings ?? metadataFallback.servings ?? null;
+    const finalPrepTime = selectedCandidate.prepTime ?? metadataFallback.prepTime ?? null;
+    const finalCookTime = selectedCandidate.cookTime ?? metadataFallback.cookTime ?? null;
+    const notes = normalizeImportedNotes(
+      Array.from(
+        new Set([
+          ...cleanedIngredients.notes,
+          ...cleanedInstructions.notes,
+          ...(markdownRecipe?.notes ?? []),
+          ...selectedCandidate.notes,
+          ...htmlNotes,
+          ...descriptionNotes,
+        ])
+      )
+    );
 
-  const selectedCandidate = selected.candidate;
-  const failureReason = classifyIngestionFailure(attempts, selectedCandidate);
-
-  if (!selectedCandidate || selected.score < MIN_INGESTION_SCORE) {
     logRecipeIngestionDiagnostics({
       sourceUrl,
       sourceHost,
       sourcePlatform: "web",
+      stageUsed: selectedCandidate.stage,
       resultQualityScore: selected.score,
-      failureReason,
       draftCreated: false,
       assistedOcrUsed: false,
       attempts: attempts.map((attempt) => ({
@@ -1671,213 +1780,113 @@ export async function importRecipeFromUrl(formData: FormData) {
         ingredients: attempt.ingredients.length,
         instructions: attempt.instructions.length,
       })),
-    });
-
-    if (existingRecipe) {
-      redirect(`/recipes/${existingRecipe.id}`);
-    }
-
-    redirect(`/recipes?importError=${failureReason}`);
-  }
-
-  const candidateHtml = selectedCandidate.html || directHtml;
-  const title =
-    selectedCandidate.title ||
-    markdownTitle ||
-    extractMeta(candidateHtml, "og:title", "property") ||
-    extractMeta(candidateHtml, "twitter:title", "name") ||
-    extractTitle(candidateHtml) ||
-    sourceHost;
-  const cleanedCandidateIngredients = cleanIngredientLines(selectedCandidate.ingredients);
-  const cleanedIngredients = {
-    lines: cleanedCandidateIngredients.lines.map((line) => convertIngredientMeasurementToMetric(line)),
-    notes: cleanedCandidateIngredients.notes,
-  };
-  const cleanedInstructionsSource = cleanInstructionLines(selectedCandidate.instructions);
-  const cleanedInstructions = {
-    lines: cleanedInstructionsSource.lines.map((line) => convertIngredientMeasurementToMetric(line)),
-    notes: cleanedInstructionsSource.notes,
-  };
-  const htmlNotes = candidateHtml ? extractNotesFromHtml(candidateHtml) : [];
-
-  // Prep groups: store two copies of source groupings so ingredients and prep groups
-  // are independently editable. sourceGroup=true powers the Ingredients card (with headers),
-  // sourceGroup=false powers the Prep Groups card and Mise Focus mode.
-  const ingredientGroupCandidates =
-    selectedCandidate.ingredientGroups?.length
-      ? selectedCandidate.ingredientGroups
-      : extractIngredientGroupsFromLines(selectedCandidate.ingredients);
-  const sourceGroupsRaw =
-    ingredientGroupCandidates.length > 0
-      ? cleanIngredientGroups(ingredientGroupCandidates).groups.map((group) => ({
-        ...group,
-        items: group.items.map((item) => convertIngredientMeasurementToMetric(item)),
-      }))
-      : cleanedIngredients.lines.length > 0
-        ? [{ title: "Ingredients", items: [...cleanedIngredients.lines] }]
-        : [];
-  const prepGroups: PrepGroup[] = [
-    ...sourceGroupsRaw.map((g) => ({ ...g, sourceGroup: true })),
-    ...sourceGroupsRaw.map((g) => ({ ...g, sourceGroup: false })),
-  ];
-  const rawDescription =
-    selectedCandidate.description ||
-    extractMeta(candidateHtml, "description", "name") ||
-    extractMeta(candidateHtml, "og:description", "property") ||
-    extractMeta(candidateHtml, "twitter:description", "name");
-  const descriptionCandidate = cleanDescription(rawDescription);
-  const { description, notes: descriptionNotes } = extractNotesFromDescription(
-    descriptionCandidate
-  );
-  const imageUrl = toOptionalUrl(
-    selectedCandidate.imageUrl ??
-    extractMeta(candidateHtml, "og:image", "property") ??
-    extractMeta(candidateHtml, "twitter:image", "name") ??
-    null
-  );
-  const rawVideoUrl = selectedCandidate.videoUrl ?? extractVideoFromHtml(candidateHtml);
-  const normalizedVideoUrl = normalizeVideoUrl(rawVideoUrl);
-  const videoUrl =
-    getVideoKind(normalizedVideoUrl) === "youtube"
-      ? normalizedVideoUrl
-      : normalizedVideoUrl ?? undefined;
-  const finalTags =
-    selectedCandidate.tags?.length
-      ? selectedCandidate.tags
-      : markdownRecipe?.tags?.length
-        ? markdownRecipe.tags
-        : metadataFallback.tags ?? [];
-  const finalServings = selectedCandidate.servings ?? metadataFallback.servings ?? null;
-  const finalPrepTime = selectedCandidate.prepTime ?? metadataFallback.prepTime ?? null;
-  const finalCookTime = selectedCandidate.cookTime ?? metadataFallback.cookTime ?? null;
-  const notes = normalizeImportedNotes(
-    Array.from(
-      new Set([
-        ...cleanedIngredients.notes,
-        ...cleanedInstructions.notes,
-        ...(markdownRecipe?.notes ?? []),
-        ...selectedCandidate.notes,
-        ...htmlNotes,
-        ...descriptionNotes,
-      ])
-    )
-  );
-
-  logRecipeIngestionDiagnostics({
-    sourceUrl,
-    sourceHost,
-    sourcePlatform: "web",
-    stageUsed: selectedCandidate.stage,
-    resultQualityScore: selected.score,
-    draftCreated: false,
-    assistedOcrUsed: false,
-    attempts: attempts.map((attempt) => ({
-      stage: attempt.stage,
-      success: attempt.success,
-      latencyMs: attempt.latencyMs,
-      errorCode: attempt.errorCode,
-      ingredients: attempt.ingredients.length,
-      instructions: attempt.instructions.length,
-    })),
-    selected: {
-      stage: selectedCandidate.stage,
-      title: selectedCandidate.title,
-      ingredients: selectedCandidate.ingredients,
-      instructions: selectedCandidate.instructions,
-    },
-  });
-
-  const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
-
-  if (existingRecipe) {
-    const existing = await prisma.recipe.findFirst({
-      where: { id: existingRecipe.id, householdId },
-      select: {
-        id: true,
-        imageUrl: true,
-        videoUrl: true,
-        servings: true,
-        prepTime: true,
-        cookTime: true,
-        tags: true,
+      selected: {
+        stage: selectedCandidate.stage,
+        title: selectedCandidate.title,
+        ingredients: selectedCandidate.ingredients,
+        instructions: selectedCandidate.instructions,
       },
     });
 
-    if (existing) {
-      const existingKind = getVideoKind(existing.videoUrl ?? undefined);
-      const nextKind = getVideoKind(videoUrl ?? undefined);
-      const shouldUpdateVideo =
-        (!existing.videoUrl && videoUrl) ||
-        (existingKind !== "youtube" && nextKind === "youtube") ||
-        (existingKind === null && nextKind !== null);
-      const shouldUpdateImage = !existing.imageUrl && imageUrl;
-      const shouldUpdateServings =
-        (existing.servings === null || existing.servings === undefined) &&
-        typeof finalServings === "number";
-      const shouldUpdatePrepTime =
-        (existing.prepTime === null || existing.prepTime === undefined) &&
-        typeof finalPrepTime === "number";
-      const shouldUpdateCookTime =
-        (existing.cookTime === null || existing.cookTime === undefined) &&
-        typeof finalCookTime === "number";
-      const shouldUpdateTags =
-        (!Array.isArray(existing.tags) || existing.tags.length === 0) &&
-        finalTags.length > 0;
+    const normalizedSourceUrl = normalizeSourceUrl(sourceUrl) ?? sourceUrl;
 
-      if (
-        shouldUpdateVideo ||
-        shouldUpdateImage ||
-        shouldUpdateServings ||
-        shouldUpdatePrepTime ||
-        shouldUpdateCookTime ||
-        shouldUpdateTags
-      ) {
-        await prisma.recipe.update({
-          where: { id: existing.id },
-          data: {
-            imageUrl: shouldUpdateImage ? imageUrl : undefined,
-            videoUrl: shouldUpdateVideo ? videoUrl : undefined,
-            servings: shouldUpdateServings ? finalServings : undefined,
-            prepTime: shouldUpdatePrepTime ? finalPrepTime : undefined,
-            cookTime: shouldUpdateCookTime ? finalCookTime : undefined,
-            tags: shouldUpdateTags ? finalTags : undefined,
-          },
-        });
+    if (existingRecipe) {
+      const existing = await prisma.recipe.findFirst({
+        where: { id: existingRecipe.id, householdId },
+        select: {
+          id: true,
+          imageUrl: true,
+          videoUrl: true,
+          servings: true,
+          prepTime: true,
+          cookTime: true,
+          tags: true,
+        },
+      });
+
+      if (existing) {
+        const existingKind = getVideoKind(existing.videoUrl ?? undefined);
+        const nextKind = getVideoKind(videoUrl ?? undefined);
+        const shouldUpdateVideo =
+          (!existing.videoUrl && videoUrl) ||
+          (existingKind !== "youtube" && nextKind === "youtube") ||
+          (existingKind === null && nextKind !== null);
+        const shouldUpdateImage = !existing.imageUrl && imageUrl;
+        const shouldUpdateServings =
+          (existing.servings === null || existing.servings === undefined) &&
+          typeof finalServings === "number";
+        const shouldUpdatePrepTime =
+          (existing.prepTime === null || existing.prepTime === undefined) &&
+          typeof finalPrepTime === "number";
+        const shouldUpdateCookTime =
+          (existing.cookTime === null || existing.cookTime === undefined) &&
+          typeof finalCookTime === "number";
+        const shouldUpdateTags =
+          (!Array.isArray(existing.tags) || existing.tags.length === 0) &&
+          finalTags.length > 0;
+
+        if (
+          shouldUpdateVideo ||
+          shouldUpdateImage ||
+          shouldUpdateServings ||
+          shouldUpdatePrepTime ||
+          shouldUpdateCookTime ||
+          shouldUpdateTags
+        ) {
+          await prisma.recipe.update({
+            where: { id: existing.id },
+            data: {
+              imageUrl: shouldUpdateImage ? imageUrl : undefined,
+              videoUrl: shouldUpdateVideo ? videoUrl : undefined,
+              servings: shouldUpdateServings ? finalServings : undefined,
+              prepTime: shouldUpdatePrepTime ? finalPrepTime : undefined,
+              cookTime: shouldUpdateCookTime ? finalCookTime : undefined,
+              tags: shouldUpdateTags ? finalTags : undefined,
+            },
+          });
+        }
       }
+
+      updateTag(`recipes-${householdId}`);
+      updateTag(`recipe-${existingRecipe.id}`);
+      revalidatePath("/recipes");
+      revalidatePath(`/recipes/${existingRecipe.id}`);
+      redirect(`/recipes/${existingRecipe.id}`);
     }
 
+    const recipe = await prisma.recipe.create({
+      data: {
+        householdId,
+        title,
+        description,
+        sourceUrl: normalizedSourceUrl,
+        imageUrl,
+        videoUrl,
+        servings: finalServings,
+        prepTime: finalPrepTime,
+        cookTime: finalCookTime,
+        tags: finalTags,
+        ingredientCount: cleanedIngredients.lines.length,
+        ingredients: cleanedIngredients.lines,
+        instructions: cleanedInstructions.lines,
+        notes,
+        prepGroups,
+      },
+    });
+
     updateTag(`recipes-${householdId}`);
-    updateTag(`recipe-${existingRecipe.id}`);
+    updateTag(`recipe-${recipe.id}`);
     revalidatePath("/recipes");
-    revalidatePath(`/recipes/${existingRecipe.id}`);
-    redirect(`/recipes/${existingRecipe.id}`);
+    revalidatePath("/planner");
+    redirect(`/recipes/${recipe.id}`);
+  } catch (err) {
+    const error = err as Error & { digest?: string };
+    if (error?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw err;
+    }
+    console.error("[importRecipeFromUrl] unhandled error:", err);
+    redirect("/recipes?importError=server_error");
   }
-
-  const recipe = await prisma.recipe.create({
-    data: {
-      householdId,
-      title,
-      description,
-      sourceUrl: normalizedSourceUrl,
-      imageUrl,
-      videoUrl,
-      servings: finalServings,
-      prepTime: finalPrepTime,
-      cookTime: finalCookTime,
-      tags: finalTags,
-      ingredientCount: cleanedIngredients.lines.length,
-      ingredients: cleanedIngredients.lines,
-      instructions: cleanedInstructions.lines,
-      notes,
-      prepGroups,
-    },
-  });
-
-  updateTag(`recipes-${householdId}`);
-  updateTag(`recipe-${recipe.id}`);
-  revalidatePath("/recipes");
-  revalidatePath("/planner");
-  redirect(`/recipes/${recipe.id}`);
 }
 
 export async function deleteRecipe(formData: FormData) {
