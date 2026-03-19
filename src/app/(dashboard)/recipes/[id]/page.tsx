@@ -21,7 +21,7 @@ const LineListEditor = dynamic(() => import("@/components/recipes/LineListEditor
 const RecipeFocusMode = dynamic(() => import("@/components/recipes/RecipeFocusMode"));
 const IngredientGroupsEditor = dynamic(() => import("@/components/recipes/IngredientGroupsEditor"));
 
-export const revalidate = 60;
+export const revalidate = 0;
 export const dynamicParams = true;
 
 const formatMinutes = (value?: number | null) => (value ? `${value} min` : null);
