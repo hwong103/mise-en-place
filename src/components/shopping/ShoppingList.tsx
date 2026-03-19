@@ -574,7 +574,7 @@ export default function ShoppingList({
             value={manualLine}
             onChange={(event) => setManualLine(event.target.value)}
             placeholder="Paper towels, coffee, etc."
-            className="order-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-emerald-500 focus:outline-none sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="order-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-[var(--accent)] focus:outline-none sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
           <select
             value={manualCategory}
@@ -601,7 +601,7 @@ export default function ShoppingList({
           <button
             type="button"
             onClick={handleAddManual}
-            className="order-2 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-60 sm:order-4 sm:w-auto sm:py-2 sm:text-sm"
+            className="order-2 w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-base font-semibold text-white disabled:opacity-60 sm:order-4 sm:w-auto sm:py-2 sm:text-sm"
             disabled={!manualLine.trim()}
           >
             Add
@@ -617,7 +617,7 @@ export default function ShoppingList({
               value={newLocation}
               onChange={(event) => setNewLocation(event.target.value)}
               placeholder="Add a new location"
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[var(--accent)] focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
             <button
               type="button"
@@ -677,12 +677,12 @@ export default function ShoppingList({
                   onClick={() => setActiveLocation(locationGroup.name)}
                   className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                     isActive
-                      ? "bg-emerald-600 text-white"
+                      ? "bg-[var(--accent)] text-white"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                   }`}
                 >
                   {locationGroup.name}
-                  <span className={`ml-2 text-xs ${isActive ? "text-emerald-100" : "text-slate-500 dark:text-slate-400"}`}>
+                  <span className={`ml-2 text-xs ${isActive ? "text-white/70" : "text-slate-500 dark:text-slate-400"}`}>
                     {itemCount}
                   </span>
                 </button>
@@ -723,8 +723,8 @@ export default function ShoppingList({
 
                           return (
                             <li key={item.key} className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-200">
-                              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2">
-                                <label className="flex min-w-0 items-start gap-3">
+                              <div className="flex items-center gap-2">
+                                <label className="flex min-w-0 flex-1 items-start gap-3">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -757,7 +757,7 @@ export default function ShoppingList({
                                         {item.recipes.map((recipe) => (
                                           <span
                                             key={`${item.key}-${recipe}`}
-                                            className="rounded bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                            className="rounded bg-teal-50 px-1.5 py-0.5 font-medium text-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
                                           >
                                             {recipe}
                                           </span>
@@ -766,29 +766,30 @@ export default function ShoppingList({
                                     ) : null}
                                   </div>
                                 </label>
-                                <select
-                                  value={item.location}
-                                  onChange={(event) =>
-                                    handleLocationChange({
-                                      key: item.key,
-                                      line: item.line,
-                                      manual: item.manual,
-                                      category: item.category,
-                                      location: event.target.value,
-                                    })
-                                  }
-                                  className="w-[7.5rem] justify-self-end rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                                  disabled={isSaving || isPending}
-                                  aria-label={`Location for ${item.line}`}
-                                >
-                                  {itemLocationOptions.map((location) => (
-                                    <option key={location} value={location}>
-                                      {location}
-                                    </option>
-                                  ))}
-                                </select>
 
-                                <div className="flex min-h-8 items-center gap-2 pl-7">
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <select
+                                    value={item.location}
+                                    onChange={(event) =>
+                                      handleLocationChange({
+                                        key: item.key,
+                                        line: item.line,
+                                        manual: item.manual,
+                                        category: item.category,
+                                        location: event.target.value,
+                                      })
+                                    }
+                                    className="w-[7.5rem] rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                    disabled={isSaving || isPending}
+                                    aria-label={`Location for ${item.line}`}
+                                  >
+                                    {itemLocationOptions.map((location) => (
+                                      <option key={location} value={location}>
+                                        {location}
+                                      </option>
+                                    ))}
+                                  </select>
+
                                   {item.amountSummary ? (
                                     <span className="text-xs text-slate-500 dark:text-slate-400">{item.amountSummary}</span>
                                   ) : item.count > 1 ? (
@@ -799,9 +800,6 @@ export default function ShoppingList({
                                   ) : isSaving ? (
                                     <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
                                   ) : null}
-                                </div>
-
-                                <div className="flex items-center justify-end">
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -814,7 +812,7 @@ export default function ShoppingList({
                                         id: item.id,
                                       })
                                     }
-                                    className="rounded-full p-2 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
+                                    className="shrink-0 rounded-full p-2 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
                                     disabled={isSaving || isPending || item._optimistic}
                                     aria-label={`Remove ${item.line}`}
                                     title="Remove item"
@@ -920,7 +918,7 @@ export default function ShoppingList({
         <button
           type="button"
           onClick={() => setIsMobileManualOpen(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-30 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-30 inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-900/20"
           aria-haspopup="dialog"
           aria-expanded={isMobileManualOpen}
           aria-controls="mobile-manual-items-dialog"
