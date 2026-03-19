@@ -1,5 +1,4 @@
 import prisma from "@/lib/prisma";
-import { unstable_cache } from "next/cache";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { readStringArray } from "@/lib/json-arrays";
 import { logServerPerf } from "@/lib/server-perf";
@@ -72,57 +71,39 @@ export async function listRecipeTitles(householdId?: string) {
 
 export async function getRecipeById(recipeId: string) {
   const householdId = await getCurrentHouseholdId();
+  const startedAt = Date.now();
+  try {
+    const recipe = await prisma.recipe.findFirst({
+      where: { id: recipeId, householdId },
+    });
 
-  const loadRecipe = async (hid: string, rid: string) => {
-    const startedAt = Date.now();
-    try {
-      const recipe = await prisma.recipe.findFirst({
-        where: { id: rid, householdId: hid },
-      });
+    logServerPerf({
+      phase: "recipes.detail_read",
+      route: "/recipes/[id]",
+      startedAt,
+      success: true,
+      householdId,
+      meta: { recipe_id: recipeId, found: Boolean(recipe) },
+    });
 
-      logServerPerf({
-        phase: "recipes.detail_read",
-        route: "/recipes/[id]",
-        startedAt,
-        success: true,
-        householdId: hid,
-        meta: { recipe_id: rid, found: Boolean(recipe) },
-      });
-
-      return recipe
-        ? {
-            ...recipe,
-            tags: readStringArray(recipe.tags),
-          }
-        : null;
-    } catch (error) {
-      logServerPerf({
-        phase: "recipes.detail_read",
-        route: "/recipes/[id]",
-        startedAt,
-        success: false,
-        householdId: hid,
-        meta: {
-          recipe_id: rid,
-          error: error instanceof Error ? error.message : "unknown_error",
-        },
-      });
-      throw error;
-    }
-  };
-
-  if (process.env.NODE_ENV === "test") {
-    return loadRecipe(householdId, recipeId);
+    return recipe
+      ? {
+          ...recipe,
+          tags: readStringArray(recipe.tags),
+        }
+      : null;
+  } catch (error) {
+    logServerPerf({
+      phase: "recipes.detail_read",
+      route: "/recipes/[id]",
+      startedAt,
+      success: false,
+      householdId,
+      meta: {
+        recipe_id: recipeId,
+        error: error instanceof Error ? error.message : "unknown_error",
+      },
+    });
+    throw error;
   }
-
-  const cachedQuery = unstable_cache(
-    loadRecipe,
-    ["recipe-detail", householdId, recipeId],
-    {
-      revalidate: 120,
-      tags: [`recipe-${recipeId}`],
-    }
-  );
-
-  return cachedQuery(householdId, recipeId);
 }
