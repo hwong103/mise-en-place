@@ -9,9 +9,9 @@ import { getRecipeById } from "@/lib/recipes";
 import { getServerNow } from "@/lib/server-clock";
 import { logServerPerf } from "@/lib/server-perf";
 import {
-  cleanIngredientLine,
   coercePrepGroups,
   coerceStringArray,
+  getRecipeIngredientLines,
 } from "@/lib/recipe-utils";
 
 
@@ -122,9 +122,7 @@ export default async function RecipeDetailPage({
   }
 
   const transformStartedAt = getServerNow();
-  const ingredients = coerceStringArray(recipe.ingredients)
-    .map((line) => cleanIngredientLine(line).line)
-    .filter(Boolean);
+  const ingredients = getRecipeIngredientLines(recipe.ingredients, recipe.prepGroups);
   const instructions = coerceStringArray(recipe.instructions);
   const notes = coerceStringArray(recipe.notes);
   const prepGroups = coercePrepGroups(recipe.prepGroups);
