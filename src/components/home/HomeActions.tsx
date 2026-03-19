@@ -59,7 +59,7 @@ export default function HomeActions({ authDisabled }: HomeActionsProps) {
     <div className="mt-8 flex flex-wrap gap-3">
       <Link
         href="/recipes"
-        className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition-transform duration-300 hover:bg-emerald-600 active:translate-y-[1px]"
+        className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white transition-transform duration-300 hover:opacity-90 active:translate-y-[1px]"
       >
         Open Recipes
         <ArrowRight className="h-4 w-4" />

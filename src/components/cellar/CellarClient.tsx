@@ -192,7 +192,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                         aria-haspopup="menu"
                         aria-expanded={pickerOpen}
                         aria-controls={pickerMenuId}
-                        className={`inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 ${isLoading ? "opacity-60 cursor-not-allowed" : ""}`}
+                        className={`inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:opacity-90 ${isLoading ? "cursor-not-allowed opacity-60" : ""}`}
                     >
                         {isLoading ? (
                             <span className="flex items-center gap-2">
@@ -236,7 +236,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                         type="button"
                                         onClick={handleNameSearch}
                                         disabled={!nameInput.trim()}
-                                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                                        className="rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
                                     >
                                         Go
                                     </button>
@@ -285,7 +285,7 @@ export default function CellarClient({ wines }: { wines: WineSummary[] }) {
                                         type="button"
                                         onClick={handleUrlSubmit}
                                         disabled={!urlInput.trim()}
-                                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                                        className="rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
                                     >
                                         Go
                                     </button>
