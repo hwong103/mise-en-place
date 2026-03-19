@@ -1305,6 +1305,7 @@ export async function updateRecipe(formData: FormData) {
 
   updateTag(`recipes-${householdId}`);
   updateTag(`recipe-${recipeId}`);
+  updateTag(`shopping-${householdId}`);
   revalidatePath("/recipes");
   revalidatePath(`/recipes/${recipeId}`);
   revalidatePath("/planner");
@@ -1471,8 +1472,12 @@ export async function updateRecipeSection(formData: FormData) {
 
   if (householdId) {
     updateTag(`recipes-${householdId}`);
+    updateTag(`shopping-${householdId}`);
   }
   updateTag(`recipe-${recipeId}`);
+  revalidatePath("/recipes");
+  revalidatePath("/planner");
+  revalidatePath("/shopping");
   revalidatePath(`/recipes/${recipeId}`);
   redirect(`/recipes/${recipeId}`);
 }
@@ -1855,6 +1860,7 @@ export async function importRecipeFromUrl(formData: FormData) {
 
       updateTag(`recipes-${householdId}`);
       updateTag(`recipe-${existingRecipe.id}`);
+      revalidatePath("/planner");
       revalidatePath("/recipes");
       revalidatePath(`/recipes/${existingRecipe.id}`);
       redirect(`/recipes/${existingRecipe.id}`);
@@ -1913,6 +1919,7 @@ export async function deleteRecipe(formData: FormData) {
 
   updateTag(`recipes-${householdId}`);
   updateTag(`recipe-${recipeId}`);
+  updateTag(`shopping-${householdId}`);
   revalidatePath("/recipes");
   revalidatePath("/planner");
   revalidatePath("/shopping");
@@ -1955,6 +1962,7 @@ export async function addToMealPlan(formData: FormData) {
     },
   });
 
+  updateTag(`shopping-${householdId}`);
   revalidatePath("/planner");
   revalidatePath("/shopping");
   redirect("/planner");
