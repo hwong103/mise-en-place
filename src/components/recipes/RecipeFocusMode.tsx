@@ -610,19 +610,34 @@ export default function RecipeFocusMode({
 
                   <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                     <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                      Instructions
+                      Ingredients
                     </h3>
                     <div className="mt-4 space-y-4">
-                      {instructions.map((step, index) => (
-                        <div key={index} className={`flex gap-3 ${index === activeStepIndex ? "opacity-100" : "opacity-40"}`}>
-                          <span className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold border ${index === activeStepIndex ? "bg-[#1a6b4a] text-white border-[#1a6b4a] dark:bg-emerald-500 dark:text-slate-950 dark:border-emerald-500" : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-500"}`}>
-                            {index + 1}
-                          </span>
-                          <p className={`text-[13px] leading-relaxed ${index === activeStepIndex ? "text-slate-900 font-medium dark:text-slate-100" : "text-slate-600 dark:text-slate-400"}`}>
-                            {step}
-                          </p>
-                        </div>
-                      ))}
+                      {misePrepGroups.length === 0 ? (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">No ingredients listed.</p>
+                      ) : (
+                        misePrepGroups.map((group, index) => {
+                          const color = HIGHLIGHT_COLORS[index % HIGHLIGHT_COLORS.length];
+                          return (
+                            <div
+                              key={group.title}
+                              className="rounded-xl border border-white/50 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                            >
+                              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                {group.title}
+                              </h4>
+                              <ul className="mt-2 space-y-1.5 text-[13px] text-slate-600 dark:text-slate-300">
+                                {group.items.map((item) => (
+                                  <li key={item} className="flex items-start gap-2">
+                                    <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${color.split(" ")[0].replace("/80", "")}`} />
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   </section>
                 </div>
