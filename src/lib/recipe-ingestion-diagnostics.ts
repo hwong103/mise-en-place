@@ -26,5 +26,12 @@ type RecipeIngestionDiagnostics = {
 };
 
 export const logRecipeIngestionDiagnostics = (payload: RecipeIngestionDiagnostics) => {
-  console.info("[recipe-ingestion]", JSON.stringify(payload));
+  const serialized = JSON.stringify(payload);
+
+  if (payload.failureReason) {
+    console.warn("[recipe-ingestion:failure]", serialized);
+    return;
+  }
+
+  console.info("[recipe-ingestion]", serialized);
 };

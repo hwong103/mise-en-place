@@ -516,21 +516,27 @@ const findRecipeBySourceUrl = async (
     return null;
   }
 
-  const matches = await prisma.recipe.findMany({
+  const recipes = await prisma.recipe.findMany({
     where: {
       householdId,
-      OR: candidates.map((candidate) => ({
-        sourceUrl: {
-          startsWith: candidate,
-        },
-      })),
+      sourceUrl: {
+        not: null,
+      },
     },
     select: { id: true, sourceUrl: true },
   });
+
+  const candidateSet = new Set(
+    candidates
+      .map((candidate) => normalizeSourceUrl(candidate) ?? candidate)
+      .filter(Boolean)
+  );
+
   return (
-    matches.find(
-      (match) => normalizeSourceUrl(match.sourceUrl ?? "") === normalized
-    ) ?? null
+    recipes.find((recipe) => {
+      const recipeUrl = normalizeSourceUrl(recipe.sourceUrl ?? "");
+      return recipeUrl ? candidateSet.has(recipeUrl) || recipeUrl === normalized : false;
+    }) ?? null
   );
 };
 
