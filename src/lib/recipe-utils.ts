@@ -617,6 +617,19 @@ export function coercePrepGroups(value: unknown): PrepGroup[] {
     .filter((entry): entry is PrepGroup => entry !== null);
 }
 
+export function getRecipeIngredientLines(ingredients: unknown, prepGroups: unknown): string[] {
+  const cleanedIngredients = coerceStringArray(ingredients)
+    .map((line) => cleanIngredientLine(line).line)
+    .filter(Boolean);
+  const sourceGroupItems = coercePrepGroups(prepGroups)
+    .filter((group) => group.sourceGroup)
+    .flatMap((group) => group.items)
+    .map((line) => cleanIngredientLine(line).line)
+    .filter(Boolean);
+
+  return sourceGroupItems.length > 0 ? sourceGroupItems : cleanedIngredients;
+}
+
 export function serializePrepGroupsToText(groups: PrepGroup[]) {
   return groups
     .map((group) => `${group.title} \n${group.items.map((item) => `- ${item}`).join("\n")} `)

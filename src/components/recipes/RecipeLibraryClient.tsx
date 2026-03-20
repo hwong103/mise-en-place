@@ -230,7 +230,7 @@ export default function RecipeLibraryClient({
                       <button
                         type="submit"
                         disabled={isImportPending}
-                        className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-70"
+                        className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-70"
                       >
                         {isImportPending ? "Importing..." : "Import Recipe"}
                       </button>

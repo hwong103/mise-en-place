@@ -212,7 +212,7 @@ export default function RecipeForm({
       <div className="flex items-center justify-end gap-3">
         <button
           type="submit"
-          className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform active:scale-95"
+          className="rounded-xl bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:opacity-90 active:scale-95"
         >
           {submitLabel}
         </button>

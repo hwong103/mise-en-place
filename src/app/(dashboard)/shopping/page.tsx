@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentAccessContext } from "@/lib/household";
 import { getUpcomingRange, toDateKey } from "@/lib/date";
 import { buildShoppingList } from "@/lib/shopping";
-import { coerceStringArray } from "@/lib/recipe-utils";
+import { getRecipeIngredientLines } from "@/lib/recipe-utils";
 import {
   buildHouseholdJoinUrl,
   getCurrentHouseholdShareLink,
@@ -40,6 +40,7 @@ export default async function ShoppingPage() {
               select: {
                 title: true,
                 ingredients: true,
+                prepGroups: true,
               },
             },
           },
@@ -70,7 +71,9 @@ export default async function ShoppingPage() {
     .filter((plan) => !plan.cooked)
     .flatMap((plan) => {
       const recipeTitle = plan.recipe?.title ?? null;
-      const ingredients = plan.recipe ? coerceStringArray(plan.recipe.ingredients) : [];
+      const ingredients = plan.recipe
+        ? getRecipeIngredientLines(plan.recipe.ingredients, plan.recipe.prepGroups)
+        : [];
       return ingredients.map((line) => ({ line, recipeTitle }));
     });
 

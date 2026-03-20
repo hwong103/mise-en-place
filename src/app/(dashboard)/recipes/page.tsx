@@ -3,7 +3,7 @@ import { listRecipes } from "@/lib/recipes";
 
 import { createRecipe, importRecipeFromUrl } from "./actions";
 
-export const revalidate = 30;
+export const revalidate = 0;
 
 export default async function RecipesPage({
   searchParams,

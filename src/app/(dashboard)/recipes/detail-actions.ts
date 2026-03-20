@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import prisma from "@/lib/prisma";
@@ -357,7 +357,13 @@ export async function updateRecipeSection(formData: FormData) {
     meta: { recipe_id: recipeId, section },
   });
 
+  updateTag(`recipes-${householdId}`);
+  updateTag(`recipe-${recipeId}`);
+  updateTag(`shopping-${householdId}`);
+  revalidatePath("/recipes");
   revalidatePath(`/recipes/${recipeId}`);
+  revalidatePath("/planner");
+  revalidatePath("/shopping");
   redirect(`/recipes/${recipeId}`);
 }
 
@@ -377,6 +383,9 @@ export async function deleteRecipe(formData: FormData) {
     where: { id: recipeId, householdId },
   });
 
+  updateTag(`recipes-${householdId}`);
+  updateTag(`recipe-${recipeId}`);
+  updateTag(`shopping-${householdId}`);
   revalidatePath("/recipes");
   revalidatePath("/planner");
   revalidatePath("/shopping");
@@ -398,6 +407,7 @@ export async function updatePrepGroupsOrder(formData: FormData) {
       where: { id: recipeId, householdId },
       data: { prepGroups },
     });
+    updateTag(`recipe-${recipeId}`);
     revalidatePath(`/recipes/${recipeId}`);
   } catch (error) {
     console.error("Failed to update prep groups order:", error);

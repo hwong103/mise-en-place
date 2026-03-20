@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
 import { fromDateKey } from "@/lib/date";
@@ -69,6 +69,7 @@ export async function upsertMealPlan(formData: FormData) {
     },
   });
 
+  updateTag(`shopping-${householdId}`);
   revalidatePath("/planner");
   revalidatePath("/shopping");
   return { status: "created" as const, id: created.id, mealType: created.mealType };
@@ -88,6 +89,7 @@ export async function removeMealPlanEntry(input: { planId: string }) {
     },
   });
 
+  updateTag(`shopping-${householdId}`);
   revalidatePath("/planner");
   revalidatePath("/shopping");
 }
@@ -107,6 +109,7 @@ export async function clearMealPlanDay(input: { date: string }) {
     },
   });
 
+  updateTag(`shopping-${householdId}`);
   revalidatePath("/planner");
   revalidatePath("/shopping");
 }
@@ -136,6 +139,8 @@ export async function markMealPlanCooked(input: { planId: string }) {
     data: { cookCount: cookedPlans.length },
   });
 
+  updateTag(`shopping-${householdId}`);
+  updateTag(`recipe-${plan.recipeId}`);
   revalidatePath("/planner");
   revalidatePath(`/recipes/${plan.recipeId}`);
   revalidatePath("/recipes");
@@ -166,6 +171,8 @@ export async function unmarkMealPlanCooked(input: { planId: string }) {
     data: { cookCount: cookedPlans.length },
   });
 
+  updateTag(`shopping-${householdId}`);
+  updateTag(`recipe-${plan.recipeId}`);
   revalidatePath("/planner");
   revalidatePath(`/recipes/${plan.recipeId}`);
   revalidatePath("/recipes");

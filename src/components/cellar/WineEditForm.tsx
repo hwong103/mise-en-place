@@ -366,7 +366,7 @@ function SaveButton() {
         <button
             type="submit"
             disabled={pending}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-3 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
         >
             {pending && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
             {pending ? "Saving…" : "Save to Cellar"}

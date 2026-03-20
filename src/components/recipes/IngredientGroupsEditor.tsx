@@ -8,20 +8,24 @@ import {
     KeyboardSensor,
     PointerSensor,
     closestCenter,
+    useDroppable,
     useSensor,
     useSensors,
     type DragEndEvent,
     type DragOverEvent,
     DragOverlay,
     type DragStartEvent,
+    type DraggableAttributes,
 } from "@dnd-kit/core";
 import {
     SortableContext,
+    arrayMove,
     sortableKeyboardCoordinates,
     useSortable,
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 
 type IngredientGroupsEditorProps = {
     initialGroups: PrepGroup[];
@@ -36,6 +40,7 @@ type EditorItem = {
 };
 
 type EditorGroup = {
+    id: string;
     title: string;
     items: EditorItem[];
     stepIndex?: number;
@@ -55,6 +60,7 @@ const autoResize = (el: HTMLTextAreaElement) => {
 
 const toEditorGroups = (initialGroups: PrepGroup[]): EditorGroup[] =>
     initialGroups.map((g) => ({
+        id: generateId(),
         title: g.title,
         items: g.items.map((value) => ({ id: generateId(), value })),
         stepIndex: g.stepIndex,
@@ -96,6 +102,9 @@ function SortableItemRow({
 }: SortableItemProps) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: item.id,
+        data: {
+            type: "item",
+        },
     });
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -189,6 +198,81 @@ function DragOverlayItem({ value }: { value: string }) {
     );
 }
 
+function DragOverlayGroup({ title }: { title: string }) {
+    return (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50/95 px-4 py-3 shadow-lg dark:border-emerald-700 dark:bg-emerald-950/95">
+            <div className="flex items-center gap-2">
+                <GripVertical className="h-4 w-4 text-emerald-500" />
+                <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                    {title || "Untitled group"}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function DroppableGroupContainer({
+    groupId,
+    children,
+}: {
+    groupId: string;
+    children: React.ReactNode;
+}) {
+    const { isOver, setNodeRef } = useDroppable({
+        id: `${groupId}-items`,
+        data: {
+            type: "group-items",
+            groupId,
+        },
+    });
+
+    return (
+        <div
+            ref={setNodeRef}
+            className={`mt-4 space-y-1 rounded-xl border bg-white p-3 transition-colors dark:bg-slate-950/70 ${
+                isOver
+                    ? "border-emerald-400 bg-emerald-50/40 dark:border-emerald-600 dark:bg-emerald-950/30"
+                    : "border-slate-200 dark:border-slate-700"
+            }`}
+        >
+            {children}
+        </div>
+    );
+}
+
+function SortableGroupCard({
+    groupId,
+    children,
+}: {
+    groupId: string;
+    children: (dragHandleProps: {
+        attributes: DraggableAttributes;
+        listeners: SyntheticListenerMap | undefined;
+        isDragging: boolean;
+    }) => React.ReactNode;
+}) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id: groupId,
+        data: {
+            type: "group",
+        },
+    });
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={{ transform: CSS.Transform.toString(transform), transition }}
+            className={`group/section relative rounded-2xl border bg-slate-50/30 p-4 transition-all dark:bg-slate-900/40 ${
+                isDragging
+                    ? "border-emerald-500/50 opacity-40 grayscale"
+                    : "border-slate-100 dark:border-slate-800/50"
+            }`}
+        >
+            {children({ attributes, listeners, isDragging })}
+        </div>
+    );
+}
+
 // ─── Main Editor ────────────────────────────────────────────────────
 
 export default function IngredientGroupsEditor(props: IngredientGroupsEditorProps) {
@@ -204,6 +288,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
     }));
     const [focusItemId, setFocusItemId] = useState<string | null>(null);
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [activeType, setActiveType] = useState<"group" | "item" | null>(null);
     const [newItemValues, setNewItemValues] = useState<Record<number, string>>({});
     const newInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
     const groups =
@@ -259,29 +344,45 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
         [groups]
     );
 
+    const findGroupIndex = useCallback(
+        (groupId: string) => groups.findIndex((group) => group.id === groupId),
+        [groups]
+    );
+
+    const findGroupIndexFromDropTarget = useCallback(
+        (id: string) => {
+            const directMatch = findGroupIndex(id);
+            if (directMatch !== -1) return directMatch;
+            return groups.findIndex((group) => `${group.id}-items` === id);
+        },
+        [findGroupIndex, groups]
+    );
+
     const activeItem = activeId ? findItem(activeId) : null;
+    const activeGroup = activeId && activeType === "group" ? groups.find((group) => group.id === activeId) : null;
 
     // ── Drag handlers ──
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id as string);
+        const dragType = event.active.data.current?.type;
+        setActiveType(dragType === "group" ? "group" : "item");
     };
 
     const handleDragOver = (event: DragOverEvent) => {
         const { active, over } = event;
         if (!over) return;
 
-        // If hovering over another item, find its container
+        if (active.data.current?.type !== "item") return;
+
         const sourceId = active.id as string;
-        const destId = over.id as string;
+        const overId = over.id as string;
 
         const source = findItem(sourceId);
-        const dest = findItem(destId);
+        if (!source || sourceId === overId) return;
 
-        // Not dragging an item, or dropping over same item
-        if (!source || sourceId === destId) return;
+        const dest = findItem(overId);
 
-        // If hovering over an item in a different group, move it immediately
         if (dest && source.gIdx !== dest.gIdx) {
             updateGroups((prev) => {
                 const next = prev.map((g) => ({ ...g, items: [...g.items] }));
@@ -297,25 +398,66 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
                 next[dest.gIdx].items.splice(dest.iIdx + modifier, 0, movedItem);
                 return next;
             });
+            return;
+        }
+
+        if (!dest) {
+            const destGroupIdx = findGroupIndexFromDropTarget(overId);
+            if (destGroupIdx === -1 || destGroupIdx === source.gIdx) return;
+
+            updateGroups((prev) => {
+                const next = prev.map((g) => ({ ...g, items: [...g.items] }));
+                const [movedItem] = next[source.gIdx].items.splice(source.iIdx, 1);
+                next[destGroupIdx].items.push(movedItem);
+                return next;
+            });
         }
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         setActiveId(null);
+        setActiveType(null);
 
         if (!over || active.id === over.id) return;
 
-        const source = findItem(active.id as string);
-        const dest = findItem(over.id as string);
-        if (!source || !dest) return;
+        if (active.data.current?.type === "group") {
+            const sourceGroupIdx = findGroupIndex(active.id as string);
+            const destGroupIdx = findGroupIndexFromDropTarget(over.id as string);
+            if (sourceGroupIdx === -1 || destGroupIdx === -1 || sourceGroupIdx === destGroupIdx) return;
 
-        // Final drop (usually within same group since cross-group is handled by DragOver)
+            updateGroups((prev) => arrayMove(prev, sourceGroupIdx, destGroupIdx));
+            return;
+        }
+
+        const source = findItem(active.id as string);
+        if (!source) return;
+
+        const dest = findItem(over.id as string);
+
+        if (!dest) {
+            const destGroupIdx = findGroupIndexFromDropTarget(over.id as string);
+            if (destGroupIdx !== -1 && destGroupIdx !== source.gIdx) {
+                updateGroups((prev) => {
+                    const next = prev.map((g) => ({ ...g, items: [...g.items] }));
+                    const [movedItem] = next[source.gIdx].items.splice(source.iIdx, 1);
+                    next[destGroupIdx].items.push(movedItem);
+                    return next;
+                });
+            }
+            return;
+        }
+
         updateGroups((prev) => {
             const next = prev.map((g) => ({
                 ...g,
                 items: [...g.items],
             }));
+
+            if (source.gIdx === dest.gIdx) {
+                next[source.gIdx].items = arrayMove(next[source.gIdx].items, source.iIdx, dest.iIdx);
+                return next;
+            }
 
             const [movedItem] = next[source.gIdx].items.splice(source.iIdx, 1);
             next[dest.gIdx].items.splice(dest.iIdx, 0, movedItem);
@@ -385,6 +527,7 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
         updateGroups((prev) => [
             ...prev,
             {
+                id: generateId(),
                 title: "",
                 items: [],
                 sourceGroup: prefix === "ingredientGroup",
@@ -419,28 +562,6 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
         newInputRefs.current[gIdx]?.focus();
     };
 
-    // ── Drag handler for group reordering ──
-
-    const [draggedGroupIdx, setDraggedGroupIdx] = useState<number | null>(null);
-
-    const handleGroupDragStart = (idx: number) => setDraggedGroupIdx(idx);
-
-    const handleGroupDragOver = (e: React.DragEvent, idx: number) => {
-        e.preventDefault();
-        if (draggedGroupIdx === null || draggedGroupIdx === idx) return;
-
-        updateGroups((prev) => {
-            const next = [...prev];
-            const dragged = next[draggedGroupIdx];
-            next.splice(draggedGroupIdx, 1);
-            next.splice(idx, 0, dragged);
-            return next;
-        });
-        setDraggedGroupIdx(idx);
-    };
-
-    const handleGroupDragEnd = () => setDraggedGroupIdx(null);
-
     return (
         <DndContext
             sensors={sensors}
@@ -450,145 +571,146 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
             onDragEnd={handleDragEnd}
         >
             <div className="space-y-6">
-                {groups.map((group, gIdx) => {
-                    const groupItemIds = group.items.map((item) => item.id);
+                <SortableContext
+                    items={groups.map((group) => group.id)}
+                    strategy={verticalListSortingStrategy}
+                >
+                    {groups.map((group, gIdx) => {
+                        const groupItemIds = group.items.map((item) => item.id);
 
-                    return (
-                        <div
-                            key={gIdx}
-                            draggable
-                            onDragStart={(e) => {
-                                // Only allow group drag from the header grip handle
-                                const target = e.target as HTMLElement;
-                                if (!target.closest("[data-group-grip]")) {
-                                    e.preventDefault();
-                                    return;
-                                }
-                                handleGroupDragStart(gIdx);
-                            }}
-                            onDragOver={(e) => handleGroupDragOver(e, gIdx)}
-                            onDragEnd={handleGroupDragEnd}
-                            className={`group/section relative rounded-2xl border bg-slate-50/30 p-4 transition-all dark:bg-slate-900/40
-                ${draggedGroupIdx === gIdx ? "opacity-40 grayscale border-emerald-500/50" : "border-slate-100 dark:border-slate-800/50"}`}
-                        >
-                            {/* Group header */}
-                            <div className="mb-2 flex items-center gap-2">
-                                <div
-                                    data-group-grip
-                                    className="cursor-grab text-slate-300 active:cursor-grabbing dark:text-slate-600"
-                                >
-                                    <GripVertical className="h-4 w-4" />
-                                </div>
-                                <input
-                                    type="text"
-                                    name={`${prefix}Title_${gIdx}`}
-                                    value={group.title}
-                                    onChange={(e) => updateGroupTitle(gIdx, e.target.value)}
-                                    placeholder={
-                                        showStepBadge
-                                            ? "Step Title (optional)"
-                                            : "Group Title (e.g. For the Sauce)"
-                                    }
-                                    className="flex-1 bg-transparent text-xs font-bold uppercase tracking-widest text-slate-400 outline-none placeholder:text-slate-300 focus:text-emerald-600 dark:text-slate-500 dark:placeholder:text-slate-700 dark:focus:text-emerald-400"
-                                />
-                                {showStepBadge && group.stepIndex !== undefined && (
-                                    <div className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                                        <span>Step {group.stepIndex + 1}</span>
-                                        <input
-                                            type="hidden"
-                                            name={`${prefix}StepIndex_${gIdx}`}
-                                            value={group.stepIndex}
-                                        />
-                                    </div>
+                        return (
+                            <SortableGroupCard key={group.id} groupId={group.id}>
+                                {({ attributes, listeners }) => (
+                                    <>
+                                        {/* Group header */}
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                data-group-grip
+                                                className="cursor-grab rounded-full p-1 text-slate-300 active:cursor-grabbing dark:text-slate-600"
+                                                aria-label={`Reorder group ${gIdx + 1}`}
+                                                {...attributes}
+                                                {...listeners}
+                                            >
+                                                <GripVertical className="h-4 w-4" />
+                                            </button>
+                                            <input
+                                                type="text"
+                                                name={`${prefix}Title_${gIdx}`}
+                                                value={group.title}
+                                                onChange={(e) => updateGroupTitle(gIdx, e.target.value)}
+                                                placeholder={
+                                                    showStepBadge
+                                                        ? "Step Title (optional)"
+                                                        : "Group Title (e.g. For the Sauce)"
+                                                }
+                                                className="flex-1 bg-transparent text-xs font-bold uppercase tracking-widest text-slate-400 outline-none placeholder:text-slate-300 focus:text-emerald-600 dark:text-slate-500 dark:placeholder:text-slate-700 dark:focus:text-emerald-400"
+                                            />
+                                            {showStepBadge && group.stepIndex !== undefined && (
+                                                <div className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                                                    <span>Step {group.stepIndex + 1}</span>
+                                                    <input
+                                                        type="hidden"
+                                                        name={`${prefix}StepIndex_${gIdx}`}
+                                                        value={group.stepIndex}
+                                                    />
+                                                </div>
+                                            )}
+                                            <input
+                                                type="hidden"
+                                                name={`${prefix}Exists_${gIdx}`}
+                                                value="true"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeGroup(gIdx)}
+                                                className="rounded-full p-2 text-slate-300 opacity-100 transition-opacity hover:bg-rose-50 hover:text-rose-500 md:opacity-0 md:group-hover/section:opacity-100 dark:hover:bg-rose-950/30"
+                                                title="Remove Section"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+
+                                        <DroppableGroupContainer groupId={group.id}>
+                                            {/* Hidden input serializes items for form submission */}
+                                            <input
+                                                type="hidden"
+                                                name={`${prefix}Items_${gIdx}`}
+                                                value={[
+                                                    ...group.items.map((item) => item.value),
+                                                    ...(newItemValues[gIdx]?.trim()
+                                                        ? [newItemValues[gIdx].trim()]
+                                                        : []),
+                                                ].join("\n")}
+                                            />
+
+                                            <SortableContext
+                                                items={groupItemIds}
+                                                strategy={verticalListSortingStrategy}
+                                            >
+                                                {group.items.map((item, iIdx) => (
+                                                    <SortableItemRow
+                                                        key={item.id}
+                                                        item={item}
+                                                        index={iIdx}
+                                                        ordered={false}
+                                                        focusOnMount={focusItemId === item.id}
+                                                        onFocusHandled={() => setFocusItemId(null)}
+                                                        onUpdate={updateItem}
+                                                        onDelete={deleteItem}
+                                                        onInsertAfter={insertAfter}
+                                                    />
+                                                ))}
+                                            </SortableContext>
+
+                                            {group.items.length === 0 && (
+                                                <p className="py-2 text-center text-xs italic text-slate-400 dark:text-slate-600">
+                                                    Drag items here or add below
+                                                </p>
+                                            )}
+
+                                            <div className="flex items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+                                                <input
+                                                    ref={(el) => {
+                                                        newInputRefs.current[gIdx] = el;
+                                                    }}
+                                                    type="text"
+                                                    value={newItemValues[gIdx] ?? ""}
+                                                    onChange={(e) =>
+                                                        setNewItemValues((prev) => ({
+                                                            ...prev,
+                                                            [gIdx]: e.target.value,
+                                                        }))
+                                                    }
+                                                    onBlur={() => appendNewItem(gIdx)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") {
+                                                            e.preventDefault();
+                                                            appendNewItem(gIdx);
+                                                        }
+                                                    }}
+                                                    placeholder={
+                                                        showStepBadge
+                                                            ? "Add prep step items..."
+                                                            : "e.g. 2 tbsp olive oil"
+                                                    }
+                                                    className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => appendNewItem(gIdx)}
+                                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                                                >
+                                                    {showStepBadge ? "+ Add item" : "+ Add ingredient"}
+                                                </button>
+                                            </div>
+                                        </DroppableGroupContainer>
+                                    </>
                                 )}
-                                <input
-                                    type="hidden"
-                                    name={`${prefix}Exists_${gIdx}`}
-                                    value="true"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => removeGroup(gIdx)}
-                                    className="rounded-full p-2 text-slate-300 opacity-100 transition-opacity hover:bg-rose-50 hover:text-rose-500 md:opacity-0 md:group-hover/section:opacity-100 dark:hover:bg-rose-950/30"
-                                    title="Remove Section"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-
-                            {/* Items with cross-group sortable */}
-                            <div className="mt-4 space-y-1 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/70">
-                                {/* Hidden input serializes items for form submission */}
-                                <input
-                                    type="hidden"
-                                    name={`${prefix}Items_${gIdx}`}
-                                    value={group.items.map((item) => item.value).join("\n")}
-                                />
-
-                                <SortableContext
-                                    items={groupItemIds}
-                                    strategy={verticalListSortingStrategy}
-                                >
-                                    {group.items.map((item, iIdx) => (
-                                        <SortableItemRow
-                                            key={item.id}
-                                            item={item}
-                                            index={iIdx}
-                                            ordered={false}
-                                            focusOnMount={focusItemId === item.id}
-                                            onFocusHandled={() => setFocusItemId(null)}
-                                            onUpdate={updateItem}
-                                            onDelete={deleteItem}
-                                            onInsertAfter={insertAfter}
-                                        />
-                                    ))}
-                                </SortableContext>
-
-                                {group.items.length === 0 && (
-                                    <p className="py-2 text-center text-xs italic text-slate-400 dark:text-slate-600">
-                                        Drag items here or add below
-                                    </p>
-                                )}
-
-                                <div className="flex items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-                                    <input
-                                        ref={(el) => {
-                                            newInputRefs.current[gIdx] = el;
-                                        }}
-                                        type="text"
-                                        value={newItemValues[gIdx] ?? ""}
-                                        onChange={(e) =>
-                                            setNewItemValues((prev) => ({
-                                                ...prev,
-                                                [gIdx]: e.target.value,
-                                            }))
-                                        }
-                                        onBlur={() => appendNewItem(gIdx)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                appendNewItem(gIdx);
-                                            }
-                                        }}
-                                        placeholder={
-                                            showStepBadge
-                                                ? "Add prep step items..."
-                                                : "e.g. 2 tbsp olive oil"
-                                        }
-                                        className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => appendNewItem(gIdx)}
-                                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                                    >
-                                        {showStepBadge ? "+ Add item" : "+ Add ingredient"}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
+                            </SortableGroupCard>
+                        );
+                    })}
+                </SortableContext>
 
                 <button
                     type="button"
@@ -603,7 +725,12 @@ export default function IngredientGroupsEditor(props: IngredientGroupsEditorProp
             </div>
 
             <DragOverlay>
-                {activeItem ? <DragOverlayItem value={activeItem.item.value} /> : null}
+                {activeType === "item" && activeItem ? (
+                    <DragOverlayItem value={activeItem.item.value} />
+                ) : null}
+                {activeType === "group" && activeGroup ? (
+                    <DragOverlayGroup title={activeGroup.title} />
+                ) : null}
             </DragOverlay>
         </DndContext>
     );

@@ -67,7 +67,7 @@ export default function AddToPlannerDialog({
         onClick={() => setIsOpen(true)}
         className={
           triggerClassName ??
-          "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+          "ui-button ui-button-secondary rounded-xl px-4 py-2 text-sm"
         }
       >
         {triggerLabel}
@@ -157,7 +157,7 @@ export default function AddToPlannerDialog({
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-50"
+              className="rounded-xl bg-[var(--accent)] px-6 py-2 text-sm font-bold text-white shadow-lg transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
             >
               {isPending ? "Saving..." : "Add to Planner"}
             </button>
