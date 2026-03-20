@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import AddToPlannerDialog from "@/components/recipes/AddToPlannerDialog";
 import SubmitButton from "@/components/forms/SubmitButton";
+import RecipeDetailTabs from "@/components/recipes/RecipeDetailTabs";
 import { getRecipeById } from "@/lib/recipes";
 import { getServerNow } from "@/lib/server-clock";
 import { logServerPerf } from "@/lib/server-perf";
@@ -14,17 +15,12 @@ import {
   getRecipeIngredientLines,
 } from "@/lib/recipe-utils";
 
-
 import { deleteRecipe, updateRecipeSection } from "../detail-actions";
 
-const LineListEditor = dynamic(() => import("@/components/recipes/LineListEditor"));
 const RecipeFocusMode = dynamic(() => import("@/components/recipes/RecipeFocusMode"));
-const IngredientGroupsEditor = dynamic(() => import("@/components/recipes/IngredientGroupsEditor"));
 
 export const revalidate = 0;
 export const dynamicParams = true;
-
-const formatMinutes = (value?: number | null) => (value ? `${value} min` : null);
 
 const getVideoEmbedUrl = (videoUrl?: string | null) => {
   if (!videoUrl) {
@@ -257,34 +253,6 @@ export default async function RecipeDetailPage({
         </div>
       </section>
 
-      {recipe.videoUrl ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:hidden dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
-            <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              Open Video
-            </a>
-          </div>
-          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-            {embedUrl ? (
-              <div className="aspect-[16/9] w-full">
-                <iframe
-                  src={embedUrl}
-                  title={`Video for ${recipe.title}`}
-                  className="h-full w-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              </div>
-            ) : (
-              <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-                Video preview not available.
-              </div>
-            )}
-          </div>
-        </section>
-      ) : null}
-
       <form id="recipe-edit-form" action={updateRecipeSection} className="space-y-6">
         {isEditing ? (
           <>
@@ -311,317 +279,25 @@ export default async function RecipeDetailPage({
           </>
         ) : null}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <section className="space-y-6 lg:col-span-1">
-            <div className="grid gap-6">
-              {/* Ingredients Card */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                      Ingredients
-                    </h2>
-                  </div>
-                </div>
-
-                {isEditing ? (
-                  <IngredientGroupsEditor initialGroups={ingredientGroups} />
-                ) : (
-                  <div className="space-y-6">
-                    {ingredientGroups.map((group, groupIdx) => (
-                      <div key={groupIdx}>
-                        {group.title && (
-                          <h3 className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                            {group.title}
-                          </h3>
-                        )}
-                        <ul className="space-y-2.5">
-                          {group.items.map((item, itemIdx) => (
-                            <li
-                              key={itemIdx}
-                              className="flex items-start gap-3 text-[15px] text-slate-600 dark:text-slate-300"
-                            >
-                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/40" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Prep Groups Card */}
-              <section className="rounded-3xl border border-amber-200 bg-amber-50/30 p-6 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Prep Groups</h2>
-                  </div>
-                </div>
-                {isEditing ? (
-                  <div className="mt-4">
-                    <IngredientGroupsEditor
-                      initialGroups={miseGroups}
-                      prefix="miseGroup"
-                    />
-                  </div>
-                ) : (
-                  <div className="mt-4 grid gap-4 grid-cols-1">
-                    {miseGroups.length === 0 ? (
-                      <p className="col-span-2 py-4 text-center text-sm italic text-slate-500">
-                        No prep groups. Edit recipe to add groups.
-                      </p>
-                    ) : (
-                      miseGroups.map((group) => (
-                        <div key={group.title} className="group relative rounded-2xl border border-white bg-white/60 p-4 shadow-sm transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-900">
-                          <div className="flex items-start justify-between">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                              {group.title}
-                            </h3>
-                          </div>
-                          <ul className="mt-3 space-y-1.5 text-sm text-slate-700 dark:text-slate-200">
-                            {group.items.map((item) => (
-                              <li key={`${group.title}-${item}`} className="flex items-start gap-2">
-                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </section>
-            </div>
-          </section>
-
-          <section className="space-y-6 lg:col-span-1">
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Instructions</h2>
-              {!isEditing ? (
-                instructions.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                    No instructions listed yet.
-                  </p>
-                ) : (
-                  <ol className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-200">
-                    {instructions.map((step, index) => (
-                      <li key={`${index}-${step}`} className="flex gap-3">
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                          {index + 1}
-                        </span>
-                        <span>{step}</span>
-                      </li>
-                    ))}
-                  </ol>
-                )
-              ) : (
-                <LineListEditor
-                  name="instructions"
-                  initialItems={instructions}
-                  ordered
-                  placeholder="Describe this step..."
-                  addLabel="+ Add step"
-                />
-              )}
-            </section>
-          </section>
-
-          <aside className="space-y-6 lg:col-span-1">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              {!isEditing ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {recipe.servings ? (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                        {recipe.servings} servings
-                      </span>
-                    ) : null}
-                    {recipe.cookCount && recipe.cookCount > 0 ? (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30">
-                        🍳 Cooked x{recipe.cookCount}
-                      </span>
-                    ) : null}
-                    {formatMinutes(recipe.prepTime) ? (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                        Prep {formatMinutes(recipe.prepTime)}
-                      </span>
-                    ) : null}
-                    {formatMinutes(recipe.cookTime) ? (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                        Cook {formatMinutes(recipe.cookTime)}
-                      </span>
-                    ) : null}
-                    {recipe.sourceUrl ? (
-                      <a
-                        href={recipe.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-                      >
-                        {authorLabel ? `By ${authorLabel}` : "Source"}
-                      </a>
-                    ) : null}
-                  </div>
-
-                  {recipe.tags?.length ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {recipe.tags.map((tag: string) => (
-                        <span
-                          key={tag}
-                          className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                    Inline Edit
-                  </p>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Title
-                      <input
-                        name="title"
-                        defaultValue={recipe.title}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Tags
-                      <input
-                        name="tags"
-                        defaultValue={(recipe.tags ?? []).join(", ")}
-                        placeholder="Weeknight, Family"
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Servings
-                      <input
-                        name="servings"
-                        type="number"
-                        min={1}
-                        defaultValue={recipe.servings ?? undefined}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Prep (min)
-                        <input
-                          name="prepTime"
-                          type="number"
-                          min={1}
-                          defaultValue={recipe.prepTime ?? undefined}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                        />
-                      </label>
-                      <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Cook (min)
-                        <input
-                          name="cookTime"
-                          type="number"
-                          min={1}
-                          defaultValue={recipe.cookTime ?? undefined}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                        />
-                      </label>
-                    </div>
-                    <label className="space-y-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 md:col-span-2">
-                      Description
-                      <textarea
-                        name="description"
-                        rows={2}
-                        defaultValue={recipe.description ?? ""}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <input
-                      name="sourceUrl"
-                      defaultValue={recipe.sourceUrl ?? ""}
-                      placeholder="Source URL"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                    <input
-                      name="videoUrl"
-                      defaultValue={recipe.videoUrl ?? ""}
-                      placeholder="Video URL"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                    <input
-                      name="imageUrl"
-                      defaultValue={recipe.imageUrl ?? ""}
-                      placeholder="Image URL"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Notes</h2>
-              {!isEditing ? (
-                notes.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No notes saved yet.</p>
-                ) : (
-                  <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                    {notes.map((note) => (
-                      <li key={note} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                        {note}
-                      </li>
-                    ))}
-                  </ul>
-                )
-              ) : (
-                <LineListEditor
-                  name="notes"
-                  initialItems={notes}
-                  ordered={false}
-                  placeholder="Add a note..."
-                  addLabel="+ Add note"
-                />
-              )}
-            </section>
-
-            {recipe.videoUrl ? (
-              <section className="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:block dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Watch</h2>
-                  <a href={recipe.videoUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                    Open Video
-                  </a>
-                </div>
-                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                  {embedUrl ? (
-                    <div className="aspect-[16/9] w-full">
-                      <iframe
-                        src={embedUrl}
-                        title={`Video for ${recipe.title}`}
-                        className="h-full w-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-                      Video preview not available.
-                    </div>
-                  )}
-                </div>
-              </section>
-            ) : null}
-          </aside>
-        </div>
+        <RecipeDetailTabs
+          ingredientGroups={ingredientGroups}
+          miseGroups={miseGroups}
+          instructions={instructions}
+          notes={notes}
+          embedUrl={embedUrl}
+          videoUrl={recipe.videoUrl}
+          servings={recipe.servings}
+          cookCount={recipe.cookCount}
+          prepTime={recipe.prepTime}
+          cookTime={recipe.cookTime}
+          sourceUrl={recipe.sourceUrl}
+          authorLabel={authorLabel}
+          tags={recipe.tags ?? []}
+          description={recipe.description}
+          imageUrl={recipe.imageUrl}
+          isEditing={isEditing}
+          recipeTitle={recipe.title}
+        />
       </form >
     </div >
   );
