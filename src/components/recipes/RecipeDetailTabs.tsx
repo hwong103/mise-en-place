@@ -378,34 +378,41 @@ export default function RecipeDetailTabs({
     <div className="grid gap-6 lg:grid-cols-3">
       <section className="lg:col-span-1">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-end gap-5 border-b border-slate-200 dark:border-slate-800">
-            <TabButton active={leftTab === "ingredients"} onClick={() => setLeftTab("ingredients")}>
-              Ingredients
-            </TabButton>
-            <TabButton active={leftTab === "prepGroups"} onClick={() => setLeftTab("prepGroups")}>
-              Prep Groups
-            </TabButton>
-          </div>
-
           <div className="pt-6">
             {isEditing ? (
-              <>
-                <div hidden={leftTab !== "ingredients"} aria-hidden={leftTab !== "ingredients"}>
+              <div className="space-y-8">
+                <div>
+                  <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                    Ingredients
+                  </p>
                   <IngredientGroupsEditor initialGroups={ingredientGroups} />
                 </div>
-                <div hidden={leftTab !== "prepGroups"} aria-hidden={leftTab !== "prepGroups"}>
+                <div>
+                  <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-amber-400 dark:text-amber-500">
+                    Prep Groups
+                  </p>
                   <IngredientGroupsEditor initialGroups={miseGroups} prefix="miseGroup" />
                 </div>
-              </>
+              </div>
             ) : (
-              <>
-                <div hidden={leftTab !== "ingredients"} aria-hidden={leftTab !== "ingredients"}>
-                  <LeftView groups={ingredientGroups} />
+              <div>
+                <div className="flex items-end gap-5 border-b border-slate-200 dark:border-slate-800">
+                  <TabButton active={leftTab === "ingredients"} onClick={() => setLeftTab("ingredients")}>
+                    Ingredients
+                  </TabButton>
+                  <TabButton active={leftTab === "prepGroups"} onClick={() => setLeftTab("prepGroups")}>
+                    Prep Groups
+                  </TabButton>
                 </div>
-                <div hidden={leftTab !== "prepGroups"} aria-hidden={leftTab !== "prepGroups"}>
-                  <PrepGroupsView groups={miseGroups} />
+                <div className="pt-6">
+                  <div hidden={leftTab !== "ingredients"} aria-hidden={leftTab !== "ingredients"}>
+                    <LeftView groups={ingredientGroups} />
+                  </div>
+                  <div hidden={leftTab !== "prepGroups"} aria-hidden={leftTab !== "prepGroups"}>
+                    <PrepGroupsView groups={miseGroups} />
+                  </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -475,24 +482,13 @@ export default function RecipeDetailTabs({
             </div>
           ) : null}
 
-          <div className="mt-6 flex items-end gap-5 border-b border-slate-200 dark:border-slate-800">
-            <TabButton active={visibleRightTab === "instructions"} onClick={() => setRightTab("instructions")}>
-              Instructions
-            </TabButton>
-            <TabButton active={visibleRightTab === "notes"} onClick={() => setRightTab("notes")}>
-              Notes
-            </TabButton>
-            {!isEditing && videoUrl ? (
-              <TabButton active={visibleRightTab === "watch"} onClick={() => setRightTab("watch")}>
-                Watch
-              </TabButton>
-            ) : null}
-          </div>
-
           <div className="pt-6">
             {isEditing ? (
-              <>
-                <div hidden={visibleRightTab !== "instructions"} aria-hidden={visibleRightTab !== "instructions"}>
+              <div className="space-y-8">
+                <div>
+                  <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                    Instructions
+                  </p>
                   <LineListEditor
                     name="instructions"
                     initialItems={instructions}
@@ -501,7 +497,10 @@ export default function RecipeDetailTabs({
                     addLabel="+ Add step"
                   />
                 </div>
-                <div hidden={visibleRightTab !== "notes"} aria-hidden={visibleRightTab !== "notes"}>
+                <div>
+                  <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                    Notes
+                  </p>
                   <LineListEditor
                     name="notes"
                     initialItems={notes}
@@ -510,21 +509,39 @@ export default function RecipeDetailTabs({
                     addLabel="+ Add note"
                   />
                 </div>
-              </>
+              </div>
             ) : (
-              <>
-                <div hidden={visibleRightTab !== "instructions"} aria-hidden={visibleRightTab !== "instructions"}>
-                  <InstructionsView instructions={instructions} />
+              <div>
+                <div className="flex items-end gap-5 border-b border-slate-200 dark:border-slate-800">
+                  <TabButton
+                    active={visibleRightTab === "instructions"}
+                    onClick={() => setRightTab("instructions")}
+                  >
+                    Instructions
+                  </TabButton>
+                  <TabButton active={visibleRightTab === "notes"} onClick={() => setRightTab("notes")}>
+                    Notes
+                  </TabButton>
+                  {videoUrl ? (
+                    <TabButton active={visibleRightTab === "watch"} onClick={() => setRightTab("watch")}>
+                      Watch
+                    </TabButton>
+                  ) : null}
                 </div>
-                <div hidden={visibleRightTab !== "notes"} aria-hidden={visibleRightTab !== "notes"}>
-                  <NotesView notes={notes} />
-                </div>
-                {!isEditing && videoUrl ? (
-                  <div hidden={visibleRightTab !== "watch"} aria-hidden={visibleRightTab !== "watch"}>
-                    <WatchView embedUrl={embedUrl} videoUrl={videoUrl} recipeTitle={recipeTitle} />
+                <div className="pt-6">
+                  <div hidden={visibleRightTab !== "instructions"} aria-hidden={visibleRightTab !== "instructions"}>
+                    <InstructionsView instructions={instructions} />
                   </div>
-                ) : null}
-              </>
+                  <div hidden={visibleRightTab !== "notes"} aria-hidden={visibleRightTab !== "notes"}>
+                    <NotesView notes={notes} />
+                  </div>
+                  {videoUrl ? (
+                    <div hidden={visibleRightTab !== "watch"} aria-hidden={visibleRightTab !== "watch"}>
+                      <WatchView embedUrl={embedUrl} videoUrl={videoUrl} recipeTitle={recipeTitle} />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             )}
           </div>
         </div>
