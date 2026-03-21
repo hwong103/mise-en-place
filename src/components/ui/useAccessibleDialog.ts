@@ -33,6 +33,11 @@ export function useAccessibleDialog<T extends HTMLElement>({
   initialFocusRef,
 }: UseAccessibleDialogOptions) {
   const dialogRef = useRef<T>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -56,7 +61,7 @@ export function useAccessibleDialog<T extends HTMLElement>({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -98,7 +103,7 @@ export function useAccessibleDialog<T extends HTMLElement>({
       document.body.style.overflow = previousOverflow;
       previousActiveElement?.focus();
     };
-  }, [initialFocusRef, isOpen, onClose]);
+  }, [initialFocusRef, isOpen]);
 
   return dialogRef;
 }
