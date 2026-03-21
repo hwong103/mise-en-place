@@ -112,6 +112,7 @@ export default function ShoppingList({
   >({});
   const [isClearing, setIsClearing] = useState(false);
   const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
+  const [mobileManualKeyboardInset, setMobileManualKeyboardInset] = useState(0);
   const [isPending, startTransition] = useTransition();
   const mobileManualInputRef = useRef<HTMLInputElement>(null);
   const mobileManualDialogRef = useAccessibleDialog<HTMLDivElement>({
@@ -134,6 +135,36 @@ export default function ShoppingList({
   useEffect(() => {
     setLocationOptions((current) => mergeLocationOptions(current, initialLocationOptions));
   }, [initialLocationOptions]);
+
+  useEffect(() => {
+    if (!isMobileManualOpen) {
+      setMobileManualKeyboardInset(0);
+      return;
+    }
+
+    const updateKeyboardInset = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) {
+        setMobileManualKeyboardInset(0);
+        return;
+      }
+
+      const obscuredHeight = Math.max(
+        0,
+        Math.round(window.innerHeight - viewport.height - viewport.offsetTop)
+      );
+      setMobileManualKeyboardInset(obscuredHeight);
+    };
+
+    updateKeyboardInset();
+    window.visualViewport?.addEventListener("resize", updateKeyboardInset);
+    window.visualViewport?.addEventListener("scroll", updateKeyboardInset);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateKeyboardInset);
+      window.visualViewport?.removeEventListener("scroll", updateKeyboardInset);
+    };
+  }, [isMobileManualOpen]);
 
   const persistedLookup = useMemo(() => {
     const map = new Map<string, ShoppingListItem>();
@@ -935,7 +966,12 @@ export default function ShoppingList({
               onClick={() => setIsMobileManualOpen(false)}
               aria-label="Close add manual items"
             />
-            <div className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] px-3">
+            <div
+              className="absolute inset-x-0 px-3"
+              style={{
+                bottom: `calc(env(safe-area-inset-bottom) + 5.25rem + ${mobileManualKeyboardInset}px)`,
+              }}
+            >
               <div
                 ref={mobileManualDialogRef}
                 id="mobile-manual-items-dialog"
@@ -943,6 +979,9 @@ export default function ShoppingList({
                 aria-modal="true"
                 aria-labelledby="mobile-manual-items-title"
                 className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-6.5rem)] flex-col rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+                style={{
+                  maxHeight: `calc(100dvh - env(safe-area-inset-top) - 6.5rem - ${mobileManualKeyboardInset}px)`,
+                }}
                 tabIndex={-1}
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
