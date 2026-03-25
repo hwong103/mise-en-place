@@ -44,6 +44,14 @@ const isLeftTab = (value: string | null): value is LeftTab =>
 const isRightTab = (value: string | null): value is RightTab =>
   value === "instructions" || value === "notes" || value === "watch";
 
+export const getVisibleRightTab = (rightTab: RightTab, videoUrl?: string | null): RightTab => {
+  if (!videoUrl && rightTab === "watch") {
+    return "instructions";
+  }
+
+  return rightTab;
+};
+
 function TabButton({
   active,
   children,
@@ -369,10 +377,7 @@ export default function RecipeDetailTabs({
     }
   }, [isHydrated, rightTab]);
 
-  const visibleRightTab: RightTab =
-    !videoUrl || (isEditing && rightTab === "watch")
-      ? "instructions"
-      : rightTab;
+  const visibleRightTab = getVisibleRightTab(rightTab, videoUrl);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
