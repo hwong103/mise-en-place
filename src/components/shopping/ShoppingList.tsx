@@ -100,6 +100,7 @@ export default function ShoppingList({
   const [manualCategory, setManualCategory] = useState("Other");
   const [manualLocation, setManualLocation] = useState(DEFAULT_SHOPPING_LOCATION);
   const [newLocation, setNewLocation] = useState("");
+  const [isDesktopLocationOpen, setIsDesktopLocationOpen] = useState(false);
   const [optimisticChecked, setOptimisticChecked] = useState<Record<string, boolean>>({});
   const [optimisticLocations, setOptimisticLocations] = useState<Record<string, string>>({});
   const [optimisticManualItems, setOptimisticManualItems] = useState<OptimisticManualItem[]>([]);
@@ -538,6 +539,7 @@ export default function ShoppingList({
     setLocationOptions((current) => mergeLocationOptions(current, [location]));
     setManualLocation(location);
     setNewLocation("");
+    setIsDesktopLocationOpen(false);
   };
 
   const handleClearList = () => {
@@ -599,7 +601,7 @@ export default function ShoppingList({
             </div>
           </div>
         ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.65fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_auto] sm:items-center">
           <input
             ref={options?.inputRef}
             value={manualLine}
@@ -637,9 +639,41 @@ export default function ShoppingList({
           >
             Add
           </button>
+          {!isEmbedded ? (
+            <button
+              type="button"
+              onClick={() => setIsDesktopLocationOpen((current) => !current)}
+              className="order-5 hidden rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 sm:inline-flex sm:w-auto sm:items-center sm:justify-center"
+              aria-expanded={isDesktopLocationOpen}
+              aria-controls="shopping-new-location-panel"
+            >
+              {isDesktopLocationOpen ? "Close" : "+ Location"}
+            </button>
+          ) : null}
         </div>
 
-        <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/40">
+        {!isEmbedded && isDesktopLocationOpen ? (
+          <div
+            id="shopping-new-location-panel"
+            className="mt-3 hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 sm:flex dark:border-slate-800 dark:bg-slate-950/40"
+          >
+            <input
+              value={newLocation}
+              onChange={(event) => setNewLocation(event.target.value)}
+              placeholder="Add a new location"
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-[var(--accent)] focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            />
+            <button
+              type="button"
+              onClick={handleAddLocation}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Save
+            </button>
+          </div>
+        ) : null}
+
+        <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 sm:hidden dark:border-slate-800 dark:bg-slate-950/40">
           <summary className="cursor-pointer list-none text-sm font-semibold text-slate-700 marker:hidden dark:text-slate-200">
             Add another shopping location
           </summary>

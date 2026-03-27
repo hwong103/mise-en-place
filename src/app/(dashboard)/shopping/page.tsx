@@ -2,7 +2,7 @@ import { unstable_cache } from "next/cache";
 import ShoppingList from "@/components/shopping/ShoppingList";
 import prisma from "@/lib/prisma";
 import { getCurrentAccessContext } from "@/lib/household";
-import { getUpcomingRange, toDateKey } from "@/lib/date";
+import { getUtcWeekRange, toDateKey } from "@/lib/date";
 import { buildShoppingList } from "@/lib/shopping";
 import { getRecipeIngredientLines } from "@/lib/recipe-utils";
 import {
@@ -17,7 +17,7 @@ import {
 export const revalidate = 30;
 
 export default async function ShoppingPage() {
-  const { start, end } = getUpcomingRange();
+  const { start, end } = getUtcWeekRange();
   const weekKey = toDateKey(start);
   const accessContext = await getCurrentAccessContext();
   const householdId = accessContext.householdId;

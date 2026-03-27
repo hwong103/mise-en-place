@@ -28,6 +28,25 @@ export function getUpcomingRange(referenceDate = new Date(), daysCount = 7) {
   return { start, end, days };
 }
 
+export function getUtcWeekRange(referenceDate = new Date(), weekStartsOn = 1) {
+  const start = normalizeToUtcDate(referenceDate);
+  const dayOfWeek = start.getUTCDay();
+  const diff = (dayOfWeek - weekStartsOn + 7) % 7;
+
+  start.setUTCDate(start.getUTCDate() - diff);
+
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(start);
+    day.setUTCDate(start.getUTCDate() + index);
+    return day;
+  });
+
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+
+  return { start, end, days };
+}
+
 export function getWeekRange(referenceDate = new Date(), weekStartsOn = 1) {
   const start = new Date(referenceDate);
   const dayOfWeek = start.getDay();
