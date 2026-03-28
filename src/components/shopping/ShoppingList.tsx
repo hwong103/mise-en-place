@@ -601,7 +601,7 @@ export default function ShoppingList({
             </div>
           </div>
         ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.65fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_auto] sm:items-center">
+        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.55fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto_auto] sm:items-center">
           <input
             ref={options?.inputRef}
             value={manualLine}

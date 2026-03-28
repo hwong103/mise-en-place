@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
+import type { ShoppingListItem } from "@/lib/db-types";
 import {
   buildShoppingLocationPreferenceKey,
   normalizeShoppingLine as normalizeShoppingLineValue,
@@ -15,12 +16,40 @@ export const isSuppressedMarkerLine = (line: string) => line.startsWith(SUPPRESS
 export const parseSuppressedMarkerLine = (line: string) =>
   isSuppressedMarkerLine(line) ? line.slice(SUPPRESS_PREFIX.length) : line;
 
+const getShoppingWeekEnd = (weekStart: Date) => {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+  return weekEnd;
+};
+
+const dedupeShoppingItems = (items: ShoppingListItem[]) => {
+  const deduped = new Map<string, ShoppingListItem>();
+
+  items.forEach((item) => {
+    const key = [item.manual ? "manual" : "auto", item.category, item.lineNormalized].join("::");
+    if (!deduped.has(key)) {
+      deduped.set(key, item);
+    }
+  });
+
+  return Array.from(deduped.values()).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+};
+
 export async function listShoppingItems(weekStart: Date, householdId?: string) {
   const resolvedHouseholdId = householdId ?? (await getCurrentHouseholdId());
-  return prisma.shoppingListItem.findMany({
-    where: { householdId: resolvedHouseholdId, weekStart },
-    orderBy: { createdAt: "asc" },
+  const weekEnd = getShoppingWeekEnd(weekStart);
+  const items = await prisma.shoppingListItem.findMany({
+    where: {
+      householdId: resolvedHouseholdId,
+      weekStart: {
+        gte: weekStart,
+        lte: weekEnd,
+      },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
+
+  return dedupeShoppingItems(items);
 }
 
 export async function listShoppingLocationPreferences(householdId?: string) {

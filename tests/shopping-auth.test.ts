@@ -26,8 +26,55 @@ describe("listShoppingItems tenant scoping", () => {
     await listShoppingItems(weekStart);
 
     expect(prisma.shoppingListItem.findMany).toHaveBeenCalledWith({
-      where: { householdId: "household_1", weekStart },
-      orderBy: { createdAt: "asc" },
+      where: {
+        householdId: "household_1",
+        weekStart: {
+          gte: weekStart,
+          lte: new Date("2026-01-11T00:00:00.000Z"),
+        },
+      },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    });
+  });
+
+  it("dedupes legacy day-scoped rows inside the same shopping week", async () => {
+    vi.mocked(getCurrentHouseholdId).mockResolvedValue("household_1");
+    vi.mocked(prisma.shoppingListItem.findMany).mockResolvedValue([
+      {
+        id: "2",
+        householdId: "household_1",
+        weekStart: new Date("2026-03-27T00:00:00.000Z"),
+        line: "Rice",
+        lineNormalized: "rice",
+        category: "Other",
+        manual: true,
+        checked: false,
+        createdAt: new Date("2026-03-27T22:46:24.955Z"),
+        updatedAt: new Date("2026-03-27T22:46:24.955Z"),
+        location: "Tong Li",
+      },
+      {
+        id: "1",
+        householdId: "household_1",
+        weekStart: new Date("2026-03-25T00:00:00.000Z"),
+        line: "Rice",
+        lineNormalized: "rice",
+        category: "Other",
+        manual: true,
+        checked: false,
+        createdAt: new Date("2026-03-25T06:19:50.825Z"),
+        updatedAt: new Date("2026-03-25T06:19:50.825Z"),
+        location: "Woolies",
+      },
+    ] as never);
+
+    const items = await listShoppingItems(new Date("2026-03-23T00:00:00.000Z"));
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: "2",
+      line: "Rice",
+      location: "Tong Li",
     });
   });
 
