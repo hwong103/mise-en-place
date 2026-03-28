@@ -33,6 +33,7 @@
   "vars": {
     "NEXT_PUBLIC_SITE_URL": "https://mise-en-place.hwong103.work",
     "BETTER_AUTH_URL": "https://mise-en-place.hwong103.work",
+    "BETTER_AUTH_ALLOWED_HOSTS": "*.workers.dev,*.pages.dev,*.mise-en-place.hwong103.work",
     "AUTH_FROM_EMAIL": "noreply@hwong103.work",
     "GOOGLE_CLIENT_ID": "73369514383-2vjhnfbu3s3mbovv91dc543cjdjqdfok.apps.googleusercontent.com"
   }

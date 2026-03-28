@@ -106,6 +106,7 @@ Required runtime variables:
 
 Optional variables:
 
+- `BETTER_AUTH_ALLOWED_HOSTS` (comma-separated Better Auth host patterns for preview/local domains; defaults already include `localhost:*`, `*.workers.dev`, and `*.pages.dev`)
 - `DEFAULT_HOUSEHOLD_NAME` (default: `My Household`)
 - `HOUSEHOLD_SHARE_SIGNING_SECRET` (required in production for household share tokens and signed guest sessions)
 - `HOUSEHOLD_GUEST_SESSION_DAYS` (default: `90`; sliding guest session window)
@@ -152,9 +153,10 @@ Structured import diagnostics are logged as JSON with source host, stage used, a
 
 ## Better Auth Redirect Setup
 
-To avoid magic links redirecting to the wrong host (for example `localhost`), configure both:
+Magic links now resolve their base URL from the incoming request host, but only when that host matches the Better Auth allowlist. Keep these configured so production, localhost, and preview branches all behave predictably:
 
-- `NEXT_PUBLIC_SITE_URL` and `BETTER_AUTH_URL` in your app environment
+- `NEXT_PUBLIC_SITE_URL` and `BETTER_AUTH_URL` for the canonical production domain
+- `BETTER_AUTH_ALLOWED_HOSTS` for any extra preview-host patterns that are not already covered by the built-in defaults (`localhost:*`, `*.workers.dev`, `*.pages.dev`)
 - Google OAuth redirect URLs:
   - `http://localhost:3000/api/auth/callback/google` (dev)
   - your deployed callback URL(s), e.g. `https://<your-domain>/api/auth/callback/google`

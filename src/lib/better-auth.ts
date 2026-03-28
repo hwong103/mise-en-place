@@ -3,6 +3,7 @@ import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins";
 import { Resend } from "resend";
 
+import { getBetterAuthBaseUrlConfig } from "@/lib/better-auth-base-url";
 import { getD1Database } from "@/lib/d1";
 
 const trimToUndefined = (value: string | undefined) => {
@@ -10,8 +11,6 @@ const trimToUndefined = (value: string | undefined) => {
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
 };
 
-const configuredBaseUrl =
-  trimToUndefined(process.env.BETTER_AUTH_URL) ?? trimToUndefined(process.env.NEXT_PUBLIC_SITE_URL);
 const googleClientId = trimToUndefined(process.env.GOOGLE_CLIENT_ID);
 const googleClientSecret = trimToUndefined(process.env.GOOGLE_CLIENT_SECRET);
 const authFromEmail = trimToUndefined(process.env.AUTH_FROM_EMAIL) ?? "noreply@hwong103.work";
@@ -37,7 +36,7 @@ export const getAuth = () => {
 
   const auth = betterAuth({
     secret: trimToUndefined(process.env.BETTER_AUTH_SECRET),
-    ...(configuredBaseUrl ? { baseURL: configuredBaseUrl } : {}),
+    baseURL: getBetterAuthBaseUrlConfig(),
     basePath: "/api/auth",
     advanced: {
       trustedProxyHeaders: true,
