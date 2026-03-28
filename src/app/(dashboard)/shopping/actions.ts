@@ -3,6 +3,7 @@
 import { updateTag } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getCurrentHouseholdId } from "@/lib/household";
+import { classifyIngredient } from "@/lib/ingredient-classifier";
 import {
   buildSuppressedMarkerLine,
   normalizeShoppingLine,
@@ -72,12 +73,10 @@ export async function toggleShoppingItem(input: {
 export async function addManualShoppingItem(input: {
   weekKey: string;
   line: string;
-  category: string;
   location?: string;
 }) {
   const weekKey = toOptionalString(input.weekKey);
   const rawLine = toOptionalString(input.line);
-  const category = toOptionalString(input.category) ?? "Other";
   const location = normalizeShoppingLocation(toOptionalString(input.location));
 
   if (!weekKey || !rawLine) {
@@ -89,6 +88,7 @@ export async function addManualShoppingItem(input: {
     return;
   }
 
+  const category = classifyIngredient(line).category;
   const householdId = await getCurrentHouseholdId();
   const lineNormalized = normalizeShoppingLine(line);
   const date = fromDateKey(weekKey);

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { CATEGORY_ORDER, type ShoppingCategory } from "@/lib/shopping";
+import { type ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@/lib/db-types";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
 import { useAccessibleDialog } from "@/components/ui/useAccessibleDialog";
@@ -22,6 +22,7 @@ import {
   DEFAULT_SHOPPING_LOCATIONS,
   normalizeShoppingLocation,
 } from "@/lib/shopping-location";
+import { classifyIngredient } from "@/lib/ingredient-classifier";
 
 const SUPPRESS_PREFIX = "__suppress__:";
 const isSuppressedMarkerLine = (line: string) => line.startsWith(SUPPRESS_PREFIX);
@@ -97,7 +98,6 @@ export default function ShoppingList({
 }: ShoppingListProps) {
   const router = useRouter();
   const [manualLine, setManualLine] = useState("");
-  const [manualCategory, setManualCategory] = useState("Other");
   const [manualLocation, setManualLocation] = useState(DEFAULT_SHOPPING_LOCATION);
   const [newLocation, setNewLocation] = useState("");
   const [isDesktopLocationOpen, setIsDesktopLocationOpen] = useState(false);
@@ -397,10 +397,6 @@ export default function ShoppingList({
     };
   }, [activeLocationGroup, optimisticChecked, persistedLookup]);
 
-  const categoryOptions = useMemo(() => {
-    return [...CATEGORY_ORDER];
-  }, []);
-
   const handleToggle = (item: { key: string; line: string; manual: boolean; category: string; location: string }) => {
     const current = persistedLookup.get(item.key);
     const currentChecked = optimisticChecked[item.key] ?? (current?.checked ?? false);
@@ -504,21 +500,21 @@ export default function ShoppingList({
 
     const location = normalizeShoppingLocation(manualLocation);
     const tempId = crypto.randomUUID();
+    const category = classifyIngredient(trimmed).category;
 
     setOptimisticManualItems((prev) => [
       ...prev,
-      { tempId, line: trimmed, category: manualCategory, location, status: "saving" },
+      { tempId, line: trimmed, category, location, status: "saving" },
     ]);
     setLocationOptions((current) => mergeLocationOptions(current, [location]));
     setManualLine("");
     setIsMobileManualOpen(false);
 
     addManualShoppingItem({
-        weekKey,
-        line: trimmed,
-        category: manualCategory,
-        location,
-      })
+      weekKey,
+      line: trimmed,
+      location,
+    })
       .then(() => {
         setOptimisticManualItems((prev) => prev.filter((item) => item.tempId !== tempId));
       })
@@ -601,7 +597,7 @@ export default function ShoppingList({
             </div>
           </div>
         ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.55fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_auto_auto] sm:items-center">
+        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_auto_auto] sm:items-center">
           <input
             ref={options?.inputRef}
             value={manualLine}
@@ -610,20 +606,9 @@ export default function ShoppingList({
             className="order-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-[var(--accent)] focus:outline-none sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
           <select
-            value={manualCategory}
-            onChange={(event) => setManualCategory(event.target.value)}
-            className="order-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 sm:order-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-          >
-            {categoryOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <select
             value={manualLocation}
             onChange={(event) => setManualLocation(event.target.value)}
-            className="order-4 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 sm:order-3 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+            className="order-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 sm:order-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
           >
             {locationOptions.map((location) => (
               <option key={location} value={location}>
@@ -634,7 +619,7 @@ export default function ShoppingList({
           <button
             type="button"
             onClick={handleAddManual}
-            className="order-2 w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-base font-semibold text-white disabled:opacity-60 sm:order-4 sm:w-auto sm:py-2 sm:text-sm"
+            className="order-2 w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-base font-semibold text-white disabled:opacity-60 sm:order-3 sm:w-auto sm:py-2 sm:text-sm"
             disabled={!manualLine.trim()}
           >
             Add
@@ -643,7 +628,7 @@ export default function ShoppingList({
             <button
               type="button"
               onClick={() => setIsDesktopLocationOpen((current) => !current)}
-              className="order-5 hidden rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 sm:inline-flex sm:w-auto sm:items-center sm:justify-center"
+              className="order-4 hidden rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 sm:inline-flex sm:w-auto sm:items-center sm:justify-center"
               aria-expanded={isDesktopLocationOpen}
               aria-controls="shopping-new-location-panel"
             >
