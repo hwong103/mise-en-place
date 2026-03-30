@@ -22,6 +22,13 @@ import {
   DEFAULT_SHOPPING_LOCATIONS,
   normalizeShoppingLocation,
 } from "@/lib/shopping-location";
+import {
+  buildPendingManualStorageKey,
+  parsePendingManualItems,
+  reconcilePendingManualItems,
+  serializePendingManualItems,
+  type PendingManualItem,
+} from "@/lib/shopping-list-pending";
 import { classifyIngredient } from "@/lib/ingredient-classifier";
 
 const SUPPRESS_PREFIX = "__suppress__:";
@@ -78,15 +85,8 @@ type MergedItem = {
   category: string;
   location: string;
   _optimistic?: boolean;
-  _status?: "saving" | "error";
-};
-
-type OptimisticManualItem = {
-  tempId: string;
-  line: string;
-  category: string;
-  location: string;
-  status: "saving" | "error";
+  _status?: "saving" | "syncing" | "error";
+  _tempId?: string;
 };
 
 export default function ShoppingList({
@@ -103,7 +103,7 @@ export default function ShoppingList({
   const [isDesktopLocationOpen, setIsDesktopLocationOpen] = useState(false);
   const [optimisticChecked, setOptimisticChecked] = useState<Record<string, boolean>>({});
   const [optimisticLocations, setOptimisticLocations] = useState<Record<string, string>>({});
-  const [optimisticManualItems, setOptimisticManualItems] = useState<OptimisticManualItem[]>([]);
+  const [optimisticManualItems, setOptimisticManualItems] = useState<PendingManualItem[]>([]);
   const [suppressedKeys, setSuppressedKeys] = useState<Record<string, boolean>>({});
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
   const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({});
@@ -114,13 +114,33 @@ export default function ShoppingList({
   const [isClearing, setIsClearing] = useState(false);
   const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
   const [mobileManualKeyboardInset, setMobileManualKeyboardInset] = useState(0);
+  const [loadedManualDraftWeek, setLoadedManualDraftWeek] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const mobileManualInputRef = useRef<HTMLInputElement>(null);
+  const refreshTimerRef = useRef<number | null>(null);
   const mobileManualDialogRef = useAccessibleDialog<HTMLDivElement>({
     isOpen: isMobileManualOpen,
     onClose: () => setIsMobileManualOpen(false),
     initialFocusRef: mobileManualInputRef,
   });
+
+  const scheduleRefresh = () => {
+    if (typeof window === "undefined") {
+      router.refresh();
+      return;
+    }
+
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current);
+    }
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      startTransition(() => {
+        router.refresh();
+      });
+    }, 150);
+  };
 
   const initialLocationOptions = useMemo(
     () =>
@@ -136,6 +156,36 @@ export default function ShoppingList({
   useEffect(() => {
     setLocationOptions((current) => mergeLocationOptions(current, initialLocationOptions));
   }, [initialLocationOptions]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storedItems = parsePendingManualItems(
+      window.localStorage.getItem(buildPendingManualStorageKey(weekKey))
+    );
+    setOptimisticManualItems(storedItems);
+    setLoadedManualDraftWeek(weekKey);
+  }, [weekKey]);
+
+  useEffect(() => {
+    setOptimisticManualItems((current) => reconcilePendingManualItems(current, persistedItems));
+  }, [persistedItems]);
+
+  useEffect(() => {
+    if (loadedManualDraftWeek !== weekKey || typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = buildPendingManualStorageKey(weekKey);
+    if (optimisticManualItems.length === 0) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    window.localStorage.setItem(storageKey, serializePendingManualItems(optimisticManualItems));
+  }, [loadedManualDraftWeek, optimisticManualItems, weekKey]);
 
   useEffect(() => {
     if (!isMobileManualOpen) {
@@ -166,6 +216,14 @@ export default function ShoppingList({
       window.visualViewport?.removeEventListener("scroll", updateKeyboardInset);
     };
   }, [isMobileManualOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, []);
 
   const persistedLookup = useMemo(() => {
     const map = new Map<string, ShoppingListItem>();
@@ -297,6 +355,7 @@ export default function ShoppingList({
         category: item.category,
         _optimistic: true,
         _status: item.status,
+        _tempId: item.tempId,
       });
     });
 
@@ -432,7 +491,13 @@ export default function ShoppingList({
     category: string;
     location: string;
     id?: string;
+    tempId?: string;
   }) => {
+    if (item.manual && item.tempId && !item.id) {
+      setOptimisticManualItems((prev) => prev.filter((entry) => entry.tempId !== item.tempId));
+      return;
+    }
+
     setSuppressedKeys((prev) => ({ ...prev, [item.key]: true }));
     setPendingKeys((prev) => ({ ...prev, [item.key]: true }));
 
@@ -516,7 +581,10 @@ export default function ShoppingList({
       location,
     })
       .then(() => {
-        setOptimisticManualItems((prev) => prev.filter((item) => item.tempId !== tempId));
+        setOptimisticManualItems((prev) =>
+          prev.map((item) => (item.tempId === tempId ? { ...item, status: "syncing" } : item))
+        );
+        scheduleRefresh();
       })
       .catch(() => {
         setOptimisticManualItems((prev) =>
@@ -767,8 +835,12 @@ export default function ShoppingList({
                         {category.activeItems.map((item) => {
                           const isChecked =
                             optimisticChecked[item.key] ?? (persistedLookup.get(item.key)?.checked ?? false);
-                          const isSaving = pendingKeys[item.key] ?? item._optimistic === true;
+                          const isSaving =
+                            pendingKeys[item.key] ??
+                            (item._status === "saving" || item._status === "syncing");
                           const isSaveError = item._status === "error";
+                          const isRemovingDisabled =
+                            isPending || pendingKeys[item.key] || item._status === "saving";
                           const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
 
                           return (
@@ -847,6 +919,8 @@ export default function ShoppingList({
                                   ) : null}
                                   {isSaveError ? (
                                     <span className="text-xs text-rose-500">Failed to save</span>
+                                  ) : item._status === "syncing" ? (
+                                    <span className="text-xs text-slate-400 dark:text-slate-500">Syncing...</span>
                                   ) : isSaving ? (
                                     <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
                                   ) : null}
@@ -860,10 +934,11 @@ export default function ShoppingList({
                                         category: item.category,
                                         location: item.location,
                                         id: item.id,
+                                        tempId: item._tempId,
                                       })
                                     }
                                     className="shrink-0 rounded-full p-2 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
-                                    disabled={isSaving || isPending || item._optimistic}
+                                    disabled={Boolean(isRemovingDisabled)}
                                     aria-label={`Remove ${item.line}`}
                                     title="Remove item"
                                   >
