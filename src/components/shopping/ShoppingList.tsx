@@ -665,7 +665,13 @@ export default function ShoppingList({
             </div>
           </div>
         ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_auto_auto] sm:items-center">
+        <form
+          className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_auto_auto] sm:items-center"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleAddManual();
+          }}
+        >
           <input
             ref={options?.inputRef}
             value={manualLine}
@@ -685,8 +691,7 @@ export default function ShoppingList({
             ))}
           </select>
           <button
-            type="button"
-            onClick={handleAddManual}
+            type="submit"
             className="order-2 w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-base font-semibold text-white disabled:opacity-60 sm:order-3 sm:w-auto sm:py-2 sm:text-sm"
             disabled={!manualLine.trim()}
           >
@@ -703,7 +708,7 @@ export default function ShoppingList({
               {isDesktopLocationOpen ? "Close" : "+ Location"}
             </button>
           ) : null}
-        </div>
+        </form>
 
         {!isEmbedded && isDesktopLocationOpen ? (
           <div
