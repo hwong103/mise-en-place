@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type ShoppingCategory } from "@/lib/shopping";
+import { CATEGORY_ORDER, type ShoppingCategory } from "@/lib/shopping";
 import type { ShoppingListItem } from "@/lib/db-types";
 import ShoppingActions from "@/components/shopping/ShoppingActions";
 import { useAccessibleDialog } from "@/components/ui/useAccessibleDialog";
@@ -13,6 +13,7 @@ import {
   removeManualShoppingItem,
   suppressShoppingItem,
   toggleShoppingItem,
+  updateShoppingItemCategory,
   updateShoppingItemLocation,
 } from "@/app/(dashboard)/shopping/actions";
 import {
@@ -20,6 +21,7 @@ import {
   buildShoppingLocationPreferenceKey,
   DEFAULT_SHOPPING_LOCATION,
   DEFAULT_SHOPPING_LOCATIONS,
+  normalizeShoppingLine,
   normalizeShoppingLocation,
 } from "@/lib/shopping-location";
 import {
@@ -43,6 +45,10 @@ const buildLocationPanelId = (location: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")}`;
 const toDisplayCategoryName = (category: string) => (category === "Pantry" ? "Dry Goods" : category);
+const categoryOptions = CATEGORY_ORDER.map((category) => ({
+  value: category,
+  label: toDisplayCategoryName(category),
+}));
 
 const mergeLocationOptions = (...groups: Array<readonly string[] | string[]>) => {
   const seen = new Set<string>();
@@ -257,6 +263,20 @@ export default function ShoppingList({
     return lookup;
   }, [categories]);
 
+  const autoItemOverrideLookup = useMemo(() => {
+    const lookup = new Map<string, ShoppingListItem>();
+    persistedItems.forEach((item) => {
+      if (item.manual || isSuppressedMarkerLine(item.line)) {
+        return;
+      }
+      const key = normalizeShoppingLine(item.line);
+      if (!lookup.has(key)) {
+        lookup.set(key, item);
+      }
+    });
+    return lookup;
+  }, [persistedItems]);
+
   const mergedLocations = useMemo(() => {
     const isItemSuppressed = (key: string) => suppressedKeys[key] || suppressedAutoKeySet.has(key);
 
@@ -281,20 +301,24 @@ export default function ShoppingList({
 
     categories.forEach((category) => {
       category.items.forEach((item) => {
-        const key = buildShoppingItemKey(category.name, item.line, false);
+        const fallbackKey = buildShoppingItemKey(category.name, item.line, false);
+        const persistedOverride = autoItemOverrideLookup.get(normalizeShoppingLine(item.line));
+        const effectiveCategory = persistedOverride?.category ?? category.name;
+        const key = buildShoppingItemKey(effectiveCategory, item.line, false);
         if (isItemSuppressed(key)) {
           return;
         }
 
-        const persisted = persistedLookup.get(key);
-        const preferenceKey = buildShoppingLocationPreferenceKey(category.name, item.line);
+        const persisted = persistedLookup.get(key) ?? persistedOverride;
+        const preferenceKey = buildShoppingLocationPreferenceKey(effectiveCategory, item.line);
         const location =
           optimisticLocations[key] ??
+          optimisticLocations[fallbackKey] ??
           persisted?.location ??
           locationPreferences[preferenceKey] ??
           DEFAULT_SHOPPING_LOCATION;
 
-        addItemToLocationMap(locationMap, location, toDisplayCategoryName(category.name), {
+        addItemToLocationMap(locationMap, location, toDisplayCategoryName(effectiveCategory), {
           line: item.line,
           count: item.count,
           amountSummary: item.amountSummary,
@@ -302,7 +326,7 @@ export default function ShoppingList({
           manual: false,
           id: persisted?.id,
           recipes: item.recipes,
-          category: category.name,
+          category: effectiveCategory,
         });
       });
     });
@@ -395,6 +419,7 @@ export default function ShoppingList({
     optimisticLocations,
     persistedItems,
     persistedLookup,
+    autoItemOverrideLookup,
     suppressedAutoKeySet,
     suppressedKeys,
   ]);
@@ -555,6 +580,45 @@ export default function ShoppingList({
         });
       }
     });
+  };
+
+  const handleCategoryChange = (item: {
+    key: string;
+    line: string;
+    manual: boolean;
+    category: string;
+    location: string;
+  }) => {
+    return async (nextCategory: string) => {
+      if (!nextCategory || nextCategory === item.category) {
+        return;
+      }
+
+      const current = persistedLookup.get(item.key);
+      const checked = optimisticChecked[item.key] ?? (current?.checked ?? false);
+      setPendingKeys((prev) => ({ ...prev, [item.key]: true }));
+
+      startTransition(async () => {
+        try {
+          await updateShoppingItemCategory({
+            weekKey,
+            line: item.line,
+            oldCategory: item.category,
+            newCategory: nextCategory,
+            manual: item.manual,
+            checked,
+            location: item.location,
+          });
+          router.refresh();
+        } finally {
+          setPendingKeys((prev) => {
+            const next = { ...prev };
+            delete next[item.key];
+            return next;
+          });
+        }
+      });
+    };
   };
 
   const handleAddManual = () => {
@@ -896,6 +960,19 @@ export default function ShoppingList({
 
                                 <div className="flex shrink-0 items-center gap-1.5">
                                   <select
+                                    value={item.category}
+                                    onChange={(event) => void handleCategoryChange(item)(event.target.value)}
+                                    className="w-[7.75rem] rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                    disabled={isSaving || isPending}
+                                    aria-label={`Category for ${item.line}`}
+                                  >
+                                    {categoryOptions.map((categoryOption) => (
+                                      <option key={categoryOption.value} value={categoryOption.value}>
+                                        {categoryOption.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <select
                                     value={item.location}
                                     onChange={(event) =>
                                       handleLocationChange({
@@ -991,6 +1068,19 @@ export default function ShoppingList({
                           >
                             <div className="flex min-w-0 items-center gap-2">
                               <span className="truncate line-through text-slate-400 dark:text-slate-500">{item.line}</span>
+                              <select
+                                value={item.category}
+                                onChange={(event) => void handleCategoryChange(item)(event.target.value)}
+                                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                disabled={isSaving || isPending}
+                                aria-label={`Category for ${item.line}`}
+                              >
+                                {categoryOptions.map((categoryOption) => (
+                                  <option key={categoryOption.value} value={categoryOption.value}>
+                                    {categoryOption.label}
+                                  </option>
+                                ))}
+                              </select>
                               <select
                                 value={item.location}
                                 onChange={(event) =>

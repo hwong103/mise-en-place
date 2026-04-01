@@ -255,6 +255,71 @@ export async function updateShoppingItemLocation(input: {
   updateTag(`shopping-${householdId}`);
 }
 
+export async function updateShoppingItemCategory(input: {
+  weekKey: string;
+  line: string;
+  oldCategory: string;
+  newCategory: string;
+  manual: boolean;
+  checked?: boolean;
+  location?: string;
+}) {
+  const weekKey = toOptionalString(input.weekKey);
+  const line = toOptionalString(input.line);
+  const oldCategory = toOptionalString(input.oldCategory) ?? "Other";
+  const newCategory = toOptionalString(input.newCategory) ?? "Other";
+  const location = normalizeShoppingLocation(toOptionalString(input.location));
+
+  if (!weekKey || !line || oldCategory === newCategory) {
+    return;
+  }
+
+  const householdId = await getCurrentHouseholdId();
+  const lineNormalized = normalizeShoppingLine(line);
+  const date = fromDateKey(weekKey);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.shoppingListItem.deleteMany({
+      where: {
+        householdId,
+        weekStart: date,
+        lineNormalized,
+        category: oldCategory,
+        manual: input.manual,
+      },
+    });
+
+    await tx.shoppingListItem.upsert({
+      where: {
+        householdId_weekStart_lineNormalized_category_manual: {
+          householdId,
+          weekStart: date,
+          lineNormalized,
+          category: newCategory,
+          manual: input.manual,
+        },
+      },
+      update: {
+        line,
+        location,
+        checked: Boolean(input.checked),
+      },
+      create: {
+        householdId,
+        weekStart: date,
+        line,
+        lineNormalized,
+        category: newCategory,
+        location,
+        manual: input.manual,
+        checked: Boolean(input.checked),
+      },
+    });
+  });
+
+  updateTag(`shopping-${householdId}`);
+}
+
 export async function clearShoppingListWeek(input: {
   weekKey: string;
   autoItems?: Array<{
