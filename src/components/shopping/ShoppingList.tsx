@@ -914,7 +914,7 @@ export default function ShoppingList({
 
                           return (
                             <li key={item.key} className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-200">
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
                                 <label className="flex min-w-0 flex-1 items-start gap-3">
                                   <input
                                     type="checkbox"
@@ -958,74 +958,80 @@ export default function ShoppingList({
                                   </div>
                                 </label>
 
-                                <div className="flex shrink-0 items-center gap-1.5">
-                                  <select
-                                    value={item.category}
-                                    onChange={(event) => void handleCategoryChange(item)(event.target.value)}
-                                    className="w-[7.75rem] rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                                    disabled={isSaving || isPending}
-                                    aria-label={`Category for ${item.line}`}
-                                  >
-                                    {categoryOptions.map((categoryOption) => (
-                                      <option key={categoryOption.value} value={categoryOption.value}>
-                                        {categoryOption.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <select
-                                    value={item.location}
-                                    onChange={(event) =>
-                                      handleLocationChange({
-                                        key: item.key,
-                                        line: item.line,
-                                        manual: item.manual,
-                                        category: item.category,
-                                        location: event.target.value,
-                                      })
-                                    }
-                                    className="w-[7.5rem] rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                                    disabled={isSaving || isPending}
-                                    aria-label={`Location for ${item.line}`}
-                                  >
-                                    {itemLocationOptions.map((location) => (
-                                      <option key={location} value={location}>
-                                        {location}
-                                      </option>
-                                    ))}
-                                  </select>
+                                <div className="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0">
+                                  <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:gap-1.5">
+                                    <select
+                                      value={item.category}
+                                      onChange={(event) => void handleCategoryChange(item)(event.target.value)}
+                                      className="min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:w-[7.75rem]"
+                                      disabled={isSaving || isPending}
+                                      aria-label={`Category for ${item.line}`}
+                                    >
+                                      {categoryOptions.map((categoryOption) => (
+                                        <option key={categoryOption.value} value={categoryOption.value}>
+                                          {categoryOption.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <select
+                                      value={item.location}
+                                      onChange={(event) =>
+                                        handleLocationChange({
+                                          key: item.key,
+                                          line: item.line,
+                                          manual: item.manual,
+                                          category: item.category,
+                                          location: event.target.value,
+                                        })
+                                      }
+                                      className="min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:w-[7.5rem]"
+                                      disabled={isSaving || isPending}
+                                      aria-label={`Location for ${item.line}`}
+                                    >
+                                      {itemLocationOptions.map((location) => (
+                                        <option key={location} value={location}>
+                                          {location}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSuppress({
+                                          key: item.key,
+                                          line: item.line,
+                                          manual: item.manual,
+                                          category: item.category,
+                                          location: item.location,
+                                          id: item.id,
+                                          tempId: item._tempId,
+                                        })
+                                      }
+                                      className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
+                                      disabled={Boolean(isRemovingDisabled)}
+                                      aria-label={`Remove ${item.line}`}
+                                      title="Remove item"
+                                    >
+                                      <Trash2 className="h-4 w-4" strokeWidth={1.8} />
+                                    </button>
+                                  </div>
 
-                                  {item.amountSummary ? (
-                                    <span className="text-xs text-slate-500 dark:text-slate-400">{item.amountSummary}</span>
-                                  ) : item.count > 1 ? (
-                                    <span className="text-xs text-slate-500 dark:text-slate-400">x{item.count}</span>
+                                  {(item.amountSummary || item.count > 1 || isSaveError || item._status === "syncing" || isSaving) ? (
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                                      {item.amountSummary ? (
+                                        <span className="text-slate-500 dark:text-slate-400">{item.amountSummary}</span>
+                                      ) : item.count > 1 ? (
+                                        <span className="text-slate-500 dark:text-slate-400">x{item.count}</span>
+                                      ) : null}
+                                      {isSaveError ? (
+                                        <span className="text-rose-500">Failed to save</span>
+                                      ) : item._status === "syncing" ? (
+                                        <span className="text-slate-400 dark:text-slate-500">Syncing...</span>
+                                      ) : isSaving ? (
+                                        <span className="text-slate-400 dark:text-slate-500">Saving...</span>
+                                      ) : null}
+                                    </div>
                                   ) : null}
-                                  {isSaveError ? (
-                                    <span className="text-xs text-rose-500">Failed to save</span>
-                                  ) : item._status === "syncing" ? (
-                                    <span className="text-xs text-slate-400 dark:text-slate-500">Syncing...</span>
-                                  ) : isSaving ? (
-                                    <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
-                                  ) : null}
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleSuppress({
-                                        key: item.key,
-                                        line: item.line,
-                                        manual: item.manual,
-                                        category: item.category,
-                                        location: item.location,
-                                        id: item.id,
-                                        tempId: item._tempId,
-                                      })
-                                    }
-                                    className="shrink-0 rounded-full p-2 text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
-                                    disabled={Boolean(isRemovingDisabled)}
-                                    aria-label={`Remove ${item.line}`}
-                                    title="Remove item"
-                                  >
-                                    <Trash2 className="h-4 w-4" strokeWidth={1.8} />
-                                  </button>
                                 </div>
                               </div>
                             </li>
@@ -1064,14 +1070,16 @@ export default function ShoppingList({
                         return (
                           <li
                             key={`completed-${item.key}`}
-                            className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm text-slate-600 dark:text-slate-300"
+                            className="flex flex-col gap-2 px-4 py-2 text-sm text-slate-600 dark:text-slate-300 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
                           >
                             <div className="flex min-w-0 items-center gap-2">
                               <span className="truncate line-through text-slate-400 dark:text-slate-500">{item.line}</span>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
                               <select
                                 value={item.category}
                                 onChange={(event) => void handleCategoryChange(item)(event.target.value)}
-                                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                className="min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                                 disabled={isSaving || isPending}
                                 aria-label={`Category for ${item.line}`}
                               >
@@ -1092,7 +1100,7 @@ export default function ShoppingList({
                                     location: event.target.value,
                                   })
                                 }
-                                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                className="min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                                 disabled={isSaving || isPending}
                                 aria-label={`Location for ${item.line}`}
                               >
@@ -1102,26 +1110,26 @@ export default function ShoppingList({
                                   </option>
                                 ))}
                               </select>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleToggle({
+                                    key: item.key,
+                                    line: item.line,
+                                    manual: item.manual,
+                                    category: item.category,
+                                    location: item.location,
+                                  })
+                                }
+                                disabled={isSaving || isPending}
+                                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                              >
+                                Undo
+                              </button>
+                              {isSaving ? (
+                                <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
+                              ) : null}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleToggle({
-                                  key: item.key,
-                                  line: item.line,
-                                  manual: item.manual,
-                                  category: item.category,
-                                  location: item.location,
-                                })
-                              }
-                              disabled={isSaving || isPending}
-                              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                              Undo
-                            </button>
-                            {isSaving ? (
-                              <span className="text-xs text-slate-400 dark:text-slate-500">Saving...</span>
-                            ) : null}
                           </li>
                         );
                       })}
