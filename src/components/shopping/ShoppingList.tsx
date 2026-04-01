@@ -913,9 +913,32 @@ export default function ShoppingList({
                           const itemLocationOptions = mergeLocationOptions(locationOptions, [item.location]);
 
                           return (
-                            <li key={item.key} className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-200">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
-                                <label className="flex min-w-0 flex-1 items-start gap-3">
+                            <li
+                              key={item.key}
+                              className="relative px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 sm:py-3.5"
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleSuppress({
+                                    key: item.key,
+                                    line: item.line,
+                                    manual: item.manual,
+                                    category: item.category,
+                                    location: item.location,
+                                    id: item.id,
+                                    tempId: item._tempId,
+                                  })
+                                }
+                                className="absolute right-3 top-2 flex h-8 w-8 items-center justify-center rounded-full text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30 sm:static sm:h-10 sm:w-10"
+                                disabled={Boolean(isRemovingDisabled)}
+                                aria-label={`Remove ${item.line}`}
+                                title="Remove item"
+                              >
+                                <Trash2 className="h-4 w-4" strokeWidth={1.8} />
+                              </button>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                                <label className="flex min-w-0 flex-1 items-start gap-3 pr-8 sm:pr-0">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -939,7 +962,7 @@ export default function ShoppingList({
                                       {item.line}
                                     </div>
                                     {item.manual || item.recipes.length > 0 ? (
-                                      <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
+                                      <div className="mt-0.5 flex flex-wrap gap-1 text-[11px]">
                                         {item.manual ? (
                                           <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                             Manual
@@ -958,12 +981,12 @@ export default function ShoppingList({
                                   </div>
                                 </label>
 
-                                <div className="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0">
-                                  <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:gap-1.5">
+                                <div className="flex w-full flex-col gap-1 sm:w-auto sm:shrink-0 sm:gap-2">
+                                  <div className="grid grid-cols-1 gap-1.5 sm:flex sm:items-center sm:gap-1.5">
                                     <select
                                       value={item.category}
                                       onChange={(event) => void handleCategoryChange(item)(event.target.value)}
-                                      className="min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:w-[7.75rem]"
+                                      className="hidden min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:block sm:w-[7.75rem]"
                                       disabled={isSaving || isPending}
                                       aria-label={`Category for ${item.line}`}
                                     >
@@ -994,26 +1017,6 @@ export default function ShoppingList({
                                         </option>
                                       ))}
                                     </select>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleSuppress({
-                                          key: item.key,
-                                          line: item.line,
-                                          manual: item.manual,
-                                          category: item.category,
-                                          location: item.location,
-                                          id: item.id,
-                                          tempId: item._tempId,
-                                        })
-                                      }
-                                      className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30"
-                                      disabled={Boolean(isRemovingDisabled)}
-                                      aria-label={`Remove ${item.line}`}
-                                      title="Remove item"
-                                    >
-                                      <Trash2 className="h-4 w-4" strokeWidth={1.8} />
-                                    </button>
                                   </div>
 
                                   {(item.amountSummary || item.count > 1 || isSaveError || item._status === "syncing" || isSaving) ? (
@@ -1079,7 +1082,7 @@ export default function ShoppingList({
                               <select
                                 value={item.category}
                                 onChange={(event) => void handleCategoryChange(item)(event.target.value)}
-                                className="min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                className="hidden min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:block"
                                 disabled={isSaving || isPending}
                                 aria-label={`Category for ${item.line}`}
                               >
