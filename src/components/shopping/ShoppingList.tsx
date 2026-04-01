@@ -930,7 +930,7 @@ export default function ShoppingList({
                                     tempId: item._tempId,
                                   })
                                 }
-                                className="absolute right-3 top-2 flex h-8 w-8 items-center justify-center rounded-full text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30 sm:static sm:h-10 sm:w-10"
+                                className="absolute right-3 top-2 flex h-8 w-8 items-center justify-center rounded-full text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30 sm:hidden"
                                 disabled={Boolean(isRemovingDisabled)}
                                 aria-label={`Remove ${item.line}`}
                                 title="Remove item"
@@ -1010,13 +1010,33 @@ export default function ShoppingList({
                                       className="hidden min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:block sm:w-[7.5rem]"
                                       disabled={isSaving || isPending}
                                       aria-label={`Location for ${item.line}`}
-                                    >
-                                      {itemLocationOptions.map((location) => (
-                                        <option key={location} value={location}>
-                                          {location}
-                                        </option>
-                                      ))}
-                                    </select>
+                                      >
+                                        {itemLocationOptions.map((location) => (
+                                          <option key={location} value={location}>
+                                            {location}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleSuppress({
+                                            key: item.key,
+                                            line: item.line,
+                                            manual: item.manual,
+                                            category: item.category,
+                                            location: item.location,
+                                            id: item.id,
+                                            tempId: item._tempId,
+                                          })
+                                        }
+                                        className="hidden h-10 w-10 items-center justify-center rounded-full text-rose-500 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-900/30 sm:flex"
+                                        disabled={Boolean(isRemovingDisabled)}
+                                        aria-label={`Remove ${item.line}`}
+                                        title="Remove item"
+                                      >
+                                        <Trash2 className="h-4 w-4" strokeWidth={1.8} />
+                                      </button>
                                   </div>
 
                                   {(item.amountSummary || item.count > 1 || isSaveError || item._status === "syncing" || isSaving) ? (
