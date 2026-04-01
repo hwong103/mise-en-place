@@ -1007,7 +1007,7 @@ export default function ShoppingList({
                                           location: event.target.value,
                                         })
                                       }
-                                      className="min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:w-[7.5rem]"
+                                      className="hidden min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:block sm:w-[7.5rem]"
                                       disabled={isSaving || isPending}
                                       aria-label={`Location for ${item.line}`}
                                     >
@@ -1103,7 +1103,7 @@ export default function ShoppingList({
                                     location: event.target.value,
                                   })
                                 }
-                                className="min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                className="hidden min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 sm:block"
                                 disabled={isSaving || isPending}
                                 aria-label={`Location for ${item.line}`}
                               >
