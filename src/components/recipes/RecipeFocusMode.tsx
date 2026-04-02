@@ -576,7 +576,7 @@ export default function RecipeFocusMode({
                         disabled={!canGoPrev}
                         aria-label="Previous step"
                       >
-                        <span className="pointer-events-none absolute right-5 top-5 hidden items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
+                        <span className="pointer-events-none absolute right-5 top-5 items-center gap-2 md:flex">
                           <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Previous</span>
                           <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
                             <ChevronUp className="h-4 w-4" />
@@ -590,7 +590,7 @@ export default function RecipeFocusMode({
                         disabled={!canGoNext}
                         aria-label="Next step"
                       >
-                        <span className="pointer-events-none absolute bottom-5 right-5 hidden items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:flex">
+                        <span className="pointer-events-none absolute bottom-5 right-5 items-center gap-2 md:flex">
                           <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
                             <ChevronDown className="h-4 w-4" />
                           </span>
