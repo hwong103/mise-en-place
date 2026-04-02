@@ -569,34 +569,36 @@ export default function RecipeFocusMode({
                     </div>
 
                     <div className="relative flex min-h-0 flex-1 overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-                      <button
-                        type="button"
-                        className="group absolute inset-x-0 top-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10 disabled:pointer-events-none disabled:cursor-default"
-                        onClick={() => navigateStep(-1)}
-                        disabled={!canGoPrev}
-                        aria-label="Previous step"
-                      >
-                        <span className="pointer-events-none absolute right-5 top-5 items-center gap-2 md:flex">
-                          <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Previous</span>
-                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                            <ChevronUp className="h-4 w-4" />
+                      {canGoPrev && (
+                        <button
+                          type="button"
+                          className="group absolute inset-x-0 top-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10"
+                          onClick={() => navigateStep(-1)}
+                          aria-label="Previous step"
+                        >
+                          <span className="pointer-events-none absolute right-5 top-5 items-center gap-2 md:flex">
+                            <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Previous</span>
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                              <ChevronUp className="h-4 w-4" />
+                            </span>
                           </span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className="group absolute inset-x-0 bottom-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10 disabled:pointer-events-none disabled:cursor-default"
-                        onClick={() => navigateStep(1)}
-                        disabled={!canGoNext}
-                        aria-label="Next step"
-                      >
-                        <span className="pointer-events-none absolute bottom-5 right-5 items-center gap-2 md:flex">
-                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                            <ChevronDown className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canGoNext && (
+                        <button
+                          type="button"
+                          className="group absolute inset-x-0 bottom-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10"
+                          onClick={() => navigateStep(1)}
+                          aria-label="Next step"
+                        >
+                          <span className="pointer-events-none absolute bottom-5 right-5 items-center gap-2 md:flex">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] border-[#d8e6de] bg-white text-[#6b8c7d] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                              <ChevronDown className="h-4 w-4" />
+                            </span>
+                            <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Next</span>
                           </span>
-                          <span className="text-xs font-medium text-[#6b8c7d] dark:text-slate-300">Next</span>
-                        </span>
-                      </button>
+                        </button>
+                      )}
 
                       <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center px-12 py-10">
                         <div
