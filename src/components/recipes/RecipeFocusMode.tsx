@@ -366,7 +366,7 @@ export default function RecipeFocusMode({
       {isMounted && mode
         ? createPortal(
           <div
-            className="fixed inset-0 z-[100] bg-slate-950/60 p-3 backdrop-blur-sm md:p-6"
+            className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-sm md:p-6"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
                 closeFocusMode();
@@ -380,15 +380,15 @@ export default function RecipeFocusMode({
               aria-labelledby={dialogTitleId}
               aria-describedby={dialogDescriptionId}
               tabIndex={-1}
-              className="mx-auto flex h-[94dvh] w-full max-w-7xl flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl md:rounded-3xl md:p-5 dark:border-slate-800 dark:bg-slate-950"
+              className="mx-auto flex w-full max-w-7xl flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl md:h-[94dvh] md:rounded-3xl md:p-5 dark:border-slate-800 dark:bg-slate-950"
             >
-              <div className="mb-4 flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div>
+              <div className="mb-3 flex shrink-0 flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between md:mb-4 md:pb-4 dark:border-slate-800">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#C67B2A] dark:text-[#E2A056]">
                       {mode === "mise" ? "Mise En Place" : "Cook Mode"}
                     </p>
-                    <h2 id={dialogTitleId} className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                    <h2 id={dialogTitleId} className="text-xl font-bold leading-tight text-slate-900 dark:text-slate-100">
                       {title}
                     </h2>
                     <p id={dialogDescriptionId} className="sr-only">
@@ -401,11 +401,11 @@ export default function RecipeFocusMode({
                     </span>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
                   <button
                     type="button"
                     onClick={() => openMode("mise")}
-                    className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "mise"
+                    className={`min-h-10 rounded-full border-[1.5px] px-4 py-1.5 text-[13px] font-semibold transition-all sm:min-h-0 sm:px-5 ${mode === "mise"
                       ? "border-[var(--mise-border)] bg-[var(--mise-bg)] text-[var(--mise-text)] dark:bg-amber-950/40"
                       : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--mise-border)] hover:text-[var(--mise-text)] dark:border-slate-700 dark:text-slate-400"
                       }`}
@@ -415,7 +415,7 @@ export default function RecipeFocusMode({
                   <button
                     type="button"
                     onClick={() => openMode("cook")}
-                    className={`rounded-full border-[1.5px] px-5 py-1.5 text-[13px] font-semibold transition-all ${mode === "cook"
+                    className={`min-h-10 rounded-full border-[1.5px] px-4 py-1.5 text-[13px] font-semibold transition-all sm:min-h-0 sm:px-5 ${mode === "cook"
                       ? "border-[var(--cook-border)] bg-[var(--cook-bg)] text-[var(--cook-text)] dark:bg-emerald-950/40"
                       : "border-slate-200 bg-transparent text-slate-600 hover:border-[var(--cook-border)] hover:text-[var(--cook-text)] dark:border-slate-700 dark:text-slate-400"
                       }`}
@@ -429,7 +429,7 @@ export default function RecipeFocusMode({
                     ref={closeButtonRef}
                     type="button"
                     onClick={closeFocusMode}
-                    className="ml-2 rounded-full border border-slate-200 bg-transparent px-4 py-1.5 text-[13px] font-medium text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-600 dark:border-slate-700 dark:text-slate-500"
+                    className="min-h-10 rounded-full border border-slate-200 bg-transparent px-4 py-1.5 text-[13px] font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-600 sm:ml-2 sm:min-h-0 dark:border-slate-700 dark:text-slate-500"
                   >
                     Close
                   </button>
@@ -438,9 +438,9 @@ export default function RecipeFocusMode({
 
 
               {mode === "mise" ? (
-                <div className="grid min-h-0 flex-1 gap-6 md:grid-cols-[1fr_1.5fr]">
+                <div className="grid gap-4 md:min-h-0 md:flex-1 md:grid-cols-[1fr_1.5fr] md:gap-6 md:overflow-hidden">
                   {/* Left Column: Prep Groups with Drag and Drop */}
-                  <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50/50 p-5 dark:border-slate-800 dark:bg-slate-900/40">
+                  <section className="min-h-0 rounded-2xl border border-slate-200 bg-slate-50/50 p-4 md:overflow-auto md:p-5 dark:border-slate-800 dark:bg-slate-900/40">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                         Prep Groups
@@ -509,8 +509,8 @@ export default function RecipeFocusMode({
                   </section>
 
                   {/* Right Column: Instructions + Notes */}
-                  <section className="min-h-0 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner dark:border-slate-800 dark:bg-slate-950/40">
-                    <div className="min-h-0 flex-1 overflow-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+                  <section className="min-h-0 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-inner md:overflow-hidden dark:border-slate-800 dark:bg-slate-950/40">
+                    <div className="min-h-0 flex-1 p-4 md:overflow-auto md:p-6 md:scrollbar-thin md:scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                       <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                         Instructions Detail
                       </h3>
@@ -520,7 +520,7 @@ export default function RecipeFocusMode({
                             <span className="mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[11px] font-bold text-slate-400 dark:bg-slate-900 dark:text-slate-500 border border-slate-100 dark:border-slate-800">
                               {index + 1}
                             </span>
-                            <div className="text-[16px] leading-[1.7] text-slate-700 dark:text-slate-200">
+                            <div className="min-w-0 text-[16px] leading-[1.7] text-slate-700 dark:text-slate-200">
                               <InstructionWithHighlights text={step} prepGroups={misePrepGroups} />
                             </div>
                           </div>
@@ -546,9 +546,9 @@ export default function RecipeFocusMode({
                   </section>
                 </div>
               ) : (
-                <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="grid gap-4 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,1fr)_300px] md:overflow-hidden">
                   {/* Cook Mode active step display */}
-                  <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#d8e6de] bg-white dark:border-slate-700 dark:bg-slate-950">
+                  <section className="flex min-h-[44dvh] flex-col overflow-hidden rounded-2xl border border-[#d8e6de] bg-white md:min-h-0 dark:border-slate-700 dark:bg-slate-950">
                     <div className="h-[3px] w-full bg-[#e6f4ed] dark:bg-emerald-400/20">
                       <div
                         className={`h-full bg-[#1a6b4a] dark:bg-emerald-400 ${prefersReducedMotion ? "" : "transition-[width] duration-300 ease-in-out"}`}
@@ -572,7 +572,7 @@ export default function RecipeFocusMode({
                       {canGoPrev && (
                         <button
                           type="button"
-                          className="group absolute inset-x-0 top-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10"
+                          className="group absolute inset-x-0 top-0 z-10 h-20 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] md:h-1/2 dark:active:bg-emerald-400/10"
                           onClick={() => navigateStep(-1)}
                           aria-label="Previous step"
                         >
@@ -587,7 +587,7 @@ export default function RecipeFocusMode({
                       {canGoNext && (
                         <button
                           type="button"
-                          className="group absolute inset-x-0 bottom-0 z-10 h-1/2 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] dark:active:bg-emerald-400/10"
+                          className="group absolute inset-x-0 bottom-0 z-10 h-20 cursor-pointer bg-transparent active:bg-[rgba(26,107,74,0.08)] md:h-1/2 dark:active:bg-emerald-400/10"
                           onClick={() => navigateStep(1)}
                           aria-label="Next step"
                         >
@@ -600,11 +600,11 @@ export default function RecipeFocusMode({
                         </button>
                       )}
 
-                      <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center px-12 py-10">
+                      <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center px-5 py-8 sm:px-8 md:px-12 md:py-10">
                         <div
                           className={`mx-auto max-w-2xl text-center transition-all duration-300 ease-out ${stepMotionClass}`}
                         >
-                          <p className="text-[21px] leading-[1.65] text-[#0e1f1a] dark:text-slate-100 font-serif">
+                          <p className="text-[18px] leading-[1.55] text-[#0e1f1a] sm:text-[21px] sm:leading-[1.65] dark:text-slate-100 font-serif">
                             {stepText}
                           </p>
                         </div>
@@ -612,7 +612,7 @@ export default function RecipeFocusMode({
                     </div>
                   </section>
 
-                  <section className="min-h-0 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                  <section className="min-h-0 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:overflow-auto dark:border-slate-800 dark:bg-slate-900/40">
                     <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                       Ingredients
                     </h3>
