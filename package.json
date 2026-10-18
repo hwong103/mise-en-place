@@ -15,7 +15,8 @@
     "test": "vitest",
     "test:run": "vitest run --coverage",
     "ingestion:benchmark": "node scripts/recipe-ingestion-benchmark.mjs",
-    "ingestion:regression-check": "node scripts/ingestion-regression-check.mjs"
+    "ingestion:regression-check": "node scripts/ingestion-regression-check.mjs",
+    "check:d1": "d1-sql-gate"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
