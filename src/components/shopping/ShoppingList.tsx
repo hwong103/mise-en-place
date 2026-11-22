@@ -109,18 +109,21 @@ export default function ShoppingList({
   const [isDesktopLocationOpen, setIsDesktopLocationOpen] = useState(false);
   const [optimisticChecked, setOptimisticChecked] = useState<Record<string, boolean>>({});
   const [optimisticLocations, setOptimisticLocations] = useState<Record<string, string>>({});
-  const [optimisticManualItems, setOptimisticManualItems] = useState<PendingManualItem[]>([]);
+  const [manualDraftState, setManualDraftState] = useState<{
+    weekKey: string;
+    items: PendingManualItem[];
+  }>({ weekKey: "", items: [] });
   const [suppressedKeys, setSuppressedKeys] = useState<Record<string, boolean>>({});
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
   const [pendingKeys, setPendingKeys] = useState<Record<string, boolean>>({});
-  const [activeLocation, setActiveLocation] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [completedTrayExpandedByLocation, setCompletedTrayExpandedByLocation] = useState<
     Record<string, boolean>
   >({});
   const [isClearing, setIsClearing] = useState(false);
   const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
   const [mobileManualKeyboardInset, setMobileManualKeyboardInset] = useState(0);
-  const [loadedManualDraftWeek, setLoadedManualDraftWeek] = useState<string | null>(null);
+  const hydratedDraftWeekRef = useRef<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const mobileManualInputRef = useRef<HTMLInputElement>(null);
   const refreshTimerRef = useRef<number | null>(null);
@@ -148,56 +151,71 @@ export default function ShoppingList({
     }, 150);
   };
 
-  const initialLocationOptions = useMemo(
-    () =>
-      mergeLocationOptions(
-        DEFAULT_SHOPPING_LOCATIONS,
-        Object.values(locationPreferences),
-        persistedItems.map((item) => item.location)
-      ),
-    [locationPreferences, persistedItems]
+  const [extraLocations, setExtraLocations] = useState<string[]>([]);
+  const locationOptions = useMemo(
+    () => mergeLocationOptions(
+      DEFAULT_SHOPPING_LOCATIONS,
+      Object.values(locationPreferences),
+      persistedItems.map((item) => item.location),
+      extraLocations
+    ),
+    [extraLocations, locationPreferences, persistedItems]
   );
-  const [locationOptions, setLocationOptions] = useState<string[]>(initialLocationOptions);
+  const optimisticManualItems = useMemo(
+    () => manualDraftState.weekKey === weekKey
+      ? reconcilePendingManualItems(manualDraftState.items, persistedItems)
+      : [],
+    [manualDraftState.items, manualDraftState.weekKey, persistedItems, weekKey]
+  );
+  const setOptimisticManualItems = (
+    update: PendingManualItem[] | ((current: PendingManualItem[]) => PendingManualItem[])
+  ) => {
+    setManualDraftState((current) => {
+      const currentItems = current.weekKey === weekKey
+        ? reconcilePendingManualItems(current.items, persistedItems)
+        : [];
+      return {
+        weekKey,
+        items: typeof update === "function" ? update(currentItems) : update,
+      };
+    });
+  };
 
   useEffect(() => {
-    setLocationOptions((current) => mergeLocationOptions(current, initialLocationOptions));
-  }, [initialLocationOptions]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     const storedItems = parsePendingManualItems(
       window.localStorage.getItem(buildPendingManualStorageKey(weekKey))
     );
-    setOptimisticManualItems(storedItems);
-    setLoadedManualDraftWeek(weekKey);
-  }, [weekKey]);
+    queueMicrotask(() => {
+      hydratedDraftWeekRef.current = weekKey;
+      setManualDraftState((current) => ({
+        weekKey,
+        items: current.weekKey === weekKey
+          ? reconcilePendingManualItems(current.items, persistedItems)
+          : reconcilePendingManualItems(storedItems, persistedItems),
+      }));
+    });
+  }, [persistedItems, weekKey]);
 
   useEffect(() => {
-    setOptimisticManualItems((current) => reconcilePendingManualItems(current, persistedItems));
-  }, [persistedItems]);
-
-  useEffect(() => {
-    if (loadedManualDraftWeek !== weekKey || typeof window === "undefined") {
+    if (
+      typeof window === "undefined" ||
+      hydratedDraftWeekRef.current !== weekKey
+    ) {
       return;
     }
 
     const storageKey = buildPendingManualStorageKey(weekKey);
     if (optimisticManualItems.length === 0) {
       window.localStorage.removeItem(storageKey);
-      return;
+    } else {
+      window.localStorage.setItem(storageKey, serializePendingManualItems(optimisticManualItems));
     }
-
-    window.localStorage.setItem(storageKey, serializePendingManualItems(optimisticManualItems));
-  }, [loadedManualDraftWeek, optimisticManualItems, weekKey]);
+  }, [optimisticManualItems, weekKey]);
 
   useEffect(() => {
-    if (!isMobileManualOpen) {
-      setMobileManualKeyboardInset(0);
-      return;
-    }
+    if (!isMobileManualOpen) return;
 
     const updateKeyboardInset = () => {
       const viewport = window.visualViewport;
@@ -424,27 +442,14 @@ export default function ShoppingList({
     suppressedKeys,
   ]);
 
-  useEffect(() => {
-    if (mergedLocations.length === 0) {
-      setActiveLocation(null);
-      return;
-    }
-
-    setActiveLocation((current) => {
-      if (current && mergedLocations.some((location) => location.name === current)) {
-        return current;
-      }
-      return mergedLocations[0].name;
-    });
-  }, [mergedLocations]);
-
   const activeLocationGroup = useMemo(() => {
-    if (!activeLocation) {
+    if (!selectedLocation) {
       return mergedLocations[0] ?? null;
     }
 
-    return mergedLocations.find((location) => location.name === activeLocation) ?? mergedLocations[0] ?? null;
-  }, [activeLocation, mergedLocations]);
+    return mergedLocations.find((location) => location.name === selectedLocation) ?? mergedLocations[0] ?? null;
+  }, [mergedLocations, selectedLocation]);
+  const activeKeyboardInset = isMobileManualOpen ? mobileManualKeyboardInset : 0;
 
   const activeLocationView = useMemo(() => {
     if (!activeLocationGroup) {
@@ -560,7 +565,7 @@ export default function ShoppingList({
     const location = normalizeShoppingLocation(item.location);
 
     setOptimisticLocations((prev) => ({ ...prev, [item.key]: location }));
-    setLocationOptions((current) => mergeLocationOptions(current, [location]));
+    setExtraLocations((current) => mergeLocationOptions(current, [location]));
     setPendingKeys((prev) => ({ ...prev, [item.key]: true }));
 
     startTransition(async () => {
@@ -635,7 +640,7 @@ export default function ShoppingList({
       ...prev,
       { tempId, line: trimmed, category, location, status: "saving" },
     ]);
-    setLocationOptions((current) => mergeLocationOptions(current, [location]));
+    setExtraLocations((current) => mergeLocationOptions(current, [location]));
     setManualLine("");
     setIsMobileManualOpen(false);
 
@@ -664,7 +669,7 @@ export default function ShoppingList({
       return;
     }
 
-    setLocationOptions((current) => mergeLocationOptions(current, [location]));
+    setExtraLocations((current) => mergeLocationOptions(current, [location]));
     setManualLocation(location);
     setNewLocation("");
     setIsDesktopLocationOpen(false);
@@ -861,7 +866,7 @@ export default function ShoppingList({
                   role="tab"
                   aria-selected={isActive}
                   aria-controls={buildLocationPanelId(locationGroup.name)}
-                  onClick={() => setActiveLocation(locationGroup.name)}
+                  onClick={() => setSelectedLocation(locationGroup.name)}
                   className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                     isActive
                       ? "bg-[var(--accent)] text-white"
@@ -1189,7 +1194,7 @@ export default function ShoppingList({
             <div
               className="absolute inset-x-0 px-3"
               style={{
-                bottom: `calc(env(safe-area-inset-bottom) + 5.25rem + ${mobileManualKeyboardInset}px)`,
+                bottom: `calc(env(safe-area-inset-bottom) + 5.25rem + ${activeKeyboardInset}px)`,
               }}
             >
               <div
@@ -1200,7 +1205,7 @@ export default function ShoppingList({
                 aria-labelledby="mobile-manual-items-title"
                 className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-6.5rem)] flex-col rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
                 style={{
-                  maxHeight: `calc(100dvh - env(safe-area-inset-top) - 6.5rem - ${mobileManualKeyboardInset}px)`,
+                  maxHeight: `calc(100dvh - env(safe-area-inset-top) - 6.5rem - ${activeKeyboardInset}px)`,
                 }}
                 tabIndex={-1}
               >

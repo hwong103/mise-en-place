@@ -5,6 +5,7 @@ import CellarClient from "@/components/cellar/CellarClient";
 import { readStringArray } from "@/lib/json-arrays";
 import type { StockistResult } from "@/lib/wine";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
+import { getServerNow } from "@/lib/server-clock";
 
 const parseStockists = (value: unknown): StockistResult[] => {
     if (!Array.isArray(value)) return [];
@@ -33,6 +34,7 @@ const stripStockistsField = <T extends { stockists?: unknown }>(value: T) => {
 export default async function CellarPage() {
     const householdId = await getCurrentHouseholdId();
     const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
+    const now = getServerNow();
 
     let wines;
     try {
@@ -71,7 +73,7 @@ export default async function CellarPage() {
     const staleWines = wines.filter((w) => {
         if (!w.danMurphysProductId) return false;
         if (!w.danMurphysPriceAt) return true;
-        const ageHours = (Date.now() - new Date(w.danMurphysPriceAt).getTime()) / 1000 / 60 / 60;
+        const ageHours = (now - new Date(w.danMurphysPriceAt).getTime()) / 1000 / 60 / 60;
         return ageHours > 24;
     });
 
