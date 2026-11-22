@@ -4,6 +4,7 @@ import { getCurrentHouseholdId } from "@/lib/household";
 import { readStringArray } from "@/lib/json-arrays";
 import WineDetail from "@/components/cellar/WineDetail";
 import type { StockistResult } from "@/lib/wine";
+import { getServerNow } from "@/lib/server-clock";
 import { hasWineStockistsColumn, isMissingStockistsColumnError, markWineStockistsColumnMissing } from "@/lib/wine-stockists";
 import { confirmWineStockist, deleteWine, refreshWinePrice, removeWineStockist } from "../actions";
 
@@ -11,6 +12,7 @@ export default async function WineDetailPage({ params }: { params: Promise<{ id:
     const { id } = await params;
     const householdId = await getCurrentHouseholdId();
     const supportsStockists = await hasWineStockistsColumn(prisma.$queryRaw.bind(prisma));
+    const now = getServerNow();
 
     const baseSelect = {
         id: true,
@@ -87,6 +89,7 @@ export default async function WineDetailPage({ params }: { params: Promise<{ id:
 
     return (
         <WineDetail
+            now={now}
             wine={{
                 ...wine,
                 grapes: readStringArray(wine.grapes),

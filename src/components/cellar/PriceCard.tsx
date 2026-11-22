@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { StockistResult } from "@/lib/wine";
 
@@ -20,6 +20,7 @@ const deriveProductNameFromUrl = (url: string) => {
 
 type PriceCardProps = {
     wineId: string;
+    now: number;
     initialStockists: StockistResult[];
     supportsStockistsPersistence: boolean;
     legacyPrice?: number | null;
@@ -54,6 +55,7 @@ type PriceCardProps = {
 
 export default function PriceCard({
     wineId,
+    now,
     initialStockists,
     supportsStockistsPersistence,
     legacyPrice,
@@ -70,6 +72,17 @@ export default function PriceCard({
     const [selectedUrl, setSelectedUrl] = useState<string | null>(legacyUrl ?? initialStockists[0]?.url ?? null);
     const [pendingAction, setPendingAction] = useState<"refresh" | "confirm" | "remove" | null>(null);
     const [isPending, startTransition] = useTransition();
+    const [clockNow, setClockNow] = useState(now);
+
+    useEffect(() => {
+        const updateClock = () => setClockNow(Date.now());
+        const initialUpdate = window.setTimeout(updateClock, 0);
+        const interval = window.setInterval(updateClock, 60_000);
+        return () => {
+            window.clearTimeout(initialUpdate);
+            window.clearInterval(interval);
+        };
+    }, []);
 
     const displayStockists: StockistResult[] =
         stockists.length > 0
@@ -88,7 +101,10 @@ export default function PriceCard({
         : null;
 
     const lastFetched = displayStockists[0]?.fetchedAt
-        ? Math.round((Date.now() - new Date(displayStockists[0].fetchedAt).getTime()) / 1000 / 60 / 60)
+        ? Math.max(
+            0,
+            Math.round((clockNow - new Date(displayStockists[0].fetchedAt).getTime()) / 1000 / 60 / 60)
+        )
         : null;
 
     const handleRefresh = () => {

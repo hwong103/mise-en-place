@@ -35,6 +35,7 @@ type WineDetailModel = {
 
 export default function WineDetail({
     wine,
+    now,
     stockists,
     supportsStockistsPersistence,
     deleteAction,
@@ -43,6 +44,7 @@ export default function WineDetail({
     removeStockistAction,
 }: {
     wine: WineDetailModel;
+    now: number;
     stockists: StockistResult[];
     supportsStockistsPersistence: boolean;
     deleteAction: (fd: FormData) => Promise<void>;
@@ -162,6 +164,7 @@ export default function WineDetail({
             {/* Price */}
             <PriceCard
                 wineId={wine.id}
+                now={now}
                 initialStockists={stockists}
                 supportsStockistsPersistence={supportsStockistsPersistence}
                 legacyPrice={wine.danMurphysPrice}
