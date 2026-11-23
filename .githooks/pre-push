@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+set -eu
+
+blocked_ref='refs/heads/main'
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "$blocked_ref" ]; then
+    cat >&2 <<MESSAGE
+Direct pushes to $blocked_ref are blocked by repository guardrails.
+
+Create a topic branch, push it, open a pull request, and merge through GitHub.
+MESSAGE
+    exit 1
+  fi
+done
+
+exit 0
