@@ -16,3 +16,17 @@
 - Before merging, sync with latest `main` (rebase or merge) to reduce conflicts.
 - Merge only after the Cloudflare deployment is Ready and tests pass.
 - Delete the branch after merge and confirm `main` deploys cleanly.
+
+<!-- repo-guardrails:start -->
+## Delivery workflow
+
+Delivery uses a topic branch and pull request for the default branch main.
+
+1. Fetch the current default branch before editing.
+2. Create a `codex/<type>-<short-name>` branch for the change.
+3. Run the repository's verification commands before publishing.
+4. Push the topic branch and open a pull request with runtime and visual evidence where applicable.
+5. Wait for checks and user approval, then merge through GitHub.
+
+The pre-push hook rejects local pushes to main. GitHub PR merges use the reviewed commit and remain available.
+<!-- repo-guardrails:end -->
